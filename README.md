@@ -40,6 +40,12 @@ prog := f1 = obj1; f2 = obj2; f3 = obj3 ...
 # Notes about C
 `malloc` is contained in `stdlib.h`.
 
+## Lessons
+Especially for arithmetic functions don't forget to assert the domain of functions as well as the range. (e.g. % division by 0)
+Write out the preconditions and post-conditions first. For every loop write the invariant.
+When requesting data pay close attention to whether or not it should be initialized or no (malloc vs calloc). For example: malloc'ing data for a (const void* array) might give you some uninitialized block that could be interpreted as random data. (you won't be able to distinguish
+the uninitialized data).
+
 ## Pointers
 
 ### Pointer nonsense:
@@ -213,3 +219,18 @@ example0:                                                                       
 .LFE3:                     
 ```
 Over here, `*arr` is the `DWORD PTR [rax]`. Therefore I think lvalues must have the form `[<register/memory addr>]`.
+
+
+### Modulus
+The rule for modulus `a%b == z` is `b*x + z = a` so, `-10%7 == -3` as `7*-1 + (-3) == -10`. 
+```
+    int x = 1;
+    int y = 7;
+    printf("x `mod` y == %d, -x `mod` y == %d, x `mod` -y == %d, -x `mod` -y == %d\n", x%y, -x%y, x%-y, -x%-y);
+    ---
+    Output
+    x `mod` y == 1, -x `mod` y == -1, x `mod` -y == 1, -x `mod` -y == -1
+```
+
+# TODO
+Improve the implementation of the rebalancing and calculation of rebalancing by using bit shift operators.

@@ -51,8 +51,12 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-
+# My own stuff - intellij, target files
 .idea/
+*.iml
 *~
 *#
+target/
 
+.#*
+*.swp
