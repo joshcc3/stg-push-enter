@@ -34,6 +34,16 @@ prog := f1 = obj1; f2 = obj2; f3 = obj3 ...
 
 ```
 
+#Objectives
+ - Manually 'compile' programs into C
+ - Write a generational garbage collector for the runtime
+
+# Why do we need continuations?
+They're kind of like return addresses with packed info.
+
+# Memory Representation of Heap Objects
+Most memory representation definitions are inside static.h. All heap objects consist of an info table pointer followed by a payload, the descriptions of which are given in the paper.
+
 
 
 
