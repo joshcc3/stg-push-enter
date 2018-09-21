@@ -34,6 +34,16 @@ prog := f1 = obj1; f2 = obj2; f3 = obj3 ...
 
 ```
 
+#Objectives
+ - Manually 'compile' stg programs into C
+ - Write a parallel generational garbage collector for the runtime based on ()
+
+# Why do we need continuations?
+They're kind of like return addresses with packed info.
+
+# Memory Representation of Heap Objects
+Most memory representation definitions are inside static.h. All heap objects consist of an info table pointer followed by a payload, the descriptions of which are given in the paper.
+
 
 
 
@@ -233,4 +243,9 @@ The rule for modulus `a%b == z` is `b*x + z = a` so, `-10%7 == -3` as `7*-1 + (-
 ```
 
 # TODO
-Improve the implementation of the rebalancing and calculation of rebalancing by using bit shift operators.
+ - Improve the implementation of hash maps w.r.t the rebalancing and calculation of rebalancing by using bit shift operators.
+ - We track the local bindings in a hashmap which we pass around (as a pointer) instead of pushing them onto the stack (as is suggested in the paper). The garbage collector would use the layout in the info table to find out about the state of the heap. One (in retrospect stupid reason) was that I wanted to declare a case_frame struct (and you can't fit a variable sized list of free variables into a struct)
+
+
+# TODO
+You create a file that contains the main functino that gets linked against the other stuff 
