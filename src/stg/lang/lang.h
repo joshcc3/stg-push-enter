@@ -4,6 +4,7 @@
 #include "data/string_.h"
 #include "containers/resizable_array.h"
 
+
 struct var {
   struct string_ id;
 };
@@ -74,7 +75,7 @@ struct case_alt_default {
 
 union alt_u {
   struct case_alt_con constructor_alternative;
-  struct case_alt_deault default_alternative;
+  struct case_alt_default default_alternative;
 };
 
 struct alt {
@@ -84,16 +85,19 @@ struct alt {
 
 struct fun {
   struct var *arg_list;
+  int argn;
   struct expr *fun_body;
 };
 
 struct pap {
   struct string_ fun_name;
+  int argn;
   struct atom* application_list;
 };
 
 struct con {
   struct string_ con_name;
+  int argn;
   struct atom *atom_list;
 };
 
@@ -105,6 +109,13 @@ struct object_u {
   bool blackhole;
 };
 
+struct object {
+  int tag;
+  struct object_u object;
+};
+
+
+
 struct func_decl {
   struct string_ func_name;
   struct object  func_object;
@@ -114,6 +125,6 @@ struct func_decl {
 struct program {
   struct func_decl * function_declarations;
   struct func_decl * main;
-}
+};
 
 #endif
