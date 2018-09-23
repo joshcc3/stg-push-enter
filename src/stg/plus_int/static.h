@@ -1,28 +1,6 @@
 // heap object - info pointer, payload
 
-struct info_table {
-  uint type;
-  union info_table_u extra;
-  struct layout layout;
-
-};
-
-struct layout {
-  int num;
-  stuct arg_entry * entries;
-};
-
-struct arg_entry {
-  int size; // bytes
-  bool pointer;
-};
-
-// pap's are not contained in the info table but in the payload itself
-union info_table_u {
-  struct fun function;
-  struct con constructor;
-
-};
+#include "data/string_.h"
 
 struct fun {
   void (*code)();
@@ -32,6 +10,7 @@ struct fun {
 struct con {
   int arity;
   int con_num;
+  struct string_ con_name;
 };
 
 struct pap {
@@ -39,3 +18,26 @@ struct pap {
 };
 
 
+struct arg_entry {
+  int size; // bytes
+  bool pointer;
+};
+
+
+struct layout {
+  int num;
+  struct arg_entry *entries;
+};
+
+// pap's are not contained in the info table but in the payload itself
+union info_table_u {
+  struct fun function;
+  struct con constructor;
+};
+
+struct info_table {
+  int type;
+  union info_table_u extra;
+  struct layout layout;
+
+};
