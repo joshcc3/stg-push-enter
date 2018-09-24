@@ -1,25 +1,24 @@
-
-struct update_frame {
-  void (*return_address)(void*);
-  void *heap_object;
-  struct thunk *thunk;
-  struct update_frame *next_update_frame;
-};
+#include "static.h"
 
 
-void update_return_address(void *heap_object)
+
+
+void update_continuation(struct update_frame *current_frame, void* value)
 {
-  perform the update; // what is the update?
-  pop_frame_from_stack;
-  return to the next frame..
+  *(current_frame->update_ref) = value;
+  stack_pointer += sizeof(struct update_frame);
+  struct info_table *tbl = (struct info_table*)stack_pointer;
+
+  void (*continuation)(struct case_frame*, void*);
+  if(tbl->type == 2)
+  {
+    continuation = tbl->extra.case_info.return_address;
+  }
+  else if(tbl->type == 3)
+  {
+    continuation = tbl->extra.update_info.return_address;
+  }
+  else assert(false);
+
+  continuation(stack_pointer, value);
 }
-
-
-struct arg {
-  
-};
-
-struct case_frame {
-  void (*return_address)(void*);
-  struct free_var *saved;
-};

@@ -1,1 +1,3 @@
+Have to investigate whether you can create a growable stack using clone for light-weight threads.
+
 Implement a verion of int map for unboxed ints.
