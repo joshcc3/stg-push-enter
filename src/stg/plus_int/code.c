@@ -1,5 +1,6 @@
 #include "data/string.h"
 #include "static.h"
+#include "stack.h"
 
 /*
   
@@ -21,63 +22,92 @@
 	              v -> print_int v
 
  */
-// we expect all of our arguments to be passed on the stack
-void plus_compiled() 
+
+void* case_cont(struct case_frame* frame, void *value)
 {
+  int k = 3;
+  hash_map_put(frame->free_vars, &k, value);
+  return continuation1(frame->free_vars);
+
+}
+
+void* continuation1(struct hash_map *bindings) {
+  
+  // let res = THUNK (x +# y) in 
+  // let res2 = I# res in res2
+  struct info_table *thunk1_info_table = (struct info_table *)new(sizeof(void *));
+  thunk1_info_table->type = 5;
+  thunk1_info_table->layout = NULL; // TODO: Need to intialize the layout
+  thunk1_info_table->extra.thunk_info.return_address = thunk1_cont;
+  void *thunk1 = new(sizeof(void*)*2);
+  thunk1[0] = thunk1_info_table;
+  thunk1[1] = bindings;
+
+  int *res_key = (int*)new(sizeof(int));
+  *res_key = 4;
+  hash_map_put(&bindings, (const void*)res_key, (const void*)(thunk1));
+
+      
+  void *constructor1 = new(sizeof(void*)*2);
+  constructor1[0] = &int_constructor_info_table;
+  hash_map_get(bindings, res_key, &(constructor1[1]));
+  int *res2_key = (int*)new(sizeof(int));
+  *res2_key = 5;
+  hash_map_put(bindings, (const void*)res2_key, (const void*)constructor1);
+      
+  return constructor1;
+}
+
+
+int thunk1_cont(void *thunk_object) 
+{
+      
+  struct hash_map *bindings = (struct hash_map *)(thunk_object + 1);
+  int *vx;
+  int *vy;
+  int x = 2;
+  int y = 3;
+  hash_map_get(bindings, &x, &vx);
+  hash_map_get(bindings, &y, &vy);
+  return x + y;
+  
+}
+
+
+
+// we expect all of our arguments to be passed on the stack
+void* plus_compiled() 
+{
+  // the fast entry point (no argument satisfaction check) [We assume arguments are always passed on the stack]
   /*
 
-
+plus_int a b = case a of
+    I# x -> case b of
+             I# y -> let res = THUNK (x +# y) in 
+	             let res2 = I# res in res2
+    
 case (plus_unboxed 1 2) of
   case I# z -> case z of 
                    a -> print_int a
 
-
-plus_unboxed 1 2, case () of ...
-
-x -> 1, y -> 2, res -> xnew, res2 -> xnew2
-// how do we represent the (x +# y) - I guess it's a heap object which has the thunk and the payload of the heap object will contain the args
-xnew -> THUNK(x +# y), let res2 = I# res in res2
-xnew2 -> I# xnew, res2
-case xnew of (a -> print_int a)
-xnew, case () of..
-x +# y, Upd xnew ()
-3, Upd xnew (), case ()
-xnew -> 3, 
-
-z -> xnew
-case (I# xnew), s, H
-
-
-----
-Qs:
-
-Does update just enter the code of the next stack frame then? Yes, it just examines the stack frame and passes that as the argument to the next frame with the newly computed answer as the input to the next continuation.
-
-How do we represent the free variables better?
-All of the free variables across the nested calls will need to have been saved according to this.. not sure how that works..
-
-  plus :: Int -> Int -> Int
-  plus a b = case a of
-                I# x -> case b of
-		           I# y -> let res = THUNK (x +# y) in 
-			           let res2 = I# res in res2
-
-
-  */
-  
+  */  
   // fast entry point for known calls
 
   struct hash_map *bindings = NULL;
   init_hash_map(&bindings, 16, &int_equals_typeclass, &int_obj_typeclass);
+  // the garbage collector will need to refcount this bindings map and free it when it is done - not sure how this would be implemented.
 
-  void *a = pop(sizeof(void *));
-  void *b = pop(sizeof(void *));
+  void *a = (void *)stack_pointer;
+  stack_pointer += sizeof(void*);
+  void *b = (void *)stack_pointer;
+  stack_pointer += (sizeof(void *));
+
   int *a_key = (int*)new(sizeof(int));
   *a_key = 0;
   int *b_key = (int*)new(sizeof(int));
   *b_key = 1;
-  hash_map_put(bindings, (const void*)a_key, (const void *)a);
-  hash_map_put(bindings, (const void*)b_key, (const void *)b);
+  hash_map_put(&bindings, (const void*)a_key, (const void *)a);
+  hash_map_put(&bindings, (const void*)b_key, (const void *)b);
 
   struct info_table *a_info = (struct info_table *)(*a);
   struct info_table *b_info = (struct info_table *)(*b);
@@ -87,7 +117,7 @@ All of the free variables across the nested calls will need to have been saved a
   {
     int *x_key = (int*)new(sizeof(int));
     *x_key = 2;
-    hash_map_put(bindings, (const void*)x_key, (const void *)(a + sizeof(void*)));
+    hash_map_put(&bindings, (const void*)x_key, (const void *)(a + sizeof(void*)));
     /*
                 I# x -> case b of
 		           I# y -> let res = THUNK (x +# y) in 
@@ -95,62 +125,44 @@ All of the free variables across the nested calls will need to have been saved a
     */
     if(b_info->type == 1)
     {
-      int *y_key = (int*)new(sizeof(int));
-      *y_key = 3;
-      hash_map_put(bindings, (const void*)y_key, (const void *)(b + sizeof(void*)));
-
-      // let res = THUNK (x +# y) in 
-      // let res2 = I# res in res2
-      struct info_table *thunk1_info_table = (struct info_table *)new(sizeof(void *));
-      thunk1_info_table->type = 5;
-      thunk1_info_table->layout = NULL; // TODO: Need to intialize the layout
-      thunk1_info_table->extra.thunk_info = thunk1_cont;
-      void *thunk1 = new(sizeof(void*)*2);
-      thunk1[0] = plus_int_thunk1_info_table;
-      thunk1[1] = bindings;
-
-      int *res_key = (int*)new(sizeof(int));
-      *res_key = 4;
-      hash_map_put(bindings, (const void*)res_key, (const void*)(thunk1));
-
-      // Continue from here
-      
+      int y_key = 3;
+      hash_map_put(&bindings, (const void*)&y_key, (const void *)(b + sizeof(void*)));
+      return continuation1(bindings);
     }
+    else
+    {
+      // push the case continuation
+      // push the update continuation
+      // set x to a blackhole in the heap
+      // enter the function for the thunk providing the necessary arguments - the address of the thunk
+      stack_pointer -= sizeof(struct case_frame);
+      struct case_frame *case_frame = (struct case_frame*)(stack_pointer);
+      case_frame->free_vars = bindings;
+      struct info_table *case_info_ptr = (struct info_table*)new(sizeof(struct info_table));
+      case_info_ptr->type = 2;
+      case_info_ptr->extra.case_info = case_cont;
+      case_frame->tbl = case_info_ptr;
+      
 
+      stack_pointer -= sizeof(struct update_frame);
+      struct update_frame *upd_frame = (struct update_frame*)(stack_pointer);
+      upd_frame->update_ref = b;
+      upd_frame->next_update_frame = su_register;
+      su_register = stack_pointer;
+      upd_frame->tbl->tbl = { .type = 3, .extra = update_continuation };
+      
+      b_info->type = 6;
+      return (b_info->extra.thunk_info)(b);
+    }
     
   }
-  else if(type == 5)
+  else
   {
-    
+      // push the continuation that carries from the above (top-level) if
+      // set x to a blackhole in the heap
+      // enter the function for the thunk providing the necessary arguments - the address of the thunk
+    assert(false);
   }
-  else assert(false);
 
-  if(casecon(a)) { plus_compiler_cont1(a.payload[0]); substitute(x, value, ref_map); }
-  else {
-    expr = a; 
-    push(plus_compiler_cont1);
-  }
   
 }
-// need a way of passing the refmaps between continuations
-void plus()
-{
-  arg x = pop();
-  xnew = malloc(thunk(x +# y)); // how do we store a thunk and what do we pass to it?
-  ref_map[res] = xnew;
-  xnew2 = malloc(con(I# res));
-  ref_map[res2] = xnew2;
-  return xnew2;
-}
-
-void plus_compiler_cont1(struct con x) 
-{
-  arg b = pop();
-  push(x);
-  if(casecon(b)) { plus_compiler_cont2(b.payload[0]); }
-  else {
-    expr = b;
-    push(plus_compiler_cont2);
-  }
-}
-

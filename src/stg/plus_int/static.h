@@ -6,6 +6,8 @@
 
 #define INITIAL_STACK_SIZE 32*1024
 
+
+
 struct fun {
   void (*fast_entry_point)(void *); // pointer to the function object, first word is a pointer to the info table. the rest is the payload
   void (*slow_entry_point)(void *);
@@ -13,15 +15,15 @@ struct fun {
 };
 
 struct update_info {
-  void (*return_address)(struct update_frame*, void*);
+  void* (*return_address)(struct update_frame*, void*);
 };
 
 struct case_info {
-  void (*return_address)(struct case_frame*, void*);
+  void* (*return_address)(struct case_frame*, void*);
 };
 
 struct update_frame {
-  void **update_ref;
+  void *update_ref;
   // Section 5: I'm not sure why we dont have to actually consider case frames for the argument satisfaction check
   struct update_frame *next_update_frame;
   struct info_table *tbl;
@@ -29,7 +31,7 @@ struct update_frame {
 
 struct case_frame {
   // TODO: these free variables will need to be collected when the case frame is popped
-  void *free_vars;
+  struct hash_map *free_vars;
   struct info_table *tbl;
 };
 
@@ -48,7 +50,7 @@ struct pap {
 };
 
 struct thunk {
-  void (*return_address)(void*);
+  void* (*return_address)(void*);
 };
 
 struct blackhole {
@@ -85,3 +87,6 @@ struct info_table {
   struct layout layout;
 
 };
+
+struct info_table int_constructor_info_table;
+struct info_table plus_info_table;

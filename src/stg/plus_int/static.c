@@ -1,9 +1,6 @@
 #include "data/string_.h"
 #include "static.h"
 
-struct info_table int_constructor_info_table;
-struct info_table plus_info_table;
-
 int main()
 {
   stack_pointer = allocate_stack(INITIAL_STACK_SIZE);
