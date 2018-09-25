@@ -3,7 +3,7 @@
 
 int main()
 {
-  stack_pointer = allocate_stack(INITIAL_STACK_SIZE);
+  /*stack_pointer = allocate_stack(INITIAL_STACK_SIZE);
 
   struct con con_info = { .arity = 1, .con_num = 0, .con_name = { .char_arr = "I#", .length = 2 } };
   struct arg_entry con_entries[1];
@@ -32,5 +32,5 @@ int main()
   plus_info_table.type = 0;
   plus_info_table.extra = plus_extra_;
   plus_info_table.layout = plus_layout;
-
+  */
 }

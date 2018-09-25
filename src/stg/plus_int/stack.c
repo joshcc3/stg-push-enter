@@ -2,7 +2,7 @@
 
 void* update_continuation(struct update_frame *current_frame, void* value)
 {
-  current_frame->update_ref = value;
+  /*  current_frame->update_ref = value;
   su_register = current_frame->next_update_frame;
   stack_pointer += sizeof(struct update_frame);
   struct info_table *tbl = (struct info_table*)(stack_pointer + sizeof(void*));
@@ -20,5 +20,5 @@ void* update_continuation(struct update_frame *current_frame, void* value)
   else assert(false);
 
   return NULL;
-
+  */
 }

@@ -1,4 +1,4 @@
 #include "static.h"
 
 
-void* update_continuation(struct update_frame *, void*)
+void* update_continuation(struct update_frame *, void*);

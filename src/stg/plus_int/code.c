@@ -1,4 +1,4 @@
-#include "data/string.h"
+#include "data/string_.h"
 #include "static.h"
 #include "stack.h"
 
@@ -25,7 +25,7 @@
 	              v -> print_int v
 
  */
-
+/*
 void* case_cont(struct case_frame* frame, void *value)
 {
   int k = 3;
@@ -53,10 +53,11 @@ void* continuation1(struct hash_map *bindings) {
   *res_key = 4;
   hash_map_put(&bindings, (const void*)res_key, (const void*)(thunk1));
 
-      
-  void *constructor1 = new(sizeof(void*)*2);
-  constructor1[0] = &int_constructor_info_table;
-  hash_map_get(bindings, res_key, &(constructor1[1]));
+  struct i_hash *constructor1 = (struct i_hash)new(sizeof(struct i_hash));
+  constructor1->info_ptr = &int_constructor_info_table;
+  void *tmp;
+  hash_map_get(bindings, res_key, &tmp);
+  constructor1->val = tmp;
   int *res2_key = (int*)new(sizeof(int));
   *res2_key = 5;
   hash_map_put(bindings, (const void*)res2_key, (const void*)constructor1);
@@ -118,7 +119,7 @@ case (plus_unboxed 1 2) of
 
   */  
   // fast entry point for known calls
-
+/*
   struct hash_map *bindings = NULL;
   init_hash_map(&bindings, 16, &int_equals_typeclass, &int_obj_typeclass);
   // the garbage collector will need to refcount this bindings map and free it when it is done - not sure how this would be implemented.
@@ -151,6 +152,7 @@ case (plus_unboxed 1 2) of
 		           I# y -> let res = THUNK (x +# y) in 
 			           let res2 = I# res in res2
     */
+/*
     if(b_info->type == 1)
     {
       int y_key = 3;
@@ -184,3 +186,5 @@ case (plus_unboxed 1 2) of
 
   
 }
+
+*/
