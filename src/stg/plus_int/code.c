@@ -30,6 +30,9 @@ void* case_cont(struct case_frame* frame, void *value)
 {
   int k = 3;
   hash_map_put(frame->free_vars, &k, value);
+  // we dont need the case frame now..
+  stack_pointer += (struct case_frame);
+
   return continuation1(frame->free_vars);
 
 }
@@ -57,6 +60,7 @@ void* continuation1(struct hash_map *bindings) {
   int *res2_key = (int*)new(sizeof(int));
   *res2_key = 5;
   hash_map_put(bindings, (const void*)res2_key, (const void*)constructor1);
+  // Is it safe to deinit 'bindings' here?
       
   return constructor1;
 }
@@ -76,6 +80,25 @@ int thunk1_cont(void *thunk_object)
   
 }
 
+void push_update_frame(void *update_ref) {
+      stack_pointer -= sizeof(struct update_frame);
+      struct update_frame *upd_frame = (struct update_frame*)(stack_pointer);
+      upd_frame->update_ref = update_ref;
+      upd_frame->next_update_frame = su_register;
+      su_register = stack_pointer;
+      upd_frame->tbl = { .type = 3, .extra = { .case_info = { .return_address = update_continuation } } };
+}
+
+void push_case_frame(void* (*continuation)(struct case_frame*, void*), struct hash_map *bindings) {
+
+      stack_pointer -= sizeof(struct case_frame);
+      struct case_frame *case_frame = (struct case_frame*)(stack_pointer);
+      case_frame->free_vars = bindings;
+      struct info_table *case_info_ptr = (struct info_table*)new(sizeof(struct info_table));
+      case_info_ptr->type = 2;
+      case_info_ptr->extra.case_info.return_address = continuation;
+      case_frame->tbl = case_info_ptr;
+}
 
 
 // we expect all of our arguments to be passed on the stack
@@ -136,36 +159,26 @@ case (plus_unboxed 1 2) of
     }
     else
     {
-      // push the case continuation
-      // push the update continuation
-      // set x to a blackhole in the heap
-      // enter the function for the thunk providing the necessary arguments - the address of the thunk
-      stack_pointer -= sizeof(struct case_frame);
-      struct case_frame *case_frame = (struct case_frame*)(stack_pointer);
-      case_frame->free_vars = bindings;
-      struct info_table *case_info_ptr = (struct info_table*)new(sizeof(struct info_table));
-      case_info_ptr->type = 2;
-      case_info_ptr->extra.case_info.return_address = case_cont;
-      case_frame->tbl = case_info_ptr;
-      
+      assert(b_info->type == 5);
 
-      stack_pointer -= sizeof(struct update_frame);
-      struct update_frame *upd_frame = (struct update_frame*)(stack_pointer);
-      upd_frame->update_ref = b;
-      upd_frame->next_update_frame = su_register;
-      su_register = stack_pointer;
-      upd_frame->tbl = { .type = 3, .extra = { .case_info = { .return_address = update_continuation } } };
-      
+      // push the case continuation
+      push_case_frame(case_cont, bindings);
+
+      // push the update continuation
+      push_update_frame(b);
+
+      // set b to a blackhole in the heap
       b_info->type = 6;
-      return (b_info->extra.thunk_info.return_address)(b);
+
+      // enter the function for the thunk providing the necessary arguments - the address of the thunk
+      void *b_computed = (b_info->extra.thunk_info.return_address)(b);
+      struct update_frame *top_most = (struct update_frame *)(stack_pointer + sizeof(struct update_frame));
+      
     }
     
   }
   else
   {
-      // push the continuation that carries from the above (top-level) if
-      // set x to a blackhole in the heap
-      // enter the function for the thunk providing the necessary arguments - the address of the thunk
     assert(false);
   }
 
