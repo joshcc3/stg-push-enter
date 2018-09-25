@@ -35,8 +35,9 @@ struct case_frame {
   struct info_table *tbl;
 };
 
-void *stack_pointer;
-void *su; // used for tracking the current update frames
+// otherwise we can't do the pointer arithmetic necessary for pushing and popping
+byte *stack_pointer;
+byte *su; // used for tracking the current update frames
 
 
 struct con {

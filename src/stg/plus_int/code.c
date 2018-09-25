@@ -2,6 +2,9 @@
 #include "static.h"
 #include "stack.h"
 
+// TODO: Need to perform stack overflow and underflow checks whenever you push/pop from the stack
+
+
 /*
   
   data Int = I# Int#
@@ -112,12 +115,14 @@ case (plus_unboxed 1 2) of
   struct info_table *a_info = (struct info_table *)(*a);
   struct info_table *b_info = (struct info_table *)(*b);
 
+  // We know that the arguments are of type Int which means they can only be the Constructor or Thunks that evaluate to the Constructor
 
   if(a_info->type == 1)
   {
     int *x_key = (int*)new(sizeof(int));
     *x_key = 2;
-    hash_map_put(&bindings, (const void*)x_key, (const void *)(a + sizeof(void*)));
+    // The payload of a Constructor contains its arguments
+    hash_map_put(&bindings, (const void*)x_key, (const void *)a + 1;
     /*
                 I# x -> case b of
 		           I# y -> let res = THUNK (x +# y) in 
@@ -126,7 +131,7 @@ case (plus_unboxed 1 2) of
     if(b_info->type == 1)
     {
       int y_key = 3;
-      hash_map_put(&bindings, (const void*)&y_key, (const void *)(b + sizeof(void*)));
+      hash_map_put(&bindings, (const void*)&y_key, (const void *)b + 1);
       return continuation1(bindings);
     }
     else
@@ -140,7 +145,7 @@ case (plus_unboxed 1 2) of
       case_frame->free_vars = bindings;
       struct info_table *case_info_ptr = (struct info_table*)new(sizeof(struct info_table));
       case_info_ptr->type = 2;
-      case_info_ptr->extra.case_info = case_cont;
+      case_info_ptr->extra.case_info.return_address = case_cont;
       case_frame->tbl = case_info_ptr;
       
 
@@ -149,10 +154,10 @@ case (plus_unboxed 1 2) of
       upd_frame->update_ref = b;
       upd_frame->next_update_frame = su_register;
       su_register = stack_pointer;
-      upd_frame->tbl->tbl = { .type = 3, .extra = update_continuation };
+      upd_frame->tbl = { .type = 3, .extra = { .case_info = { .return_address = update_continuation } } };
       
       b_info->type = 6;
-      return (b_info->extra.thunk_info)(b);
+      return (b_info->extra.thunk_info.return_address)(b);
     }
     
   }
