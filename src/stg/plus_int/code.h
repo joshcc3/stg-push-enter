@@ -9,5 +9,6 @@ struct i_hash {
   int val;
 };
 
+void* (*plus_compiled)(void *);
 
 #endif

@@ -1,9 +1,11 @@
 #include "stack.h"
+#include <assert.h>
 
-void* update_continuation(struct update_frame *current_frame, void* value)
+void* update_continuation(void*current_frame_, void* value)
 {
-  /*  current_frame->update_ref = value;
-  su_register = current_frame->next_update_frame;
+  struct update_frame* current_frame = (struct update_frame*)current_frame_;
+  current_frame->update_ref = value;
+  su_register = (char*)current_frame->next_update_frame;
   stack_pointer += sizeof(struct update_frame);
   struct info_table *tbl = (struct info_table*)(stack_pointer + sizeof(void*));
 
@@ -20,5 +22,5 @@ void* update_continuation(struct update_frame *current_frame, void* value)
   else assert(false);
 
   return NULL;
-  */
+
 }

@@ -18,7 +18,9 @@ test/data/target/containers/%.o: src/containers/%.c
 	$(GCC_CMD) $^ -c -o $@
 
 test/stg/target/test: test/stg/target/stg/plus_int/code.o test/stg/target/stg/plus_int/stack.o test/stg/target/stg/plus_int/static.o \
-			test/data/target/data/string_.o test/data/target/containers/mmanager.o
+		test/data/target/data/string_.o test/containers/target/containers/mmanager.o test/containers/target/containers/arraylist.o\
+		     test/containers/target/stg/math.o test/containers/target/stg/util.o test/containers/target/containers/llist.o\
+		   test/containers/target/containers/hash_set.o test/containers/target/containers/resizable_array.o test/containers/target/containers/hash_map.o 
 
 	$(GCC_CMD) -I . $^ -o $@
 

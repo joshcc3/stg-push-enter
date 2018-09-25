@@ -1,7 +1,10 @@
 #include "data/string_.h"
 #include "static.h"
+#include "typeclasses.h"
 #include "stack.h"
-
+#include "containers/hash_map.h"
+#include "containers/mmanager.h"
+#include "code.h"
 // TODO: Need to perform stack overflow and underflow checks whenever you push/pop from the stack
 
 
@@ -25,49 +28,9 @@
 	              v -> print_int v
 
  */
-/*
-void* case_cont(struct case_frame* frame, void *value)
-{
-  int k = 3;
-  hash_map_put(frame->free_vars, &k, value);
-  // we dont need the case frame now..
-  stack_pointer += (struct case_frame);
-
-  return continuation1(frame->free_vars);
-
-}
-
-void* continuation1(struct hash_map *bindings) {
-  
-  // let res = THUNK (x +# y) in 
-  // let res2 = I# res in res2
-  struct info_table *thunk1_info_table = (struct info_table *)new(sizeof(void *));
-  thunk1_info_table->type = 5;
-  thunk1_info_table->layout = NULL; // TODO: Need to intialize the layout
-  thunk1_info_table->extra.thunk_info.return_address = thunk1_cont;
-  void *thunk1 = new(sizeof(void*)*2);
-  thunk1[0] = thunk1_info_table;
-  thunk1[1] = bindings;
-
-  int *res_key = (int*)new(sizeof(int));
-  *res_key = 4;
-  hash_map_put(&bindings, (const void*)res_key, (const void*)(thunk1));
-
-  struct i_hash *constructor1 = (struct i_hash)new(sizeof(struct i_hash));
-  constructor1->info_ptr = &int_constructor_info_table;
-  void *tmp;
-  hash_map_get(bindings, res_key, &tmp);
-  constructor1->val = tmp;
-  int *res2_key = (int*)new(sizeof(int));
-  *res2_key = 5;
-  hash_map_put(bindings, (const void*)res2_key, (const void*)constructor1);
-  // Is it safe to deinit 'bindings' here?
-      
-  return constructor1;
-}
 
 
-int thunk1_cont(void *thunk_object) 
+void* thunk1_cont(void *thunk_object) 
 {
       
   struct hash_map *bindings = (struct hash_map *)(thunk_object + 1);
@@ -75,22 +38,74 @@ int thunk1_cont(void *thunk_object)
   int *vy;
   int x = 2;
   int y = 3;
-  hash_map_get(bindings, &x, &vx);
-  hash_map_get(bindings, &y, &vy);
-  return x + y;
+  hash_map_get(bindings, (const void*)&x, (const void**)&vx);
+  hash_map_get(bindings, (const void*)&y, (const void**)&vy);
+  int *result = (int*)new(sizeof(int));
+  *result =x + y;
+  return (void*)result;
   
 }
+
+
+void* continuation1(struct hash_map *bindings) {
+  
+  // let res = THUNK (x +# y) in 
+  // let res2 = I# res in res2
+  struct info_table *thunk1_info_table = (struct info_table *)new(sizeof(void *));
+  thunk1_info_table->type = 5;
+  struct layout layout_tmp = { .num = 1 };
+  thunk1_info_table->layout = layout_tmp; // TODO: Need to intialize the layout
+  thunk1_info_table->extra.thunk_info.return_address = thunk1_cont;
+
+  void**thunk1 = new(sizeof(void**)*2);
+  thunk1[0] = (void*)thunk1_info_table;
+  thunk1[1] = (void*)bindings;	
+
+  int *res_key = (int*)new(sizeof(int));
+  *res_key = 4;
+  hash_map_put(&bindings, (const void*)res_key, (const void*)(thunk1));
+
+  struct i_hash *constructor1 = (struct i_hash *)new(sizeof(struct i_hash));
+  constructor1->info_ptr = &int_constructor_info_table;
+  void *tmp;
+  hash_map_get(bindings, res_key, (const void**)&tmp);
+  constructor1->val = *(int*)tmp;
+  int *res2_key = (int*)new(sizeof(int));
+  *res2_key = 5;
+  hash_map_put(&bindings, (const void*)res2_key, (const void**)constructor1);
+  // Is it safe to deinit 'bindings' here?
+      
+  return constructor1;
+
+}
+
+void* case_cont(struct case_frame* frame, void *value)
+{
+  int k = 3;
+  hash_map_put(&(frame->free_vars), (const void*)&k, (const void*)value);
+  // we dont need the case frame now..
+  stack_pointer += sizeof(struct case_frame);
+
+  return continuation1(frame->free_vars);
+
+}
+
 
 void push_update_frame(void *update_ref) {
       stack_pointer -= sizeof(struct update_frame);
       struct update_frame *upd_frame = (struct update_frame*)(stack_pointer);
       upd_frame->update_ref = update_ref;
-      upd_frame->next_update_frame = su_register;
+      upd_frame->next_update_frame = (struct update_frame*)su_register;
       su_register = stack_pointer;
-      upd_frame->tbl = { .type = 3, .extra = { .case_info = { .return_address = update_continuation } } };
+      struct info_table *tbl =  (struct info_table*)new(sizeof(struct info_table));
+      tbl->type = 3;
+      tbl->extra.case_info.return_address = (void* (*)(void*, void*))update_continuation;
+      upd_frame->tbl = tbl;
 }
 
-void push_case_frame(void* (*continuation)(struct case_frame*, void*), struct hash_map *bindings) {
+
+
+void push_case_frame(void* (*continuation)(void*, void*), struct hash_map *bindings) {
 
       stack_pointer -= sizeof(struct case_frame);
       struct case_frame *case_frame = (struct case_frame*)(stack_pointer);
@@ -101,9 +116,8 @@ void push_case_frame(void* (*continuation)(struct case_frame*, void*), struct ha
       case_frame->tbl = case_info_ptr;
 }
 
-
 // we expect all of our arguments to be passed on the stack
-void* plus_compiled() 
+void* plus_compiled(void *no_arg) 
 {
   // the fast entry point (no argument satisfaction check) [We assume arguments are always passed on the stack]
   /*
@@ -119,9 +133,9 @@ case (plus_unboxed 1 2) of
 
   */  
   // fast entry point for known calls
-/*
+
   struct hash_map *bindings = NULL;
-  init_hash_map(&bindings, 16, &int_equals_typeclass, &int_obj_typeclass);
+  init_hash_map(&bindings, 16, &int_ptr_equals, &int_ptr_obj);
   // the garbage collector will need to refcount this bindings map and free it when it is done - not sure how this would be implemented.
 
   void *a = (void *)stack_pointer;
@@ -136,6 +150,7 @@ case (plus_unboxed 1 2) of
   hash_map_put(&bindings, (const void*)a_key, (const void *)a);
   hash_map_put(&bindings, (const void*)b_key, (const void *)b);
 
+  /*
   struct info_table *a_info = (struct info_table *)(*a);
   struct info_table *b_info = (struct info_table *)(*b);
 
@@ -183,8 +198,7 @@ case (plus_unboxed 1 2) of
   {
     assert(false);
   }
-
+*/
   
 }
 
-*/
