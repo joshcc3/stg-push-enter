@@ -91,17 +91,47 @@ void* continuation1(struct hash_map *bindings) {
 
 }
 
-void* case_cont(void* frame_, void *value)
+void* alternatives_evaluator1(struct hash_map *bindings)
 {
-  struct case_frame *frame = (struct case_frame *)frame_;
-  int k = 3;
-  hash_map_put(&(frame->free_vars), (const void*)&k, (const void*)value);
-  // we dont need the case frame now..
-  stack_pointer += sizeof(struct case_frame);
 
-  return continuation1(frame->free_vars);
+  void *b;
+  int b_key = 1;
+  hash_map_get(bindings, (const void*)&b_key, (const void**)&b);
 
+  struct info_table *b_info = *(struct info_table **)b;
+  
+  /*
+    I# x -> case b of
+		           I# y -> let res = THUNK (x +# y) in 
+			   let res2 = I# res in res2
+  */
+  if(b_info->type == 1)
+  {
+    int y_key = 3;
+    int y_value = *(int*)(b + sizeof(void*));
+    hash_map_put(&bindings, (const void*)&y_key, (const void*)&y_value);
+    return continuation1(bindings);
+  }
+  else
+  {
+    assert(b_info->type == 5);
+    
+    // push the case continuation
+    push_case_frame(continuation1, 3, bindings);
+    
+    // push the update continuation
+    push_update_frame(b);
+    
+    // set b to a blackhole in the heap
+    b_info->type = 6;
+    
+    // enter the function for the thunk providing the necessary arguments - the address of the thunk
+    void *b_computed = (b_info->extra.thunk_info.return_address)(b);
+    void *top_most = (void*)(stack_pointer + sizeof(struct update_frame));
+    return update_continuation(top_most, b_computed);
+  }
 }
+
 
 // we expect all of our arguments to be passed on the stack
 void* plus_int (void *no_arg)
@@ -139,7 +169,6 @@ case (plus_unboxed 1 2) of
 
 
   struct info_table *a_info = *(struct info_table **)a;
-  struct info_table *b_info = *(struct info_table **)b;
 
   // We know that the arguments are of type Int which means they can only be the Constructor or Thunks that evaluate to the Constructor
 
@@ -148,45 +177,20 @@ case (plus_unboxed 1 2) of
     // The bindings dont escape this function (for unboxed values they will be copied so no need to worry about this stack getting cleaned up
     int x_key = 2;
     // The payload of a Constructor contains its arguments
-    int x_value = *(int*)((const void **)a + 1);
+    int x_value = *(int*)(a + sizeof(void*));
     hash_map_put(&bindings, (const void*)&x_key, (const void*)&x_value);
-    /*
-                I# x -> case b of
-		           I# y -> let res = THUNK (x +# y) in 
-			           let res2 = I# res in res2
-    */
-    if(b_info->type == 1)
-    {
-      int y_key = 3;
-      int y_value = *(int*)((const void **)b + 1);
-      hash_map_put(&bindings, (const void*)&y_key, (const void*)&y_value);
-      return continuation1(bindings);
-    }
-    else
-    {
-      assert(b_info->type == 5);
-
-      // push the case continuation
-      push_case_frame(case_cont, bindings);
-
-      // push the update continuation
-      push_update_frame(b);
-
-      // set b to a blackhole in the heap
-      b_info->type = 6;
-
-      // enter the function for the thunk providing the necessary arguments - the address of the thunk
-      void *b_computed = (b_info->extra.thunk_info.return_address)(b);
-      void *top_most = (void*)(stack_pointer + sizeof(struct update_frame));
-      return update_continuation(top_most, b_computed);
-    }
-    
+    return alternatives_evaluator1(bindings);
   }
   else
   {
-    assert(false);
+    assert(a_info->type == 5);
+    push_case_frame(alternatives_evaluator1, 2, bindings);
+    push_update_frame(a);
+    a_info->type = 6;
+    void *a_computed = (a_info->extra.thunk_info.return_address(b));
+    void *top_most = (void*)(stack_pointer + sizeof(struct update_frame));
+    return update_continuation(top_most, a_computed);
   }
 
-  
 }
 

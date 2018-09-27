@@ -73,7 +73,7 @@ struct info_table {
 
 };
 
-
+// All of these are basically function closures
 struct update_frame {
   void *update_ref;
   // Section 5: I'm not sure why we dont have to actually consider case frames for the argument satisfaction check
@@ -85,6 +85,8 @@ struct update_frame {
 struct case_frame {
   // TODO: these free variables will need to be collected when the case frame is popped
   struct hash_map *free_vars;
+  int update_key;
+  void* (*alternatives_evaluator)(struct hash_map*);
   struct info_table *tbl;
 };
 

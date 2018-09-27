@@ -8,6 +8,6 @@ void* update_continuation(void *, void*);
 
 void push_update_frame(void *);
 
-void push_case_frame(void* (*)(void*, void*), struct hash_map *);
+void push_case_frame(void* (*)(struct hash_map*), int, struct hash_map *);
 
 #endif
