@@ -1,9 +1,11 @@
 #ifndef STATIC_H
 #define STATIC_H
 
+
 // heap object - info pointer, payload
 
 #include "data/string_.h"
+
 
 // functions as well as continuations take a pointer to the info table of the structure, the stack pointer should be globally available
 
@@ -92,12 +94,12 @@ struct case_frame {
 
 
 
-// for pointer arithmetic necessary for pushing and popping stack frames
+// for easier pointer arithmetic necessary for pushing and popping stack frames
 char *stack_pointer;
 char *su_register; // used for tracking the current update frames
 
 
-
+// TODO: where should these go? The defns of the constructor are in code.h
 struct info_table int_constructor_info_table;
 struct info_table plus_info_table;
 

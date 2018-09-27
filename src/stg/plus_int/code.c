@@ -127,7 +127,7 @@ void* alternatives_evaluator1(struct hash_map *bindings)
     
     // enter the function for the thunk providing the necessary arguments - the address of the thunk
     void *b_computed = (b_info->extra.thunk_info.return_address)(b);
-    void *top_most = (void*)(stack_pointer + sizeof(struct update_frame));
+    void *top_most = (void*)(stack_pointer);
     return update_continuation(top_most, b_computed);
   }
 }
@@ -188,9 +188,8 @@ case (plus_unboxed 1 2) of
     push_update_frame(a);
     a_info->type = 6;
     void *a_computed = (a_info->extra.thunk_info.return_address(b));
-    void *top_most = (void*)(stack_pointer + sizeof(struct update_frame));
+    void *top_most = (void*)(stack_pointer);
     return update_continuation(top_most, a_computed);
   }
 
 }
-

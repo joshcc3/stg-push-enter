@@ -39,11 +39,17 @@ prog := f1 = obj1; f2 = obj2; f3 = obj3 ...
  - Write a parallel generational garbage collector for the runtime based on ()
 
 # Why do we need continuations?
-They're kind of like return addresses with packed info.
+They're kind of like return addresses with packed info. They are needed because the same sections of code are visited from different points.  (like after a case or after a thunk)
 
 # Memory Representation of Heap Objects
 Most memory representation definitions are inside static.h. All heap objects consist of an info table pointer followed by a payload, the descriptions of which are given in the paper.
+Constructor: (<info table pointer>, <arg1> ... ) where the args can be either boxed or unboxed values. The layout is specified in the info table.
+Thunk: (<info table pointer>, <hash map pointer>) the hash map points to the free variables inside the body of the thunk
+Fun(<info table pointer>, arity) number of arguments this takes?
+PAP(<info table pointer to function>, arity?)
+BLACKHOLE: (<info ptr to thunk>,)
 
+The stack pointer starts of at the byte just after the highest point in the stack.
 
 
 
