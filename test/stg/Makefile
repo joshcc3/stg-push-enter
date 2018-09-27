@@ -27,14 +27,14 @@ test/target/%.o: src/%.c
 
 test/stg/target/main1: test/stg/target/stg/plus_int/code.o test/stg/target/stg/plus_int/stack.o test/stg/target/stg/plus_int/static.o test/stg/target/stg/plus_int/main.o \
 		test/data/target/data/string_.o test/containers/target/containers/mmanager.o test/containers/target/containers/arraylist.o\
-		     test/stg/target/stg/math.o test/target/typeclasses.o test/stg/target/stg/util.o test/containers/target/containers/llist.o\
+		     test/stg/target/stg/math.o test/target/typeclasses.o  test/stg/target/stg/bindings.o test/stg/target/stg/util.o test/containers/target/containers/llist.o\
 		   test/containers/target/containers/hash_set.o test/containers/target/containers/resizable_array.o test/containers/target/containers/hash_map.o 
 
 	$(GCC_CMD) -I . $^ -o $@
 
 test/stg/target/main2: test/stg/target/stg/plus_int/code.o test/stg/target/stg/plus_int/stack.o test/stg/target/stg/plus_int/static.o test/stg/target/stg/plus_int/main2.o \
 		test/data/target/data/string_.o test/containers/target/containers/mmanager.o test/containers/target/containers/arraylist.o\
-		     test/stg/target/stg/math.o test/target/typeclasses.o test/stg/target/stg/util.o test/containers/target/containers/llist.o\
+		     test/stg/target/stg/math.o test/stg/target/stg/bindings.o test/target/typeclasses.o test/stg/target/stg/util.o test/containers/target/containers/llist.o\
 		   test/containers/target/containers/hash_set.o test/containers/target/containers/resizable_array.o test/containers/target/containers/hash_map.o 
 
 	$(GCC_CMD) -I . $^ -o $@

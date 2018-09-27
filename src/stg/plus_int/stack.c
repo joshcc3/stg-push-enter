@@ -10,28 +10,13 @@ void* update_continuation(void* value)
   current_frame->update_ref = value;
   su_register = (char*)current_frame->next_update_frame;
   stack_pointer += sizeof(struct update_frame);
-  struct info_table *tbl = (struct info_table*)(stack_pointer + sizeof(void*));
-
-  if(tbl->type == 2)
-  {
-    struct case_frame *n_frame = (struct case_frame *)(stack_pointer + sizeof(struct case_frame));
-    return (tbl->extra.case_info.return_address)(n_frame, value);
-  }
-  else if(tbl->type == 3)
-  {
-    struct update_frame *n_frame = (struct update_frame*)(stack_pointer + sizeof(struct update_frame));
-    return (tbl->extra.update_info.return_address)(n_frame, value);
-  }
-  else assert(false);
-
-  return NULL;
-
+  return value;
 }
 
 void* case_continuation(void *result)
 {
   struct case_frame *frame = (struct case_frame *)stack_pointer;
-  hash_map_put(frame->free_vars, frame->update_key, result);
+  hash_map_put(&(frame->free_vars), &frame->update_key, (const void*)result);
   return frame->alternatives_evaluator(frame->free_vars);
 }
 
@@ -47,9 +32,9 @@ void push_update_frame(void *update_ref) {
   upd_frame->tbl = tbl;
 }
 
-void* case_cont(void* frame_, void *value)
+void* case_cont(void *value)
 {
-  struct case_frame *frame = (struct case_frame *)frame_;
+  struct case_frame *frame = (struct case_frame *)stack_pointer;
   int k = frame->update_key;
   hash_map_put(&(frame->free_vars), (const void*)&k, (const void*)value);
   // we dont need the case frame now..

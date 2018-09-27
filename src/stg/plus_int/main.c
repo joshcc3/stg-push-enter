@@ -2,6 +2,7 @@
 #include "containers/mmanager.h"
 #include <assert.h>
 #include <stdio.h>
+#include "stg/bindings.h"
 
 void* main_function(void* no_arg)
 {

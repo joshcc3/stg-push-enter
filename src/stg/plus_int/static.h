@@ -18,11 +18,11 @@ struct fun {
 };
 
 struct update_info {
-  void* (*return_address)(void*, void*);
+  void* (*return_address)(void*);
 };
 
 struct case_info {
-  void* (*return_address)(void*, void*);
+  void* (*return_address)(void*);
 };
 
 
@@ -77,19 +77,19 @@ struct info_table {
 
 // All of these are basically function closures
 struct update_frame {
+  struct info_table *tbl;
   void *update_ref;
   // Section 5: I'm not sure why we dont have to actually consider case frames for the argument satisfaction check
   struct update_frame *next_update_frame;
-  struct info_table *tbl;
 };
 
 
 struct case_frame {
+  struct info_table *tbl;
   // TODO: these free variables will need to be collected when the case frame is popped
   struct hash_map *free_vars;
   int update_key;
   void* (*alternatives_evaluator)(struct hash_map*);
-  struct info_table *tbl;
 };
 
 

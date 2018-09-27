@@ -1,12 +1,12 @@
 #include "code.h"
 #include "containers/mmanager.h"
-#include "containers/hash_map.h"
 #include <assert.h>
 #include <stdio.h>
 #include "main.h"
 #include "typeclasses.h"
 #include "stack.h"
 #include "static.h"
+#include "stg/bindings.h"
 
 void* c_cont(void *thunk_object)
 {
@@ -16,12 +16,13 @@ void* c_cont(void *thunk_object)
   void *b;
   int b_key = 1;
   void *c;
-  int c_key = 1;
+  int c_key = 2;
 
-  hash_map_get(bindings, (const void*)&a_key, (const void**)&a);
-  hash_map_get(bindings, (const void*)&b_key, (const void**)&b);
-  hash_map_get(bindings, (const void*)&c_key, (const void**)&c);
+  get_binding(bindings, a_key, (const void**)&a);
+  get_binding(bindings, b_key, (const void**)&b);
+  get_binding(bindings, c_key, (const void**)&c);
   
+
   push_update_frame(c);
 
   push_ptr(b);
@@ -36,7 +37,7 @@ void* alternatives_evaluator(struct hash_map* bindings)
 
   int e_key = 3;
   void* e;
-  hash_map_get(bindings, (const void*)&e_key, (const void**)&e);
+  get_binding(bindings, e_key, (const void**)&e);
   
   struct info_table *e_info = *(struct info_table**)e;
 
@@ -68,6 +69,9 @@ void* main_function(void* _no_arg)
     
    */
   
+  struct hash_map *bindings;
+  init_hash_map(&bindings, 16, &int_ptr_equals_typeclass, &int_ptr_obj_typeclass);
+
   struct i_hash* a = (struct i_hash*)new(sizeof(struct i_hash));
   a->info_ptr = &int_constructor_info_table;
   a->val = 1;
@@ -84,16 +88,17 @@ void* main_function(void* _no_arg)
   c[0] = (void*)info;
   c[1] = bindings;
 
-
-  struct hash_map *bindings;
-  init_hash_map(&bindings, 16, &int_ptr_equals_typeclass, &int_ptr_obj_typeclass);
   int a_key = 0;
   int b_key = 1;
   int c_key = 2;
   
-  hash_map_put(&bindings, (const void*)&a_key, (const void*)&a);
-  hash_map_put(&bindings, (const void*)&b_key, (const void*)&b);
-  hash_map_put(&bindings, (const void*)&c_key, c);
+  put_binding(bindings, a_key, (const void*)a);
+  put_binding(bindings, b_key, (const void*)b);
+  put_binding(bindings, c_key, c);
+
+  void *tmp;
+  get_binding(bindings, a_key, (const void**)&tmp);
+  assert(((struct i_hash*)tmp)->val == 1);
 
   push_case_frame(alternatives_evaluator, 3, bindings);
 

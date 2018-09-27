@@ -1,12 +1,11 @@
 #include <assert.h>
-
 #include "data/string_.h"
 #include "static.h"
 #include "typeclasses.h"
 #include "stack.h"
-#include "containers/hash_map.h"
 #include "containers/mmanager.h"
 #include "code.h"
+#include "stg/bindings.h"
 
 // TODO: I dont think you can free stuff that is on the stack so the hash map which is full of references to the stack will need
 // to be taken care of
@@ -45,10 +44,8 @@ void* thunk1_cont(void *thunk_object)
   struct hash_map *bindings = (struct hash_map *)(((const void **)thunk_object)[1]);
   int *vx;
   int *vy;
-  int x = 2;
-  int y = 3;
-  hash_map_get(bindings, (const void*)&x, (const void**)&vx);
-  hash_map_get(bindings, (const void*)&y, (const void**)&vy);
+  get_binding(bindings, 2, (const void**)&vx);
+  get_binding(bindings, 3, (const void**)&vy);
   int *result = (int*)new(sizeof(int));
   *result = *vx + *vy;
   return (void*)result;
@@ -69,22 +66,21 @@ void* continuation1(struct hash_map *bindings) {
   void**thunk1 = new(sizeof(void**)*2);
   thunk1[0] = (void*)thunk1_info_table;
   thunk1[1] = (void*)bindings;	
+  
+  int res_key = 4;
 
-  int *res_key = (int*)new(sizeof(int));
-  *res_key = 4;
-  hash_map_put(&bindings, (const void*)res_key, (const void*)(thunk1));
+  put_binding(bindings, res_key, (const void*)(thunk1));
 
   struct i_hash *constructor1 = (struct i_hash *)new(sizeof(struct i_hash));
   constructor1->info_ptr = &int_constructor_info_table;
   void *tmp;
-  hash_map_get(bindings, res_key, (const void**)&tmp);
+  get_binding(bindings, res_key, (const void**)&tmp);
   struct info_table *tbl = *(struct info_table **)tmp;
   void *thunk_result = (tbl->extra.thunk_info.return_address)(tmp);
   constructor1->val = *(int*)(thunk_result);
   
-  int *res2_key = (int*)new(sizeof(int));
-  *res2_key = 5;
-  hash_map_put(&bindings, (const void*)res2_key, (const void**)constructor1);
+  int res2_key = 5;
+  put_binding(bindings, res2_key, (const void**)constructor1);
   // Is it safe to deinit 'bindings' here?
       
   return constructor1;
@@ -96,7 +92,7 @@ void* alternatives_evaluator1(struct hash_map *bindings)
 
   void *b;
   int b_key = 1;
-  hash_map_get(bindings, (const void*)&b_key, (const void**)&b);
+  get_binding(bindings, b_key, (const void**)&b);
 
   struct info_table *b_info = *(struct info_table **)b;
   
@@ -109,7 +105,7 @@ void* alternatives_evaluator1(struct hash_map *bindings)
   {
     int y_key = 3;
     int y_value = *(int*)(b + sizeof(void*));
-    hash_map_put(&bindings, (const void*)&y_key, (const void*)&y_value);
+    put_binding(bindings, y_key, (const void*)&y_value);
     return continuation1(bindings);
   }
   else
@@ -127,7 +123,7 @@ void* alternatives_evaluator1(struct hash_map *bindings)
     
     // enter the function for the thunk providing the necessary arguments - the address of the thunk
     void *b_computed = (b_info->extra.thunk_info.return_address)(b);
-    return update_continuation(b_computed);
+    return case_continuation(update_continuation(b_computed));
   }
 }
 
@@ -159,12 +155,10 @@ case (plus_unboxed 1 2) of
   void *b = *(void **)stack_pointer;
   stack_pointer += sizeof(void*);
 
-  int *a_key = (int*)new(sizeof(int));
-  *a_key = 0;
-  int *b_key = (int*)new(sizeof(int));
-  *b_key = 1;
-  hash_map_put(&bindings, (const void*)a_key, (const void *)a);
-  hash_map_put(&bindings, (const void*)b_key, (const void *)b);
+  int a_key = 0;
+  int b_key = 1;
+  put_binding(bindings, a_key, (const void *)a);
+  put_binding(bindings, b_key, (const void *)b);
 
 
   struct info_table *a_info = *(struct info_table **)a;
@@ -177,7 +171,7 @@ case (plus_unboxed 1 2) of
     int x_key = 2;
     // The payload of a Constructor contains its arguments
     int x_value = *(int*)(a + sizeof(void*));
-    hash_map_put(&bindings, (const void*)&x_key, (const void*)&x_value);
+    put_binding(bindings, x_key, (const void*)&x_value);
     return alternatives_evaluator1(bindings);
   }
   else
@@ -186,8 +180,8 @@ case (plus_unboxed 1 2) of
     push_case_frame(alternatives_evaluator1, 2, bindings);
     push_update_frame(a);
     a_info->type = 6;
-    void *a_computed = (a_info->extra.thunk_info.return_address(b));
-    return update_continuation(a_computed);
+    void *a_computed = (a_info->extra.thunk_info.return_address(a));
+    return case_continuation(update_continuation(a_computed));
   }
 
 }
