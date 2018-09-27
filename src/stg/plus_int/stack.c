@@ -4,9 +4,9 @@
 #include "containers/hash_map.h"
 
 
-void* update_continuation(void*current_frame_, void* value)
+void* update_continuation(void* value)
 {
-  struct update_frame* current_frame = (struct update_frame*)current_frame_;
+  struct update_frame* current_frame = (struct update_frame*)stack_pointer;
   current_frame->update_ref = value;
   su_register = (char*)current_frame->next_update_frame;
   stack_pointer += sizeof(struct update_frame);
@@ -43,7 +43,7 @@ void push_update_frame(void *update_ref) {
   su_register = stack_pointer;
   struct info_table *tbl =  (struct info_table*)new(sizeof(struct info_table));
   tbl->type = 3;
-  tbl->extra.case_info.return_address = (void* (*)(void*, void*))update_continuation;
+  tbl->extra.case_info.return_address = (void* (*)(void*))update_continuation;
   upd_frame->tbl = tbl;
 }
 

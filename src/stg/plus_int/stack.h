@@ -4,7 +4,7 @@
 #include "static.h"
 
 
-void* update_continuation(void *, void*);
+void* update_continuation(void*);
 
 void* case_continuation(void *);
 

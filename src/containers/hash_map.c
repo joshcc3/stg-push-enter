@@ -111,7 +111,7 @@ bool hash_map_get(const struct hash_map * inp, const void* key, const void ** ou
 
     delete((void**)&elem);
 
-    assert(!hash_map_contains_key(inp, key) || (result == 0 && *output));
+    assert(!hash_map_contains_key(inp, key) || (result == 0));
 
     return result == 0;
 }
