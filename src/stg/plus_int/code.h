@@ -9,6 +9,6 @@ struct i_hash {
   int val;
 };
 
-void* plus_int(void *);
+struct ref plus_int(struct ref);
 
 #endif

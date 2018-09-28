@@ -2,25 +2,27 @@
 #include <assert.h>
 #include "containers/mmanager.h"
 #include "containers/hash_map.h"
+#include "stg/bindings.h"
 
 
-void* update_continuation(void* value)
+struct ref update_continuation(struct ref value)
 {
   struct update_frame* current_frame = (struct update_frame*)stack_pointer;
-  current_frame->update_ref = value;
+  upd_ref(current_frame->update_ref, value);
   su_register = (char*)current_frame->next_update_frame;
   stack_pointer += sizeof(struct update_frame);
   return value;
 }
 
-void* case_continuation(void *result)
+struct ref case_continuation(struct ref result)
 {
   struct case_frame *frame = (struct case_frame *)stack_pointer;
-  hash_map_put(&(frame->free_vars), &frame->update_key, (const void*)result);
+  put_binding(frame->free_vars, frame->update_key, result);
+  stack_pointer += sizeof(struct case_frame);
   return frame->alternatives_evaluator(frame->free_vars);
 }
 
-void push_update_frame(void *update_ref) {
+void push_update_frame(struct ref update_ref) {
   stack_pointer -= sizeof(struct update_frame);
   struct update_frame *upd_frame = (struct update_frame*)(stack_pointer);
   upd_frame->update_ref = update_ref;
@@ -28,15 +30,15 @@ void push_update_frame(void *update_ref) {
   su_register = stack_pointer;
   struct info_table *tbl =  (struct info_table*)new(sizeof(struct info_table));
   tbl->type = 3;
-  tbl->extra.case_info.return_address = (void* (*)(void*))update_continuation;
+  tbl->extra.case_info.return_address = (struct ref (*)(struct ref))update_continuation;
   upd_frame->tbl = tbl;
 }
 
-void* case_cont(void *value)
+struct ref case_cont(struct ref value)
 {
   struct case_frame *frame = (struct case_frame *)stack_pointer;
   int k = frame->update_key;
-  hash_map_put(&(frame->free_vars), (const void*)&k, (const void*)value);
+  put_binding(frame->free_vars, k, value);
   // we dont need the case frame now..
   stack_pointer += sizeof(struct case_frame);
 
@@ -44,7 +46,7 @@ void* case_cont(void *value)
 
 }
 
-void push_case_frame(void* (*alternatives_evaluator)(struct hash_map*), int update_key, struct hash_map *bindings) {
+void push_case_frame(struct ref (*alternatives_evaluator)(struct hash_map*), int update_key, struct hash_map *bindings) {
       stack_pointer -= sizeof(struct case_frame);
       struct case_frame *case_frame = (struct case_frame*)(stack_pointer);
       case_frame->free_vars = bindings;
@@ -56,10 +58,10 @@ void push_case_frame(void* (*alternatives_evaluator)(struct hash_map*), int upda
       case_frame->tbl = case_info_ptr;
 }
 
-void push_ptr(void *a)
+void push_ptr(struct ref a)
 {
-  stack_pointer -= sizeof(void*);
-  *(void**)stack_pointer = a;
+  stack_pointer -= sizeof(struct ref);
+  *(struct ref *)stack_pointer = a;
 }
 
 
@@ -67,4 +69,11 @@ void push_int(int a)
 {
   stack_pointer -= sizeof(int);
   *(int*)stack_pointer = a;
+}
+
+
+void pop_ptr(struct ref *res)
+{
+  *res = *(struct ref *)stack_pointer;
+  stack_pointer += (sizeof(struct ref));
 }
