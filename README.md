@@ -51,10 +51,18 @@ BLACKHOLE: (<info ptr to thunk>,)
 
 The stack pointer starts of at the byte just after the highest point in the stack.
 
+In order to perform the 'Update' continuation we cannot just pass around pointers to the heap object.
+This is because when attempting to update a heap object you'll have to go through all the bindings maps (that map a bound variable to the heap object  - represented as maps from int -> ptr)) and update the reference to the heap object in them.
+One alternative is to maintain a pointer table and pass around pointers into the pointer table and update entries in the pointer table when updating through an Update continuation.
+Or you could maintain a global bindings map - then the key of the map would have to be globally unique and you would pass around the keys to the object. This is basically the same as the pointer table approach with some added overhead.
+My decision was to maintain a pointer table and have the local global bindings point to the pointer table.
+One tricky question is how to maintain the pointer table.. evidently its append only and only the garbage collector can really "compact it". 
 
 
 # Notes about C
 `malloc` is contained in `stdlib.h`.
+
+
 
 ## Lessons
 Especially for arithmetic functions don't forget to assert the domain of functions as well as the range. (e.g. % division by 0)
@@ -251,7 +259,8 @@ The rule for modulus `a%b == z` is `b*x + z = a` so, `-10%7 == -3` as `7*-1 + (-
 # TODO
  - Improve the implementation of hash maps w.r.t the rebalancing and calculation of rebalancing by using bit shift operators.
  - We track the local bindings in a hashmap which we pass around (as a pointer) instead of pushing them onto the stack (as is suggested in the paper). The garbage collector would use the layout in the info table to find out about the state of the heap. One (in retrospect stupid reason) was that I wanted to declare a case_frame struct (and you can't fit a variable sized list of free variables into a struct)
-
-
+ - The pointer table keeps growing - is there a way to shrink it? (considering other stuff holds references into it you can't really move elements around. Check if it's possible to free interior portions of a malloced structure.
+ - Todo, create an abstraction in front of our pointer table that allows us to interact with the pointers better - I think I'm actually implementing references here.
+ - There is no need to have local bindings - just index straight into the pointer table.
 # TODO
 You create a file that contains the main functino that gets linked against the other stuff 

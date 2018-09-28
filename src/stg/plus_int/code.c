@@ -37,17 +37,16 @@
 
  */
 
-
 void* thunk1_cont(void *thunk_object) 
 {
       
   struct hash_map *bindings = (struct hash_map *)(((const void **)thunk_object)[1]);
-  int *vx;
-  int *vy;
-  get_binding(bindings, 2, (const void**)&vx);
-  get_binding(bindings, 3, (const void**)&vy);
+  struct ref vx;
+  struct ref vy;
+  get_binding(bindings, 2, (const struct ref*)&vx);
+  get_binding(bindings, 3, (const struct ref*)&vy);
   int *result = (int*)new(sizeof(int));
-  *result = *vx + *vy;
+  *result = *get_ref(vx) + *get_ref(vy);
   return (void*)result;
   
 }
@@ -73,9 +72,9 @@ void* continuation1(struct hash_map *bindings) {
 
   struct i_hash *constructor1 = (struct i_hash *)new(sizeof(struct i_hash));
   constructor1->info_ptr = &int_constructor_info_table;
-  void *tmp;
-  get_binding(bindings, res_key, (const void**)&tmp);
-  struct info_table *tbl = *(struct info_table **)tmp;
+  struct ref tmp;
+  get_binding(bindings, res_key, (const struct ref*)&tmp);
+  struct info_table *tbl = *(struct info_table **)get_ref(tmp);
   void *thunk_result = (tbl->extra.thunk_info.return_address)(tmp);
   constructor1->val = *(int*)(thunk_result);
   
@@ -90,10 +89,11 @@ void* continuation1(struct hash_map *bindings) {
 void* alternatives_evaluator1(struct hash_map *bindings)
 {
 
-  void *b;
+  void **b_;
   int b_key = 1;
-  get_binding(bindings, b_key, (const void**)&b);
+  get_binding(bindings, b_key, (const struct ref*)&b);
 
+  void *b = *b_; 
   struct info_table *b_info = *(struct info_table **)b;
   
   /*
@@ -116,13 +116,13 @@ void* alternatives_evaluator1(struct hash_map *bindings)
     push_case_frame(continuation1, 3, bindings);
     
     // push the update continuation
-    push_update_frame(b);
+    push_update_frame(b_);
     
     // set b to a blackhole in the heap
     b_info->type = 6;
     
     // enter the function for the thunk providing the necessary arguments - the address of the thunk
-    void *b_computed = (b_info->extra.thunk_info.return_address)(b);
+    void **b_computed = (b_info->extra.thunk_info.return_address)(b_);
     return case_continuation(update_continuation(b_computed));
   }
 }

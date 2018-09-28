@@ -11,16 +11,18 @@
 void* c_cont(void *thunk_object)
 {
   struct hash_map *bindings = *(struct hash_map**)(thunk_object + sizeof(void*));
-  void *a;
+
+  struct ref a;
+  struct ref b;
+  struct ref c;
+
   int a_key = 0;
-  void *b;
   int b_key = 1;
-  void *c;
   int c_key = 2;
 
-  get_binding(bindings, a_key, (const void**)&a);
-  get_binding(bindings, b_key, (const void**)&b);
-  get_binding(bindings, c_key, (const void**)&c);
+  get_binding(bindings, a_key, (const struct ref*)&a);
+  get_binding(bindings, b_key, (const struct ref*)&b);
+  get_binding(bindings, c_key, (const struct ref*)&c);
   
 
   push_update_frame(c);
@@ -36,8 +38,8 @@ void* alternatives_evaluator(struct hash_map* bindings)
 {
 
   int e_key = 3;
-  void* e;
-  get_binding(bindings, e_key, (const void**)&e);
+  struct ref e;
+  get_binding(bindings, e_key, (const struct ref*)&e);
   
   struct info_table *e_info = *(struct info_table**)e;
 
@@ -96,8 +98,9 @@ void* main_function(void* _no_arg)
   put_binding(bindings, b_key, (const void*)b);
   put_binding(bindings, c_key, c);
 
-  void *tmp;
-  get_binding(bindings, a_key, (const void**)&tmp);
+  struct ref tmp_;
+  get_binding(bindings, a_key, (struct ref*)&tmp);
+  void *tmp = *tmp_;
   assert(((struct i_hash*)tmp)->val == 1);
 
   push_case_frame(alternatives_evaluator, 3, bindings);
