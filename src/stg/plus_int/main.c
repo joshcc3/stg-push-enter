@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include "stg/bindings.h"
+#include "stack.h"
 
 void* main_function(void* no_arg)
 {
@@ -15,23 +16,22 @@ void* main_function(void* no_arg)
    */
 
 
-  struct i_hash *a_ptr = (struct i_hash *)new(sizeof(struct i_hash));
+  struct ref a_ref;
+  new_ref(sizeof(struct i_hash), &a_ref);
+  struct i_hash *a_ptr = get_ref(a_ref);
   a_ptr->info_ptr = &int_constructor_info_table;
   a_ptr->val = 1;
 
-  struct i_hash *b_ptr = (struct i_hash *)new(sizeof(struct i_hash));
+  struct ref b_ref;
+  new_ref(sizeof(struct i_hash), &b_ref);
+  struct i_hash *b_ptr = get_ref(b_ref);
   b_ptr->info_ptr = &int_constructor_info_table;
   b_ptr->val = 1;
 
   // neither a or b are free in the body of the case so there are no relevant bindings
 
-  void **sp_ = (void**)stack_pointer;
-  sp_--;
-  *sp_ = a_ptr;
-  sp_--;
-  *sp_ = b_ptr;
-
-  stack_pointer = (char*)sp_;
+  push_ptr(b_ref);
+  push_ptr(a_ref);
   
   struct ref rand;
   struct ref res_ref = (plus_info_table.extra.function.fast_entry_point)(rand);

@@ -32,8 +32,9 @@ void put_binding(struct hash_map *mp, int key, const struct ref value)
 {
   int size = arrl_size(pointer_table);
   void** v_ptr = value.ptr;
-  const void** array_start = pointer_table->wrapped->array;
-  assert(v_ptr >= (void**)array_start && v_ptr <= (void**)array_start + size - 1 && (v_ptr - (void**)array_start)%sizeof(void **) == 0);
+  void** array_start = (void**)pointer_table->wrapped->array;
+  assert(v_ptr >= (void**)array_start && v_ptr <= array_start + size - 1 && ((char*)v_ptr - (char*)array_start)%sizeof(void **) == 0);
   int *key_ = (int*)new(sizeof(int));
+  *key_ = key;
   hash_map_put(&mp, (const void *)key_, (const void *)value.ptr);
 }
