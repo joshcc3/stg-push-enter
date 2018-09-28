@@ -18,6 +18,7 @@ struct ref case_continuation(struct ref result)
 {
   struct case_frame *frame = (struct case_frame *)stack_pointer;
   put_binding(frame->free_vars, frame->update_key, result);
+  stack_pointer += sizeof(struct case_frame);
   return frame->alternatives_evaluator(frame->free_vars);
 }
 

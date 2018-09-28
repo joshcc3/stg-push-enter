@@ -41,8 +41,8 @@ struct ref alternatives_evaluator(struct hash_map* bindings)
 
   int e_key = 3;
   struct ref e_ref;
+  get_binding(bindings, e_key, (struct ref*)&e_ref);
   void* e = get_ref(e_ref);
-  get_binding(bindings, e_key, (struct ref*)&e);
   
   struct info_table *e_info = *(struct info_table**)e;
 

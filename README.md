@@ -51,13 +51,23 @@ BLACKHOLE: (<info ptr to thunk>,)
 
 The stack pointer starts of at the byte just after the highest point in the stack.
 
+Remember to bind the actual value of the case when the case is evaluated.
+
+
+TODO: Find a more elegant way of handling the binding of the case continuation result.
+
+
 In order to perform the 'Update' continuation we cannot just pass around pointers to the heap object.
 This is because when attempting to update a heap object you'll have to go through all the bindings maps (that map a bound variable to the heap object  - represented as maps from int -> ptr)) and update the reference to the heap object in them.
 One alternative is to maintain a pointer table and pass around pointers into the pointer table and update entries in the pointer table when updating through an Update continuation.
 Or you could maintain a global bindings map - then the key of the map would have to be globally unique and you would pass around the keys to the object. This is basically the same as the pointer table approach with some added overhead.
 My decision was to maintain a pointer table and have the local global bindings point to the pointer table references referred to in the pointer table. Requesting a new reference adds an entry into the pointer table. Adding a mapping from to a hashmap
 maps the key to the reference in the table.
+Using pointers internal to a structure is a terrible idea (in this case on resize all your pointers would be invalidated) so you store them as offsets from the start of the index.
 One tricky question is how to maintain the pointer table.. evidently its append only and only the garbage collector can really "compact it". 
+
+
+
 
 
 # Notes about C

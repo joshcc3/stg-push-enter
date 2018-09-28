@@ -87,7 +87,7 @@ struct ref continuation1(struct hash_map *bindings) {
   int res2_key = 5;
   put_binding(bindings, res2_key, constructor1_ref);
   // Is it safe to deinit 'bindings' here?
-      
+
   return constructor1_ref;
 
 }
@@ -102,6 +102,10 @@ struct ref alternatives_evaluator1(struct hash_map *bindings)
   void *b = get_ref(b_);
   struct info_table *b_info = *(struct info_table **)b;
   
+  struct ref y_value_ref;
+  new_ref(sizeof(int*), &y_value_ref);
+  int* y_value = (int*)(get_ref(y_value_ref));
+
   /*
     I# x -> case b of
 		           I# y -> let res = THUNK (x +# y) in 
@@ -111,9 +115,6 @@ struct ref alternatives_evaluator1(struct hash_map *bindings)
   {
     int y_key = 3;
 
-    struct ref y_value_ref;
-    new_ref(sizeof(int*), &y_value_ref);
-    int* y_value = (int*)(get_ref(y_value_ref));
     *y_value = *(int*)(b + sizeof(void*));
     
     put_binding(bindings, y_key, y_value_ref);
@@ -134,7 +135,10 @@ struct ref alternatives_evaluator1(struct hash_map *bindings)
     
     // enter the function for the thunk providing the necessary arguments - the address of the thunk
     struct ref b_computed = (b_info->extra.thunk_info.return_address)(b_);
-    return case_continuation(update_continuation(b_computed));
+    *y_value = *(int*)(get_ref(b_computed) + sizeof(void*));
+    
+    update_continuation(b_computed);
+    case_continuation(y_value_ref);
   }
 }
 
@@ -176,6 +180,10 @@ case (plus_unboxed 1 2) of
 
   struct info_table *a_info = *(struct info_table **)a;
 
+  struct ref x_ref;
+  new_ref(sizeof(void*), &x_ref);
+  int *x = (int*)get_ref(x_ref);
+
   // We know that the arguments are of type Int which means they can only be the Constructor or Thunks that evaluate to the Constructor
 
   if(a_info->type == 1)
@@ -183,10 +191,6 @@ case (plus_unboxed 1 2) of
     // The bindings dont escape this function (for unboxed values they will be copied so no need to worry about this stack getting cleaned up
     int x_key = 2;
     // The payload of a Constructor contains its arguments
-
-    struct ref x_ref;
-    new_ref(sizeof(void*), &x_ref);
-    int *x = (int*)get_ref(x_ref);
     *x = *(int*)(a + sizeof(void*));
 
     put_binding(bindings, x_key, x_ref);
@@ -198,8 +202,13 @@ case (plus_unboxed 1 2) of
     push_case_frame(alternatives_evaluator1, 2, bindings);
     push_update_frame(a_ref);
     a_info->type = 6;
+
+    // update x
     struct ref a_computed = (a_info->extra.thunk_info.return_address(a_ref));
-    return case_continuation(update_continuation(a_computed));
+    *x = *(int*)(get_ref(a_computed) + sizeof(void*));
+
+    update_continuation(a_computed);
+    return case_continuation(x_ref);
   }
 
 }
