@@ -21,9 +21,9 @@ struct ref c_cont(struct ref thunk_object_ref)
   int b_key = 1;
   int c_key = 2;
 
-  get_binding(bindings, a_key, (const struct ref*)&a);
-  get_binding(bindings, b_key, (const struct ref*)&b);
-  get_binding(bindings, c_key, (const struct ref*)&c);
+  get_binding(bindings, a_key, (struct ref*)&a);
+  get_binding(bindings, b_key, (struct ref*)&b);
+  get_binding(bindings, c_key, (struct ref*)&c);
   
 
   push_update_frame(c);
@@ -42,7 +42,7 @@ struct ref alternatives_evaluator(struct hash_map* bindings)
   int e_key = 3;
   struct ref e_ref;
   void* e = get_ref(e_ref);
-  get_binding(bindings, e_key, (const struct ref*)&e);
+  get_binding(bindings, e_key, (struct ref*)&e);
   
   struct info_table *e_info = *(struct info_table**)e;
 

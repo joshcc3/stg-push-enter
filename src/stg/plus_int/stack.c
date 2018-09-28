@@ -17,7 +17,7 @@ struct ref update_continuation(struct ref value)
 struct ref case_continuation(struct ref result)
 {
   struct case_frame *frame = (struct case_frame *)stack_pointer;
-  put_binding(&(frame->free_vars), frame->update_key, result);
+  put_binding(frame->free_vars, frame->update_key, result);
   return frame->alternatives_evaluator(frame->free_vars);
 }
 
@@ -29,7 +29,7 @@ void push_update_frame(struct ref update_ref) {
   su_register = stack_pointer;
   struct info_table *tbl =  (struct info_table*)new(sizeof(struct info_table));
   tbl->type = 3;
-  tbl->extra.case_info.return_address = (void* (*)(void*))update_continuation;
+  tbl->extra.case_info.return_address = (struct ref (*)(struct ref))update_continuation;
   upd_frame->tbl = tbl;
 }
 
@@ -37,7 +37,7 @@ struct ref case_cont(struct ref value)
 {
   struct case_frame *frame = (struct case_frame *)stack_pointer;
   int k = frame->update_key;
-  put_binding(&(frame->free_vars), k, value);
+  put_binding(frame->free_vars, k, value);
   // we dont need the case frame now..
   stack_pointer += sizeof(struct case_frame);
 
