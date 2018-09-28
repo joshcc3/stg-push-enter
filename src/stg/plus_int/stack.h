@@ -4,15 +4,15 @@
 #include "static.h"
 
 
-void* update_continuation(void*);
+struct ref update_continuation(struct ref);
 
-void* case_continuation(void *);
+struct ref case_continuation(struct ref);
 
-void push_update_frame(void *);
+void push_update_frame(struct ref);
 
-void push_case_frame(void* (*)(struct hash_map*), int, struct hash_map *);
+void push_case_frame(struct ref (*)(struct hash_map*), int, struct hash_map *);
 
-void push_ptr(void*);
+void push_ptr(struct ref);
 void push_int(int);
 void push_char(char);
 void push_long(long);

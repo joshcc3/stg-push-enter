@@ -23,7 +23,7 @@ void new_ref(size_t, struct ref*);
 void get_binding(struct hash_map *, int, const struct ref*);
 
 // Associate a key with an existing entry in the pointer table
-void put_binding_ref(struct hash_map *, int, const struct ref);
+void put_binding(struct hash_map *, int, const struct ref);
 
 
 

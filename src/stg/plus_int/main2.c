@@ -8,8 +8,9 @@
 #include "static.h"
 #include "stg/bindings.h"
 
-void* c_cont(void *thunk_object)
+struct ref c_cont(struct ref thunk_object_ref)
 {
+  void *thunk_object = get_ref(thunk_object_ref);
   struct hash_map *bindings = *(struct hash_map**)(thunk_object + sizeof(void*));
 
   struct ref a;
@@ -34,14 +35,14 @@ void* c_cont(void *thunk_object)
 
 }
 
-void* alternatives_evaluator(struct hash_map* bindings)
+struct ref alternatives_evaluator(struct hash_map* bindings)
 {
 
   int e_key = 3;
   struct ref e;
   get_binding(bindings, e_key, (const struct ref*)&e);
   
-  struct info_table *e_info = *(struct info_table**)e;
+  struct info_table *e_info = *(struct info_table**)get_ref(e);
 
   if(e_info->type == 1) {
     int d = *(int*)(e + sizeof(void*));
@@ -56,7 +57,7 @@ void* alternatives_evaluator(struct hash_map* bindings)
   else { assert(false); }
 }
 
-void* main_function(void* _no_arg)
+struct ref main_function(struct ref _no_arg)
 {
   // TODO Complete the implementation of the remaining stuff.
   // Build PAPs to see how they work
@@ -74,11 +75,15 @@ void* main_function(void* _no_arg)
   struct hash_map *bindings;
   init_hash_map(&bindings, 16, &int_ptr_equals_typeclass, &int_ptr_obj_typeclass);
 
-  struct i_hash* a = (struct i_hash*)new(sizeof(struct i_hash));
-  a->info_ptr = &int_constructor_info_table;
-  a->val = 1;
+  struct ref a_ref;
+  new_ref(sizeof(struct i_hash), &a_ref);
+  struct i_hash *a = (struct i_hash*)get_ref(a_ref);
+  a_val->info_ptr = &int_constructor_info_table;
+  a_val->val = 1;
 
-  struct i_hash* b = (struct i_hash*)new(sizeof(struct i_hash));
+  struct ref b_ref;
+  new_ref(sizeof(struct i_hash), &b_ref);
+  struct i_hash* b = (struct i_hash*)get_ref(b_ref);
   b->info_ptr = &int_constructor_info_table;
   b->val = 2;
 
@@ -86,7 +91,9 @@ void* main_function(void* _no_arg)
   info->type = 5;
   info->extra.thunk_info.return_address = c_cont;
   
-  void **c = new(sizeof(void*)*2);
+  struct ref c_ref;
+  new_ref(sizeof(void*)*2, &c_ref);
+  const void **c = (const void **)get_ref(c_ref);
   c[0] = (void*)info;
   c[1] = bindings;
 
@@ -94,13 +101,15 @@ void* main_function(void* _no_arg)
   int b_key = 1;
   int c_key = 2;
   
-  put_binding(bindings, a_key, (const void*)a);
-  put_binding(bindings, b_key, (const void*)b);
-  put_binding(bindings, c_key, c);
+  put_binding(bindings, a_key, a_ref);
+  put_binding(bindings, b_key, b_ref);
+  put_binding(bindings, c_key, c_ref);
 
+  // TODO: Remove
+  // Sanity check
   struct ref tmp_;
-  get_binding(bindings, a_key, (struct ref*)&tmp);
-  void *tmp = *tmp_;
+  get_binding(bindings, a_key, (struct ref*)&tmp_);
+  void *tmp = get_ref(tmp);
   assert(((struct i_hash*)tmp)->val == 1);
 
   push_case_frame(alternatives_evaluator, 3, bindings);

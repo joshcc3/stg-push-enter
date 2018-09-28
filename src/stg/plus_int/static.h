@@ -12,17 +12,17 @@
 #define INITIAL_STACK_SIZE 32*1024
 
 struct fun {
-  void* (*fast_entry_point)(void *); // pointer to the function object, first word is a pointer to the info table. the rest is the payload
-  void* (*slow_entry_point)(void *);
+  struct ref (*fast_entry_point)(struct ref); // pointer to the function object, first word is a pointer to the info table. the rest is the payload
+  struct ref (*slow_entry_point)(struct ref);
   int arity;
 };
 
 struct update_info {
-  void* (*return_address)(void*);
+  struct ref (*return_address)(struct ref);
 };
 
 struct case_info {
-  void* (*return_address)(void*);
+  struct ref (*return_address)(struct ref);
 };
 
 
@@ -37,7 +37,7 @@ struct pap {
 };
 
 struct thunk {
-  void* (*return_address)(void*);
+  struct ref (*return_address)(struct ref);
 };
 
 struct blackhole {
@@ -78,7 +78,7 @@ struct info_table {
 // All of these are basically function closures
 struct update_frame {
   struct info_table *tbl;
-  void *update_ref;
+  struct ref update_ref;
   // Section 5: I'm not sure why we dont have to actually consider case frames for the argument satisfaction check
   struct update_frame *next_update_frame;
 };
@@ -89,7 +89,7 @@ struct case_frame {
   // TODO: these free variables will need to be collected when the case frame is popped
   struct hash_map *free_vars;
   int update_key;
-  void* (*alternatives_evaluator)(struct hash_map*);
+  struct ref (*alternatives_evaluator)(struct hash_map*);
 };
 
 

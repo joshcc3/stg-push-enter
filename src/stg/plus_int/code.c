@@ -37,22 +37,23 @@
 
  */
 
-void* thunk1_cont(void *thunk_object) 
+struct ref thunk1_cont(struct ref thunk_object_ref) 
 {
-      
+  void *thunk_object = get_ref(thunk_object_ref);
   struct hash_map *bindings = (struct hash_map *)(((const void **)thunk_object)[1]);
   struct ref vx;
   struct ref vy;
   get_binding(bindings, 2, (const struct ref*)&vx);
   get_binding(bindings, 3, (const struct ref*)&vy);
-  int *result = (int*)new(sizeof(int));
+  struct ref result_ref;
+  new_ref(sizeof(int), &result_ref);
+  void *result = get_ref(result_ref);
   *result = *get_ref(vx) + *get_ref(vy);
-  return (void*)result;
-  
+  return result_ref;
 }
 
 
-void* continuation1(struct hash_map *bindings) {
+struct ref continuation1(struct hash_map *bindings) {
   
   // let res = THUNK (x +# y) in 
   // let res2 = I# res in res2
@@ -62,38 +63,43 @@ void* continuation1(struct hash_map *bindings) {
   thunk1_info_table->layout = layout_tmp; // TODO: Need to intialize the layout
   thunk1_info_table->extra.thunk_info.return_address = thunk1_cont;
 
-  void**thunk1 = new(sizeof(void**)*2);
+  struct ref *thunk1_ref;
+  new_ref(sizeof(void**)*2, &thunk1_ref);
+  void**thunk1 = (void**)get_ref(thunk1_ref);
   thunk1[0] = (void*)thunk1_info_table;
   thunk1[1] = (void*)bindings;	
   
   int res_key = 4;
 
-  put_binding(bindings, res_key, (const void*)(thunk1));
+  put_binding(bindings, res_key, thunk1_ref);
 
-  struct i_hash *constructor1 = (struct i_hash *)new(sizeof(struct i_hash));
+  struct ref constructor1_ref;
+  new_ref(sizeof(struct i_hash), &constructor1_ref);
+  struct i_hash *constructor1 = (struct i_hash *)get_ref(constructor1_ref);
+
   constructor1->info_ptr = &int_constructor_info_table;
   struct ref tmp;
-  get_binding(bindings, res_key, (const struct ref*)&tmp);
+  get_binding(bindings, res_key, &tmp);
   struct info_table *tbl = *(struct info_table **)get_ref(tmp);
-  void *thunk_result = (tbl->extra.thunk_info.return_address)(tmp);
-  constructor1->val = *(int*)(thunk_result);
+  struct ref thunk_result = (tbl->extra.thunk_info.return_address)(tmp);
+  constructor1->val = *(int*)(get_ref(thunk_result));
   
   int res2_key = 5;
-  put_binding(bindings, res2_key, (const void**)constructor1);
+  put_binding(bindings, res2_key, constructor1_ref);
   // Is it safe to deinit 'bindings' here?
       
-  return constructor1;
+  return constructor1_ref;
 
 }
 
-void* alternatives_evaluator1(struct hash_map *bindings)
+struct ref alternatives_evaluator1(struct hash_map *bindings)
 {
 
-  void **b_;
+  struct ref b_;
   int b_key = 1;
-  get_binding(bindings, b_key, (const struct ref*)&b);
+  get_binding(bindings, b_key, &b_);
 
-  void *b = *b_; 
+  void *b = get_ref(b_);
   struct info_table *b_info = *(struct info_table **)b;
   
   /*
@@ -104,8 +110,13 @@ void* alternatives_evaluator1(struct hash_map *bindings)
   if(b_info->type == 1)
   {
     int y_key = 3;
-    int y_value = *(int*)(b + sizeof(void*));
-    put_binding(bindings, y_key, (const void*)&y_value);
+
+    struct ref y_value_ref;
+    new_ref(sizeof(int*), &y_value_ref);
+    int* y_value = (int*)(get_ref(y_value_ref));
+    *y_value = *(int*)(b + sizeof(void*));
+    
+    put_binding(bindings, y_key, y_value_ref);
     return continuation1(bindings);
   }
   else
@@ -122,14 +133,14 @@ void* alternatives_evaluator1(struct hash_map *bindings)
     b_info->type = 6;
     
     // enter the function for the thunk providing the necessary arguments - the address of the thunk
-    void **b_computed = (b_info->extra.thunk_info.return_address)(b_);
+    struct ref b_computed = (b_info->extra.thunk_info.return_address)(b_);
     return case_continuation(update_continuation(b_computed));
   }
 }
 
 
 // we expect all of our arguments to be passed on the stack
-void* plus_int (void *no_arg)
+struct ref plus_int (struct ref no_arg)
 {
   // the fast entry point (no argument satisfaction check) [We assume arguments are always passed on the stack]
   /*
@@ -150,15 +161,18 @@ case (plus_unboxed 1 2) of
   init_hash_map(&bindings, 16, &int_ptr_equals_typeclass, &int_ptr_obj_typeclass);
   // the garbage collector will need to refcount this bindings map and free it when it is done - not sure how this would be implemented.
 
-  void *a = *(void **)stack_pointer;
-  stack_pointer += (sizeof(void *));
-  void *b = *(void **)stack_pointer;
-  stack_pointer += sizeof(void*);
+  struct ref a_ref;
+  pop_ref(&a_ref);
+  void *a = get_ref(a_ref);
+
+  struct ref b_ref;
+  pop_ref(&b_ref);
+  void *b = get_ref(b_ref);
 
   int a_key = 0;
   int b_key = 1;
-  put_binding(bindings, a_key, (const void *)a);
-  put_binding(bindings, b_key, (const void *)b);
+  put_binding(bindings, a_key, a_ref);
+  put_binding(bindings, b_key, b_ref);
 
 
   struct info_table *a_info = *(struct info_table **)a;
@@ -170,8 +184,13 @@ case (plus_unboxed 1 2) of
     // The bindings dont escape this function (for unboxed values they will be copied so no need to worry about this stack getting cleaned up
     int x_key = 2;
     // The payload of a Constructor contains its arguments
-    int x_value = *(int*)(a + sizeof(void*));
-    put_binding(bindings, x_key, (const void*)&x_value);
+
+    struct ref x_ref;
+    new_ref(sizeof(void*), &x_ref);
+    int *x = (int*)get_ref(x_ref);
+    *x = *(int*)(a + sizeof(void*));
+
+    put_binding(bindings, x_key, x_ref);
     return alternatives_evaluator1(bindings);
   }
   else
@@ -180,7 +199,7 @@ case (plus_unboxed 1 2) of
     push_case_frame(alternatives_evaluator1, 2, bindings);
     push_update_frame(a);
     a_info->type = 6;
-    void *a_computed = (a_info->extra.thunk_info.return_address(a));
+    struct ref a_computed = (a_info->extra.thunk_info.return_address(a));
     return case_continuation(update_continuation(a_computed));
   }
 

@@ -33,21 +33,22 @@ void* main_function(void* no_arg)
 
   stack_pointer = (char*)sp_;
 
-  void *res = (plus_info_table.extra.function.fast_entry_point)(NULL);
+  struct ref res_ref = (plus_info_table.extra.function.fast_entry_point)(NULL);
+  void *res = get_ref(res_ref);
 
   struct info_table *con_tbl = *(struct info_table **)res;
 
-  void *con_result;
+  struct ref con_result;
   if(con_tbl->type == 5)
   {
-    con_result = (con_tbl->extra.thunk_info.return_address)(res);
+    con_result = (con_tbl->extra.thunk_info.return_address)(res_ref);
   }
   else if(con_tbl->type == 1) con_result = res;
 
-  struct info_table *con_info_tbl = *(struct info_table**)con_result;
+  struct info_table *con_info_tbl = *(struct info_table**)get_ref(con_result);
   assert(con_info_tbl->type == 1);
   
-  int value = *(int*)(con_result + sizeof(void*));
+  int value = *(int*)(get_ref(con_result) + sizeof(void*));
   printf("%d\n", value);
 
   return NULL;
