@@ -2,12 +2,13 @@
 #include <assert.h>
 #include "containers/mmanager.h"
 #include "containers/hash_map.h"
+#include "stg/bindings.h"
 
 
 struct ref update_continuation(struct ref value)
 {
   struct update_frame* current_frame = (struct update_frame*)stack_pointer;
-  upd_ref(current_frame->update_ref, get_ref(value));
+  upd_ref(current_frame->update_ref, value);
   su_register = (char*)current_frame->next_update_frame;
   stack_pointer += sizeof(struct update_frame);
   return value;
@@ -16,7 +17,7 @@ struct ref update_continuation(struct ref value)
 struct ref case_continuation(struct ref result)
 {
   struct case_frame *frame = (struct case_frame *)stack_pointer;
-  put_binding(&(frame->free_vars), &frame->update_key, result);
+  put_binding(&(frame->free_vars), frame->update_key, result);
   return frame->alternatives_evaluator(frame->free_vars);
 }
 
@@ -36,7 +37,7 @@ struct ref case_cont(struct ref value)
 {
   struct case_frame *frame = (struct case_frame *)stack_pointer;
   int k = frame->update_key;
-  put_binding(&(frame->free_vars), (const void*)&k, value);
+  put_binding(&(frame->free_vars), k, value);
   // we dont need the case frame now..
   stack_pointer += sizeof(struct case_frame);
 
@@ -72,7 +73,6 @@ void push_int(int a)
 
 void pop_ptr(struct ref *res)
 {
-  *res = (struct ref)stack_pointer;
-  void *a = get_ref(a_ref);
+  *res = *(struct ref *)stack_pointer;
   stack_pointer += (sizeof(struct ref));
 }

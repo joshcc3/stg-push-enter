@@ -32,8 +32,9 @@ void* main_function(void* no_arg)
   *sp_ = b_ptr;
 
   stack_pointer = (char*)sp_;
-
-  struct ref res_ref = (plus_info_table.extra.function.fast_entry_point)(NULL);
+  
+  struct ref rand;
+  struct ref res_ref = (plus_info_table.extra.function.fast_entry_point)(rand);
   void *res = get_ref(res_ref);
 
   struct info_table *con_tbl = *(struct info_table **)res;
@@ -43,7 +44,7 @@ void* main_function(void* no_arg)
   {
     con_result = (con_tbl->extra.thunk_info.return_address)(res_ref);
   }
-  else if(con_tbl->type == 1) con_result = res;
+  else if(con_tbl->type == 1) con_result = res_ref;
 
   struct info_table *con_info_tbl = *(struct info_table**)get_ref(con_result);
   assert(con_info_tbl->type == 1);

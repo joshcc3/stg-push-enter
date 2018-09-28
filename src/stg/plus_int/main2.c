@@ -31,7 +31,8 @@ struct ref c_cont(struct ref thunk_object_ref)
   push_ptr(b);
   push_ptr(a);
   
-  return update_continuation(plus_int(NULL));
+  struct ref noop;
+  return update_continuation(plus_int(noop));
 
 }
 
@@ -39,20 +40,21 @@ struct ref alternatives_evaluator(struct hash_map* bindings)
 {
 
   int e_key = 3;
-  struct ref e;
+  struct ref e_ref;
+  void* e = get_ref(e_ref);
   get_binding(bindings, e_key, (const struct ref*)&e);
   
-  struct info_table *e_info = *(struct info_table**)get_ref(e);
+  struct info_table *e_info = *(struct info_table**)e;
 
   if(e_info->type == 1) {
     int d = *(int*)(e + sizeof(void*));
     printf("%d\n", d);
-    return NULL;
+    return e_ref;
   }
   else if(e_info->type == 5)
   {
     push_case_frame(alternatives_evaluator, 3, bindings);
-    return case_continuation((e_info->extra.thunk_info.return_address)(e));
+    return case_continuation((e_info->extra.thunk_info.return_address)(e_ref));
   }
   else { assert(false); }
 }
@@ -78,8 +80,8 @@ struct ref main_function(struct ref _no_arg)
   struct ref a_ref;
   new_ref(sizeof(struct i_hash), &a_ref);
   struct i_hash *a = (struct i_hash*)get_ref(a_ref);
-  a_val->info_ptr = &int_constructor_info_table;
-  a_val->val = 1;
+  a->info_ptr = &int_constructor_info_table;
+  a->val = 1;
 
   struct ref b_ref;
   new_ref(sizeof(struct i_hash), &b_ref);
@@ -109,13 +111,13 @@ struct ref main_function(struct ref _no_arg)
   // Sanity check
   struct ref tmp_;
   get_binding(bindings, a_key, (struct ref*)&tmp_);
-  void *tmp = get_ref(tmp);
+  void *tmp = get_ref(tmp_);
   assert(((struct i_hash*)tmp)->val == 1);
 
   push_case_frame(alternatives_evaluator, 3, bindings);
 
-  push_ptr(c);
-  push_ptr(c);
-  return case_continuation(plus_int(NULL));
+  push_ptr(c_ref);
+  push_ptr(c_ref);
+  return case_continuation(plus_int(c_ref));
 
 }

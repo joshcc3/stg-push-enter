@@ -5,6 +5,7 @@
 // heap object - info pointer, payload
 
 #include "data/string_.h"
+#include "stg/bindings.h"
 
 
 // functions as well as continuations take a pointer to the info table of the structure, the stack pointer should be globally available

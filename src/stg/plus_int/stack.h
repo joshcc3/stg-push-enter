@@ -17,5 +17,6 @@ void push_int(int);
 void push_char(char);
 void push_long(long);
 
+void pop_ptr(struct ref*);
 
 #endif

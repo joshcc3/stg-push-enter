@@ -43,12 +43,12 @@ struct ref thunk1_cont(struct ref thunk_object_ref)
   struct hash_map *bindings = (struct hash_map *)(((const void **)thunk_object)[1]);
   struct ref vx;
   struct ref vy;
-  get_binding(bindings, 2, (const struct ref*)&vx);
-  get_binding(bindings, 3, (const struct ref*)&vy);
+  get_binding(bindings, 2, (struct ref*)&vx);
+  get_binding(bindings, 3, (struct ref*)&vy);
   struct ref result_ref;
   new_ref(sizeof(int), &result_ref);
-  void *result = get_ref(result_ref);
-  *result = *get_ref(vx) + *get_ref(vy);
+  int *result = (int*)get_ref(result_ref);
+  *result = *(int*)get_ref(vx) + *(int*)get_ref(vy);
   return result_ref;
 }
 
@@ -63,7 +63,7 @@ struct ref continuation1(struct hash_map *bindings) {
   thunk1_info_table->layout = layout_tmp; // TODO: Need to intialize the layout
   thunk1_info_table->extra.thunk_info.return_address = thunk1_cont;
 
-  struct ref *thunk1_ref;
+  struct ref thunk1_ref;
   new_ref(sizeof(void**)*2, &thunk1_ref);
   void**thunk1 = (void**)get_ref(thunk1_ref);
   thunk1[0] = (void*)thunk1_info_table;
@@ -162,12 +162,11 @@ case (plus_unboxed 1 2) of
   // the garbage collector will need to refcount this bindings map and free it when it is done - not sure how this would be implemented.
 
   struct ref a_ref;
-  pop_ref(&a_ref);
+  pop_ptr(&a_ref);
   void *a = get_ref(a_ref);
 
   struct ref b_ref;
-  pop_ref(&b_ref);
-  void *b = get_ref(b_ref);
+  pop_ptr(&b_ref);
 
   int a_key = 0;
   int b_key = 1;
@@ -197,9 +196,9 @@ case (plus_unboxed 1 2) of
   {
     assert(a_info->type == 5);
     push_case_frame(alternatives_evaluator1, 2, bindings);
-    push_update_frame(a);
+    push_update_frame(a_ref);
     a_info->type = 6;
-    struct ref a_computed = (a_info->extra.thunk_info.return_address(a));
+    struct ref a_computed = (a_info->extra.thunk_info.return_address(a_ref));
     return case_continuation(update_continuation(a_computed));
   }
 

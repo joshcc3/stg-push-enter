@@ -3,7 +3,7 @@
 #include "code.h"
 #include "containers/mmanager.h"
 #include "main.h"
-#include "bindings.h"
+#include "stg/bindings.h"
 
 char* allocate_stack(int stack_size) { return (char*)new(stack_size); }
 
@@ -42,6 +42,7 @@ int main()
   plus_info_table.layout = plus_layout;
 
   init_pointer_table(16);
-
-  main_function(NULL);
+  
+  struct ref inp;
+  main_function(inp);
 }
