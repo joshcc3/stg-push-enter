@@ -3,13 +3,13 @@
 
 #include "static.h"
 
-
 struct ref update_continuation(struct ref);
 
 struct ref case_continuation(struct ref);
 
 void push_update_frame(struct ref);
 
+// case cont, update key, bindings
 void push_case_frame(struct ref (*)(struct hash_map*), int, struct hash_map *);
 
 void push_ptr(struct ref);

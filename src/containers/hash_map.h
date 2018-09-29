@@ -22,11 +22,11 @@ struct hash_map_element {
 */
 
 // A hash map consists of a hash set of a pair of (key, value) where equality between the elements is based on the key.
-struct hash_map {
+typedef struct hash_map {
     struct hash_set * wrapped;
     const struct equals_typeclass * e_t;
     const struct obj_typeclass * o_t;
-};
+} hash_map;
 
 /*
 

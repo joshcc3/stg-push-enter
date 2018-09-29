@@ -186,12 +186,14 @@ err_t ll_delete_element(struct linked_list * const linked_list, const int n, con
         node_to_free = old_head;
         linked_list->head = NULL;
         linked_list->tail = NULL;
+        return_code = 0;
     }
     else if(actual_index == 0)
     {
         *result = old_head->element;
         linked_list->head = old_head->next;
         node_to_free = old_head;
+        return_code = 0;
     }
     else
     {
@@ -242,8 +244,8 @@ err_t ll_map(struct linked_list const * const linked_list, err_t map_fn(void**))
     for(int ix = 0; ix < old_size; ix++)
     {
         assert(pointer);
-	    const void ** reference = &((*pointer).element);
-        return_code = return_code & map_fn(reference);
+	    const void * reference = ((*pointer).element);
+        return_code = return_code & map_fn(&reference);
         pointer = pointer->next;
     }
 

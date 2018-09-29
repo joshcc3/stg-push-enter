@@ -4,6 +4,19 @@
 #include "containers/mmanager.h"
 #include "main.h"
 #include "stg/bindings.h"
+#include "containers/hash_map.h"
+#include "typeclasses.h"
+
+#include <assert.h>
+
+
+void init_bindings(hash_map** bindings) { init_hash_map(bindings, 16, &int_ptr_equals_typeclass, &int_ptr_obj_typeclass); }
+
+bool arg_satisfaction_check(int size)
+{
+    assert((su_register - stack_pointer) > 0);
+    return (su_register - stack_pointer) >= size;
+}
 
 char* allocate_stack(int stack_size) { return (char*)new(stack_size); }
 
@@ -11,38 +24,15 @@ int main()
 {
   stack_pointer = allocate_stack(INITIAL_STACK_SIZE);
   stack_pointer += INITIAL_STACK_SIZE;
-  
-  struct con con_info = { .arity = 1, .con_num = 0, .con_name = { .char_arr = "I#", .length = 2 } };
-  struct arg_entry con_entries[1];
-  struct layout con_layout = { .num = 1, .entries = con_entries };
-  union info_table_u con_info_ = { .constructor = con_info };
-  int_constructor_info_table.type = 1;
-  int_constructor_info_table.extra = con_info_;
-  int_constructor_info_table.layout = con_layout;
 
-  struct arg_entry e1 = { .size = sizeof(int), .pointer = false };
-  con_entries[0] = e1;
-  
-  struct arg_entry plus_entries[2];
-  struct arg_entry plus_entry1 = { .size = sizeof(int*), .pointer = true };
-  struct arg_entry plus_entry2 = { .size = sizeof(int*), .pointer = true };
-  plus_entries[0] = plus_entry1;
-  plus_entries[1] = plus_entry2;
-  struct layout plus_layout = { .num = 2, .entries = plus_entries };
+  init_pointer_table(64);
 
-  struct fun plus_extra = {
-    .fast_entry_point = plus_int,
-    // TODO need to set the slow entry point
-    .arity = 2
-    
-  };
-  union info_table_u plus_extra_ = { .function = plus_extra };
-  plus_info_table.type = 0;
-  plus_info_table.extra = plus_extra_;
-  plus_info_table.layout = plus_layout;
+  init_int();
+  init_list();
 
   init_pointer_table(16);
-  
-  struct ref inp;
-  main_function(inp);
+
+  struct ref null;
+  main_function(null);
 }
+
