@@ -6,11 +6,9 @@
 
 #include "data/string_.h"
 #include "stg/bindings.h"
+#include "stg/list.h"
 
-
-// functions as well as continuations take a pointer to the info table of the structure, the stack pointer should be globally available
-
-#define INITIAL_STACK_SIZE 32*1024
+bool arg_satisfaction_check(int);
 
 struct fun {
   /*
@@ -44,7 +42,8 @@ struct con {
 };
 
 struct pap {
-  struct fun * ptr;
+  struct info_table * info_ptr;
+  int size;
 };
 
 struct thunk {
@@ -57,10 +56,11 @@ struct blackhole {
 };
 
 
-struct arg_entry {
+typedef struct arg_entry {
   int size; // bytes
   bool pointer;
-};
+  size_t offset;
+} arg_entry;
 
 
 struct layout {
@@ -80,12 +80,14 @@ union info_table_u {
   struct blackhole blackhole_info;
 };
 
-struct info_table {
+typedef struct info_table {
   int type;
   union info_table_u extra;
   struct layout layout;
 
-};
+} info_table;
+
+
 
 // All of these are basically function closures
 struct update_frame {
@@ -96,19 +98,23 @@ struct update_frame {
 };
 
 
-struct case_frame {
+typedef struct case_frame {
   struct info_table *tbl;
   // TODO: these free variables will need to be collected when the case frame is popped
   struct hash_map *free_vars;
   int update_key;
   struct ref (*alternatives_evaluator)(struct hash_map*);
-};
+} case_frame;
 
 
 
 // for easier pointer arithmetic necessary for pushing and popping stack frames
 char *stack_pointer;
 char *su_register; // used for tracking the current update frames
+
+// functions as well as continuations take a pointer to the info table of the structure, the stack pointer should be globally available
+
+#define INITIAL_STACK_SIZE 32*1024
 
 
 // TODO: where should these go? The defns of the constructor are in code.h

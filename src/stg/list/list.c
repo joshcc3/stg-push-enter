@@ -1,36 +1,68 @@
-#include "list.h"
 #include <assert.h>
+
+#include "list.h"
+#include "containers/hash_map.h"
+#include "stg/bindings.h"
+#include "stg/plus_int/static.h"
+#include "typeclasses.h"
+#include "heap.h"
+
+void init_list()
+{
+    cons_info_table = { .type = 1, .extra = { .constructor = { .arg_num = 2, .con_num = 0 } } };
+    nil_info_table = { .type = 1, .extra = { .constructor = { .arg_num = 0, .con_num = 1 } } };
+
+    arg_entry map_entries[2];
+    map_entries[0] = { .pointer = true, .offset = 0 };
+    map_entries[1] = { .pointer = true, .offset = sizeof(ref) };
+    map_info_table = { .type = 0,
+                       .extra.function = { .arity = 2, .slow_entry_point = map_slow },
+                       .layout = { .num = 2, .entries = map_entries }
+                      };
+
+    nil_value = new_ref(sizeof(Nil), &nil_value);
+    (Nil*)get_ref(nil_value)->info_ptr = &nil_info_table;
+}
 
 ref map_thunk1(ref bindings)
 {
-  get bindings to f
-  get bindings to x
+      ref f_ref;
+      ref x_ref;
+      get_binding(bindings, 1, &x_ref);
 
-  if(f is a thunk)
-  {
-    push update frame
-    pop update(enter thunk)
-    map_thunk1(bindings);
-  }
-  else if(f is a pap)
-  {
-    push x
-    unroll pap on to stack
-    return enter fs code
-  }
-  else if(if is a func)
-  {
-    push x
-    return enter fs code
-  }
-  else assert(false);
+      get_binding(bindings, 0, &f_ref);
+
+      void** f = (void**)get_ref(f_ref);
+      struct info_table f_info = **(struct info_table**)f;
+      if(f_info.type == 5)
+      {
+        push_update_frame(0);
+        update_continuation(f_info.extra.thunk.return_address(f_ref));
+        map_thunk1(bindings);
+      }
+      else if(f_info.type == 4)
+      {
+        push_ptr(x_ref);
+        unroll_pap((void**)get_ref(f_ref));
+
+        ref null;
+        return f_info.function.slow_entry_point(null);
+      }
+      else if(f_info.type == 0)
+      {
+        push_ptr(x_ref);
+        ref null;
+        return f_info.function.slow_entry_point(null);
+      }
+      else assert(false);
 }
 
-ref map_thunk2(ref bindings)
-{
-  get bindings to f
-  get bindings to xs
-  return map_fast(f, xs);
+ref map_thunk2(ref bindings) {
+    ref a1;
+    ref a2;
+    get_binding(bindings, 0, &a1);
+    get_binding(bindings, 0 ,&a2);
+    return map_fast(a1, a2);
 }
 
 /*
@@ -39,50 +71,105 @@ map f l = case l of
                          let f' = THUNK (map f xs) in
                          let c' = Cons x' f'
                          in c'
+            Nil -> Nil
 */
+ref map_case_cont(struct hash_map* bindings)
+{
+    ref func_ref;
+    ref list_ref;
+
+    get_binding(bindings, 0, &func_ref);
+    get_binding(bindings, 1, &list_ref);
+    void **l_ = (void**)get_ref(list_ref);
+    struct info_ptr *l_info = (struct info_ptr*)(*l_);
+    if(l_info->type == 1)
+    {
+        if(l_info->extra.constructor.con_num == 0)
+        {
+            Cons *l = (Cons*)l;
+            put_binding(bindings, 2, l->value);
+            put_binding(bindings, 3, l->next);
+            ref thunk1_ref = create_thunk(bindings, map_thunk1);
+            put_binding(bindings, 4, thunk1_ref);
+
+            ref thunk2_ref = create_thunk(bindings, map_thunk2);
+            put_binding(bindings, 5, thunk2_ref);
+
+            ref cons_ref;
+            new_ref(sizeof(Cons), cons_ref);
+            Cons *cons = (Cons *)get_ref(cons_ref);
+            cons->info_ptr = cons_constructor_info_table;
+            cons->value = thunk1_ref;
+            cons->next = thunk2_ref;
+
+            return cons;
+         }
+         else
+         {
+            assert(l_info->extra.constructor.con_num == 1);
+            return nil_value;
+         }
+    }
+    else return thunk_continuation(l_ref, map_case_cont, bindings, 1, 1);
+
+    return cons;
+
+}
+
+// TODO: intialize the layout for every function info table, (plus_int, map)
+
 ref map_fast(ref function, ref list)
 {
-    declare thunk1
-    bind x' to it
-    declare thunk2
-    bind f' to it
-    declare constructor
-    return constructor
+    struct hash_map *bindings;
+    init_hash_map(&bindings, 16, int_ptr_eq, int_ptr_obj);
+    put_binding(bindings, 0, function);
+    put_binding(bindings, 1, list);
+    return map_case_cont(bindings);
+
 }
 
 ref map_slow(ref null)
 {
-  assert (su - stack_pointer < sizeof(void*)*2)
-  if(su - stack_pointer == sizeof(void*)*2)
+  if(arg_satisfaction_check(sizeof(ref)*2))
   {
-    arg1 = pop
-    arg2 = pop
-    return map_fast(arg1, arg2)
+    ref arg1;
+    ref arg2;
+    pop_ptr(&arg1);
+    pop_ptr(&arg2);
+    return map_fast(arg1, arg2);
   }
   else
   {
      // at least 1 arg must be present
-     arg1 = pop
-     build a pap with arg1
-     return pap
+     ref arg1;
+     pop_ptr(&arg1);
+
+     ref pap_ref;
+     new_ref(&pap_ref);
+     void **pap_ = (void**)get_ref(pap_ref);
+
+     struct info_table* pap_info = (struct info_table*)new(sizeof(struct info_table));
+     pap_info->type = 4;
+     pap_info->extra.pap = { .info_ptr = &map_info_table, .size = 1 };
+     pap_[0] = pap_info;
+     *(ref*)pap_ = ref_arg1;
+     return pap_ref;
   }
 }
 
-ref head_case_cont(ref bindings)
+ref head_case_cont(struct hash_map *bindings)
 {
-    arg = get l from bindings
-    if(constructor)
+    ref arg_ref;
+    get_binding(bindings, 0, &arg_ref);
+    void**l = (void**)get_ref(arg_ref);
+    struct info_table *l_info = *(struct info_ptr **)l;
+    if(l_info->type == 1)
     {
-      must be cons
-      return ref to x in l
+      assert(l_info->extra.constructor.con_num == 0);
+      Cons *c = (Cons*)l;
+      return c->value;
     }
-    else
-    {
-      must be a thunk
-      push the case frame refed to case_cont
-      push the update frame to update l
-      pop case(pop update(enter thunks code))
-    }
+    else return thunk_continuation(l_ref, head_case_cont, bindings, 0, 0);
 }
 /*
     head :: [a] -> a
@@ -91,32 +178,36 @@ ref head_case_cont(ref bindings)
 */
 ref head_fast(ref list)
 {
-    bind l to list in bindings
-    head_case_cont(bindings)
+    struct hash_map *bindings;
+    init_hash_map(&bindings, 16, int_ptr_eq, int_ptr_obj);
+    put_binding(bindings, 0, list);
+    return head_case_cont(bindings);
 }
 
 ref head_slow(ref null)
 {
     // no need to perform an argument satisfaction check because the only way this is called is when its applied to its argument
-    pop arg from stack
-    head_fast(arg)
+    ref arg;
+    pop_ptr(&arg);
+    return head_fast(arg);
 }
 
 
 ref tail_case_cont(ref bindings)
 {
-   if(l is a constructor)
+   ref l_ref;
+   get_binding(bindings, 0, &l_ref);
+   void** l = (void**)get_ref(l_ref);
+   struct info_ptr l_info = **(struct info_ptr **)l;
+
+   if(l_info.type == 1)
    {
-      assert its a cons
-      return (get xs for l)
+      assert(l_info.extra.constructor.con_num == 1);
+      Cons *c = (Cons*)l;
+      return c->next;
    }
-   else
-   {
-     must be a thunk
-     push case frame (tail case cont)
-     push update frame(l)
-     pop case(pop update(enter thunk code))
-   }
+   else return thunk_continuation(l_ref, tail_case_cont, bindings, 0, 0);
+
 }
 
 /*
@@ -126,12 +217,15 @@ ref tail_case_cont(ref bindings)
 */
 ref tail_fast(ref list)
 {
-  bind l to list in bindings
+  init_hash_map(&bindings, 16, &int_ptr_equals_typeclass, &int_ptr_obj_typeclass);
+  put_binding(bindings, 0, list);
+
   tail_case_cont(bindings);
 }
 
 ref tail_slow(ref list)
 {
-  pop arg from stack
-  tail_fast(arg);
+    ref arg_ref;
+    pop_ptr(&arg_ref);
+    return tail_fast(arg_ref);
 }

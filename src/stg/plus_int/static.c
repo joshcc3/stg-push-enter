@@ -4,6 +4,13 @@
 #include "containers/mmanager.h"
 #include "main.h"
 #include "stg/bindings.h"
+#include <assert.h>
+
+bool arg_satisfaction_check(int size)
+{
+    assert((su_register - stack_pointer) > 0);
+    return (su_register - stack_pointer) >= size;
+}
 
 char* allocate_stack(int stack_size) { return (char*)new(stack_size); }
 
@@ -24,8 +31,8 @@ int main()
   con_entries[0] = e1;
   
   struct arg_entry plus_entries[2];
-  struct arg_entry plus_entry1 = { .size = sizeof(int*), .pointer = true };
-  struct arg_entry plus_entry2 = { .size = sizeof(int*), .pointer = true };
+  struct arg_entry plus_entry1 = { .size = sizeof(int*), .pointer = true, .offset = 0 };
+  struct arg_entry plus_entry2 = { .size = sizeof(int*), .pointer = true, .offset = sizef(int*) };
   plus_entries[0] = plus_entry1;
   plus_entries[1] = plus_entry2;
   struct layout plus_layout = { .num = 2, .entries = plus_entries };
@@ -40,6 +47,8 @@ int main()
   plus_info_table.type = 0;
   plus_info_table.extra = plus_extra_;
   plus_info_table.layout = plus_layout;
+
+  init_list();
 
   init_pointer_table(16);
   
