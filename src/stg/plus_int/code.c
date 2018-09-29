@@ -142,11 +142,34 @@ struct ref alternatives_evaluator1(struct hash_map *bindings)
   }
 }
 
+struct ref plus_int(ref null)
+{
+  assert (su - stack_pointer <= sizeof(void*)*2)
+  if(su - stack_pointer == sizeof(void*)*2)
+  {
+      ref a_ref;
+      pop_ptr(&a_ref);
+
+      ref b_ref;
+      pop_ptr(&b_ref);
+
+      return map_fast(arg1, arg2);
+  }
+  else
+  {
+    assert(false);
+     // at least 1 arg must be present
+     /*arg1 = pop
+     build a pap with arg1
+     return pap*/
+  }
+}
+
 
 // we expect all of our arguments to be passed on the stack
-struct ref plus_int (struct ref no_arg)
+struct ref plus_int (ref a_ref, ref b_ref)
 {
-  // the fast entry point (no argument satisfaction check) [We assume arguments are always passed on the stack]
+  // the fast entry point (no argument satisfaction check)
   /*
 
 plus_int a b = case a of
@@ -165,12 +188,7 @@ case (plus_unboxed 1 2) of
   init_hash_map(&bindings, 16, &int_ptr_equals_typeclass, &int_ptr_obj_typeclass);
   // the garbage collector will need to refcount this bindings map and free it when it is done - not sure how this would be implemented.
 
-  struct ref a_ref;
-  pop_ptr(&a_ref);
   void *a = get_ref(a_ref);
-
-  struct ref b_ref;
-  pop_ptr(&b_ref);
 
   int a_key = 0;
   int b_key = 1;

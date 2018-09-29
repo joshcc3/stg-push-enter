@@ -7,9 +7,9 @@
 struct arr_list *pointer_table;
 
 // A ref stores an offset into the pointer table to avoid containing internal pointers
-struct ref {
+typedef struct ref {
   int* offset;
-};
+} ref;
 
 void init_pointer_table(size_t);
 

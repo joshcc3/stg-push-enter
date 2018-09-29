@@ -10,5 +10,6 @@ struct i_hash {
 };
 
 struct ref plus_int(struct ref);
+struct ref plus_int_fast(struct ref);
 
 #endif

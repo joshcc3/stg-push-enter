@@ -6,11 +6,13 @@ struct test {
   int x;
 };
 
+typedef struct ref {
+    void **ptr;
+} ref;
+
 int main()
 {
-  struct test z = { .a = "The thing\0", .x = 13 };
-  
-  printf("%s.\n", z.a);
-
+    struct ref a;
+    ref b;
 }
 

@@ -13,16 +13,25 @@
 #define INITIAL_STACK_SIZE 32*1024
 
 struct fun {
+  /*
+    takes the function object as the argument
+    the fast entry point assumes that all the arguments are on the stack and pops them off
+    this is used for the KNOWN FUNCTION CALL rule
+   */
   struct ref (*fast_entry_point)(struct ref); // pointer to the function object, first word is a pointer to the info table. the rest is the payload
+
+  // the slow entry point is used when the function is statically unknown (arguments to functions/variables declared in let bindings)
   struct ref (*slow_entry_point)(struct ref);
   int arity;
 };
 
 struct update_info {
+  // Closure, the ref points to the object that needs to be updated
   struct ref (*return_address)(struct ref);
 };
 
 struct case_info {
+  // Closure, the ref points to the bindings of the free variables
   struct ref (*return_address)(struct ref);
 };
 
@@ -38,6 +47,7 @@ struct pap {
 };
 
 struct thunk {
+  // takes the thunk object as the argument
   struct ref (*return_address)(struct ref);
 };
 
