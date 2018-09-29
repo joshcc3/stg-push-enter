@@ -30,11 +30,7 @@ void* main_function(void* no_arg)
 
   // neither a or b are free in the body of the case so there are no relevant bindings
 
-  push_ptr(b_ref);
-  push_ptr(a_ref);
-  
-  struct ref rand;
-  struct ref res_ref = (plus_info_table.extra.function.fast_entry_point)(rand);
+  struct ref res_ref = plus_int_fast(a_ref, b_ref);
   void *res = get_ref(res_ref);
 
   struct info_table *con_tbl = *(struct info_table **)res;

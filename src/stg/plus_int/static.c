@@ -31,10 +31,10 @@ int main()
   struct layout plus_layout = { .num = 2, .entries = plus_entries };
 
   struct fun plus_extra = {
-    .fast_entry_point = plus_int,
-    // TODO need to set the slow entry point
+    //.fast_entry_point = plus_int_fast,
+    .slow_entry_point = plus_int_slow,
     .arity = 2
-    
+
   };
   union info_table_u plus_extra_ = { .function = plus_extra };
   plus_info_table.type = 0;

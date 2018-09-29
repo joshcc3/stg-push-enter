@@ -9,7 +9,7 @@ struct i_hash {
   int val;
 };
 
-struct ref plus_int(struct ref);
-struct ref plus_int_fast(struct ref);
+struct ref plus_int_slow(ref);
+struct ref plus_int_fast(ref, ref);
 
 #endif

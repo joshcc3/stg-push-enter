@@ -28,11 +28,7 @@ struct ref c_cont(struct ref thunk_object_ref)
 
   push_update_frame(c);
 
-  push_ptr(b);
-  push_ptr(a);
-  
-  struct ref noop;
-  return update_continuation(plus_int(noop));
+  return update_continuation(plus_int_fast(a, b));
 
 }
 
@@ -116,8 +112,6 @@ struct ref main_function(struct ref _no_arg)
 
   push_case_frame(alternatives_evaluator, 3, bindings);
 
-  push_ptr(c_ref);
-  push_ptr(c_ref);
-  return case_continuation(plus_int(c_ref));
+  return case_continuation(plus_int_fast(c_ref, c_ref));
 
 }

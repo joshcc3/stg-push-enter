@@ -17,6 +17,8 @@ void* get_ref(struct ref);
 
 void upd_ref(struct ref, struct ref);
 
+void upd_ref_value(struct ref, struct ref);
+
 // Insert a new heap object into the pointer table and return the pointer to the 
 void new_ref(size_t, struct ref*);
 

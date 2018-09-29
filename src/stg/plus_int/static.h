@@ -18,7 +18,8 @@ struct fun {
     the fast entry point assumes that all the arguments are on the stack and pops them off
     this is used for the KNOWN FUNCTION CALL rule
    */
-  struct ref (*fast_entry_point)(struct ref); // pointer to the function object, first word is a pointer to the info table. the rest is the payload
+   // This takes a variable number of arguments..
+  // struct ref (*fast_entry_point)(struct ref); // pointer to the function object, first word is a pointer to the info table. the rest is the payload
 
   // the slow entry point is used when the function is statically unknown (arguments to functions/variables declared in let bindings)
   struct ref (*slow_entry_point)(struct ref);

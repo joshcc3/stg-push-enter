@@ -7,6 +7,9 @@
 #include "code.h"
 #include "stg/bindings.h"
 
+
+#define PTR_SIZE sizeof(void*)
+
 // TODO: I dont think you can free stuff that is on the stack so the hash map which is full of references to the stack will need
 // to be taken care of
 
@@ -138,14 +141,14 @@ struct ref alternatives_evaluator1(struct hash_map *bindings)
     *y_value = *(int*)(get_ref(b_computed) + sizeof(void*));
     
     update_continuation(b_computed);
-    case_continuation(y_value_ref);
+    return case_continuation(y_value_ref);
   }
 }
 
-struct ref plus_int(ref null)
+struct ref plus_int_slow(ref null)
 {
-  assert (su - stack_pointer <= sizeof(void*)*2)
-  if(su - stack_pointer == sizeof(void*)*2)
+  assert (su_register - stack_pointer <= sizeof(void*)*2);
+  if(su_register - stack_pointer == sizeof(void*)*2)
   {
       ref a_ref;
       pop_ptr(&a_ref);
@@ -153,21 +156,31 @@ struct ref plus_int(ref null)
       ref b_ref;
       pop_ptr(&b_ref);
 
-      return map_fast(arg1, arg2);
+      return plus_int_fast(a_ref, b_ref);
   }
   else
   {
-    assert(false);
      // at least 1 arg must be present
-     /*arg1 = pop
-     build a pap with arg1
-     return pap*/
+
+     ref arg1;
+     pop_ptr(&arg1);
+
+     ref pap_ref;
+     new_ref(sizeof(int) + PTR_SIZE, &pap_ref);
+
+     void **pap = (void**)get_ref(pap_ref);
+     pap[0] = (void*)&int_constructor_info_table;
+     *(int*)(pap + 1) = 1;
+     ref* arg1_loc = (ref*)((char*)pap + PTR_SIZE + sizeof(int));
+     *arg1_loc = arg1;
+
+     return pap_ref;
   }
 }
 
 
 // we expect all of our arguments to be passed on the stack
-struct ref plus_int (ref a_ref, ref b_ref)
+struct ref plus_int_fast(ref a_ref, ref b_ref)
 {
   // the fast entry point (no argument satisfaction check)
   /*

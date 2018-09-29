@@ -55,6 +55,9 @@ Fun(<info table pointer>, arity) number of arguments this takes?
 PAP(<info table pointer to function>, arity?)
 BLACKHOLE: (<info ptr to thunk>,)
 
+PAP heap objects contain the info pointer, then an int describing the number of args to follow.
+
+
 In the paper they make many optimizations. For one, in the info table, the code is juxtaposed against the rest of the entries. An info table pointer, will point to the code of the object. The rest of the data of the info table will be laid out above the code and can be accessed by negative references. the fast entry point lies just below the slow entry point because all the slow entry point does is do the satisfaction check, prepare the arguments and then call the fast entry point.
 
 Effectively we have two stacks. One for the c runtime and the other is the stack we use for pushing continuations.
@@ -79,6 +82,8 @@ One tricky question is how to maintain the pointer table.. evidently its append 
 A constructor that takes an unboxed value can never take a ref so if you're doing a `let x = I# int_value` the code will evaluate its argument strictly because of course we can't store a ref as an argument to the I# constructor.
 
 // TODO need to implement the slow entry point for functions
+
+
 
 # Code flow
 ## Examples
