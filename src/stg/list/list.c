@@ -43,7 +43,7 @@ ref map_thunk1(ref thunk)
       GET_BINDING(f_ref, void**, f, 0, bindings)
 
       ref x_ref;
-      get_binding(bindings, 1, &x_ref);
+      get_binding(bindings, 2, &x_ref);
 
       struct info_table f_info = **(struct info_table**)f;
       if(f_info.type == 5)

@@ -16,11 +16,9 @@ ref inc_cont(ref thunk_ref)
      void** thunk = (void**)get_ref(thunk_ref);
      struct hash_map *bindings = (struct hash_map*)thunk[1];
 
-     ref pap_ref;
-     new_ref(sizeof(sizeof(void*) + sizeof(ref)), &pap_ref);
-     void **pap = (void**)get_ref(pap_ref);
+     NEW_REF(pap_ref, void**, sizeof(void*) + sizeof(ref), pap)
 
-     struct info_table* pap_info = (struct info_table*)new(sizeof(struct info_table));
+     NEW(struct info_table, pap_info)
      pap_info->type = 4;
      struct pap pap_info_extra = { .info_ptr = &plus_info_table, .size = 1 };
      pap_info->extra.pap_info = pap_info_extra;
@@ -89,9 +87,7 @@ ref case_cont(hash_map *bindings)
   void** i_ = (void**)get_ref(i_ref);
   if((*(struct info_table **)i_)->type == 1)
   {
-    int z = *(int*)i_[1];
-
-    printf("%d\n", z);
+    printf("%d\n", *(int*)(i_ + 1));
     ref null;
     return null;
   }
