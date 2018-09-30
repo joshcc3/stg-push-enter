@@ -1,12 +1,15 @@
 #ifndef STATIC_H
 #define STATIC_H
 
+// TODO: Need to fix the import structure - there should be a types module. There should be one for the stack.
+// TODO: Then there should be the actual function that initializes everything and should import from the constructors and stack.
 
 // heap object - info pointer, payload
 
 #include "data/string_.h"
 #include "stg/bindings.h"
-#include "stg/list.h"
+#include "stg/list/list.h"
+#include "stg/plus_int/code.h"
 
 bool arg_satisfaction_check(int);
 

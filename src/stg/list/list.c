@@ -5,11 +5,11 @@
 #include "stg/bindings.h"
 #include "stg/plus_int/static.h"
 #include "typeclasses.h"
-#include "heap.h"
+#include "stg/heap.h"
 
 void init_list()
 {
-    cons_info_table = { .type = 1, .extra = { .constructor = { .arg_num = 2, .con_num = 0 } } };
+/*    cons_info_table = { .type = 1, .extra = { .constructor = { .arg_num = 2, .con_num = 0 } } };
     nil_info_table = { .type = 1, .extra = { .constructor = { .arg_num = 0, .con_num = 1 } } };
 
     arg_entry map_entries[2];
@@ -22,8 +22,9 @@ void init_list()
 
     nil_value = new_ref(sizeof(Nil), &nil_value);
     (Nil*)get_ref(nil_value)->info_ptr = &nil_info_table;
+    */
 }
-
+/*
 ref map_thunk1(ref bindings)
 {
       ref f_ref;
@@ -73,6 +74,7 @@ map f l = case l of
                          in c'
             Nil -> Nil
 */
+/*
 ref map_case_cont(struct hash_map* bindings)
 {
     ref func_ref;
@@ -115,21 +117,25 @@ ref map_case_cont(struct hash_map* bindings)
     return cons;
 
 }
-
+*/
 // TODO: intialize the layout for every function info table, (plus_int, map)
 
 ref map_fast(ref function, ref list)
 {
+/*
     struct hash_map *bindings;
     init_hash_map(&bindings, 16, int_ptr_eq, int_ptr_obj);
     put_binding(bindings, 0, function);
     put_binding(bindings, 1, list);
     return map_case_cont(bindings);
-
+*/
+   ref null;
+return null;;
 }
 
 ref map_slow(ref null)
 {
+/*
   if(arg_satisfaction_check(sizeof(ref)*2))
   {
     ref arg1;
@@ -155,8 +161,11 @@ ref map_slow(ref null)
      *(ref*)pap_ = ref_arg1;
      return pap_ref;
   }
-}
+  */
 
+  return null;;
+}
+/*
 ref head_case_cont(struct hash_map *bindings)
 {
     ref arg_ref;
@@ -178,23 +187,32 @@ ref head_case_cont(struct hash_map *bindings)
 */
 ref head_fast(ref list)
 {
+/*
     struct hash_map *bindings;
     init_hash_map(&bindings, 16, int_ptr_eq, int_ptr_obj);
     put_binding(bindings, 0, list);
     return head_case_cont(bindings);
+    */
+    ref null;
+
+return null;;
 }
 
 ref head_slow(ref null)
 {
+/*
     // no need to perform an argument satisfaction check because the only way this is called is when its applied to its argument
     ref arg;
     pop_ptr(&arg);
     return head_fast(arg);
+    */
+return null;;
 }
 
-
+/*
 ref tail_case_cont(ref bindings)
 {
+
    ref l_ref;
    get_binding(bindings, 0, &l_ref);
    void** l = (void**)get_ref(l_ref);
@@ -217,15 +235,24 @@ ref tail_case_cont(ref bindings)
 */
 ref tail_fast(ref list)
 {
+  /*
   init_hash_map(&bindings, 16, &int_ptr_equals_typeclass, &int_ptr_obj_typeclass);
   put_binding(bindings, 0, list);
 
   tail_case_cont(bindings);
+  */
+  ref null;
+  return null;;
 }
 
 ref tail_slow(ref list)
 {
+    /*
     ref arg_ref;
     pop_ptr(&arg_ref);
     return tail_fast(arg_ref);
+    */
+
+  ref null;
+  return null;
 }

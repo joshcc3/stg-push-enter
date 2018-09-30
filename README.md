@@ -56,7 +56,7 @@ PAP(<info table pointer to function>, arity?)
 BLACKHOLE: (<info ptr to thunk>,)
 
 A PAP heap objects contain the info pointer and then the arguments. We use the info pointer to infer the size and type of each argument.
-The fun object stores the offset from the start if all the arguments were laid out consecutively
+The fun object stores the offset from the start if all the arguments were laid out consecutively.
 
 In the paper they make many optimizations. For one, in the info table, the code is juxtaposed against the rest of the entries. An info table pointer, will point to the code of the object. The rest of the data of the info table will be laid out above the code and can be accessed by negative references. the fast entry point lies just below the slow entry point because all the slow entry point does is do the satisfaction check, prepare the arguments and then call the fast entry point.
 
@@ -357,6 +357,8 @@ The rule for modulus `a%b == z` is `b*x + z = a` so, `-10%7 == -3` as `7*-1 + (-
 ```
 
 # TODO
+ - One of the issues of using these refs to pass pointers is that you no longer have types which sucks. Maybe create a macro that takes the name of the ref, the name of the value and the type of the value and casts creates a new ref, gets the value and casts the ref to the value. Alternatively for the longer route - dont think you really need this - I think there is a way to automatically generate definitions and the corresponding bindings functions for a ref of a new type using macros but haven't investigated yet. For e.g., you'd hava ref_int, ref_hash_map etc.
+
  - Improve the implementation of hash maps w.r.t the rebalancing and calculation of rebalancing by using bit shift operators.
  - We track the local bindings in a hashmap which we pass around (as a pointer) instead of pushing them onto the stack (as is suggested in the paper). The garbage collector would use the layout in the info table to find out about the state of the heap. One (in retrospect stupid reason) was that I wanted to declare a case_frame struct (and you can't fit a variable sized list of free variables into a struct)
  - The pointer table keeps growing - is there a way to shrink it? (considering other stuff holds references into it you can't really move elements around. Check if it's possible to free interior portions of a malloced structure.
@@ -364,3 +366,19 @@ The rule for modulus `a%b == z` is `b*x + z = a` so, `-10%7 == -3` as `7*-1 + (-
  - There is no need to have local bindings - just index straight into the pointer table.
 # TODO
 You create a file that contains the main functino that gets linked against the other stuff 
+
+
+# Makefiles
+Variables are specified as <key> := <value>. The convention is to use capitals for keys.
+You refer to variables with $(<key>)
+
+The usualy layout is to have an all target and a clean target at least. clean is marked as .PHONY to note that there is nothing generated. The generated files go into a target directory whose internal dir structure matches the source dir structure.
+
+An example rule to compile a .o files from the corresponding .c file. The % denote variables that are captured in rule local variables.
+The targets are captured in $@ and the dependency in $^. There are more variables and funnier ways of using them.
+
+```
+test/stg/target/stg/plus_int/%.o: src/stg/plus_int/%.c
+	mkdir -p test/stg/target/stg/plus_int
+	$(GCC_CMD) $^ -c -o $@
+```

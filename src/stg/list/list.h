@@ -1,4 +1,9 @@
-#include "stg/static.h"
+#ifndef LIST_H
+#define LIST_H
+
+#include "stg/plus_int/static.h"
+
+void init_list();
 
 typedef struct Cons {
     struct info_table *info_ptr;
@@ -32,3 +37,5 @@ struct info_table map_info_table;
 struct info_table head_info_table;
 struct info_table tail_info_table;
 ref nil_value;
+
+#endif

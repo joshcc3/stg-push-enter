@@ -10,6 +10,39 @@
 
 #define PTR_SIZE sizeof(void*)
 
+
+void init_int()
+{
+  struct con con_info = { .arity = 1, .con_num = 0, .con_name = { .char_arr = "I#", .length = 2 } };
+  struct arg_entry *con_entries = (struct arg_entry*)new(sizeof(struct arg_entry));
+  struct arg_entry e1 = { .size = sizeof(int), .pointer = false, .offset = 0 };
+  con_entries[0] = e1;
+
+  struct layout con_layout = { .num = 1, .entries = con_entries };
+  union info_table_u con_info_ = { .constructor = con_info };
+  int_constructor_info_table.type = 1;
+  int_constructor_info_table.extra = con_info_;
+  int_constructor_info_table.layout = con_layout;
+
+  struct arg_entry *plus_entries = (struct arg_entry*)new(sizeof(struct arg_entry)*2);
+  struct arg_entry plus_entry1 = { .size = sizeof(ref), .pointer = true, .offset = 0 };
+  struct arg_entry plus_entry2 = { .size = sizeof(ref), .pointer = true, .offset = sizeof(ref) };
+  plus_entries[0] = plus_entry1;
+  plus_entries[1] = plus_entry2;
+  struct layout plus_layout = { .num = 2, .entries = plus_entries };
+
+  struct fun plus_extra = {
+    //.fast_entry_point = plus_int_fast,
+    .slow_entry_point = plus_int_slow,
+    .arity = 2
+
+  };
+  union info_table_u plus_extra_ = { .function = plus_extra };
+  plus_info_table.type = 0;
+  plus_info_table.extra = plus_extra_;
+  plus_info_table.layout = plus_layout;
+}
+
 // TODO: I dont think you can free stuff that is on the stack so the hash map which is full of references to the stack will need
 // to be taken care of
 

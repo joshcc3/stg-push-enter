@@ -17,7 +17,7 @@ main = let one = I# 1
 */
 
 
-
+/*
 ref inc_cont(ref thunk_ref)
 {
      void** thunk = (void**)get_ref(thunk_ref);
@@ -104,11 +104,11 @@ ref inced_cont(ref thunk_ref)
      return map_fast_call(inc, list);
 }
 
-
+*/
 
 ref main_function(ref)
 {
-    ref one_ref;
+/*    ref one_ref;
     new_ref(sizeof(void*) + sizeof(int), &one);
     void **one = (void**)get_ref(one_ref);
     one[0] = &int_constructor_info_table;
@@ -139,4 +139,5 @@ ref main_function(ref)
 
     push_case_frame(case_cont, 8, bindings);
     return case_continuation(plus_int_fast(element1, element2));
+    */
 }
