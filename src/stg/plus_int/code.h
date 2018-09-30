@@ -12,6 +12,8 @@ struct i_hash {
 struct ref plus_int_slow(ref);
 struct ref plus_int_fast(ref, ref);
 
+void c_int(int, ref*);
+
 void init_int();
 
 #endif

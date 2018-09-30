@@ -9,7 +9,7 @@
 void unroll_pap(void **);
 
 // thunk object, case continuation, current bindings, update key for the case, update key for the update cont
-ref thunk_continuation(ref, ref (*)(struct hash_map*), struct hash_map*, int, int);
+ref thunk_continuation(ref, ref (*)(struct hash_map*), struct hash_map*, int, ref);
 
 // bindings, thunk continuation
 ref create_thunk(struct hash_map*, ref (*)(ref));

@@ -43,6 +43,14 @@ void init_int()
   plus_info_table.layout = plus_layout;
 }
 
+void c_int(int unboxed_value, ref *ref)
+{
+   new_ref(sizeof(void*) + sizeof(int), ref);
+   void **ref_ = (void**)get_ref(*ref);
+   ref_[0] = &int_constructor_info_table;
+   *(int*)(ref_[1]) = unboxed_value;
+}
+
 // TODO: I dont think you can free stuff that is on the stack so the hash map which is full of references to the stack will need
 // to be taken care of
 

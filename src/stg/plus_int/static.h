@@ -11,6 +11,7 @@
 #include "stg/list/list.h"
 #include "stg/plus_int/code.h"
 
+void init_bindings(hash_map**);
 bool arg_satisfaction_check(int);
 
 struct fun {
@@ -34,7 +35,7 @@ struct update_info {
 
 struct case_info {
   // Closure, the ref points to the bindings of the free variables
-  struct ref (*return_address)(struct ref);
+  ref (*return_address)(ref);
 };
 
 

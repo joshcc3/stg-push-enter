@@ -4,7 +4,13 @@
 #include "containers/mmanager.h"
 #include "main.h"
 #include "stg/bindings.h"
+#include "containers/hash_map.h"
+#include "typeclasses.h"
+
 #include <assert.h>
+
+
+void init_bindings(hash_map** bindings) { init_hash_map(&bindings, 16, &int_ptr_equals_typeclass, &int_ptr_obj_typeclass); }
 
 bool arg_satisfaction_check(int size)
 {
@@ -27,3 +33,4 @@ int main()
   struct ref inp;
   main_function(inp);
 }
+

@@ -34,7 +34,7 @@ void push_update_frame(struct ref update_ref) {
   upd_frame->tbl = tbl;
 }
 
-struct ref case_cont(struct ref value)
+static struct ref case_cont(struct ref value)
 {
   struct case_frame *frame = (struct case_frame *)stack_pointer;
   int k = frame->update_key;
