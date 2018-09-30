@@ -4,6 +4,8 @@
 #include "stg/plus_int/static.h"
 
 void init_list();
+// value, next, and the ref to update
+
 
 typedef struct Cons {
     struct info_table *info_ptr;
@@ -37,5 +39,6 @@ struct info_table map_info_table;
 struct info_table head_info_table;
 struct info_table tail_info_table;
 ref nil_value;
+void c_cons(ref, ref, Cons*);
 
 #endif

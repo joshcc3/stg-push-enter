@@ -9,9 +9,8 @@ ref create_thunk(hash_map* bindings, ref (*return_address)(ref))
     thunk_info_ptr->type = 5;
     thunk_info_ptr->extra.thunk_info.return_address = return_address;
 
-    ref thunk_ref;
-    new_ref(sizeof(void*)*2, &thunk_ref);
-    void** thunk = (void**)get_ref;
+    NEW_REF(thunk_ref, void**, sizeof(void*) * 2, thunk)
+
     thunk[0] = thunk_info_ptr;
     thunk[1] = (void*) bindings;
 
@@ -21,11 +20,12 @@ ref create_thunk(hash_map* bindings, ref (*return_address)(ref))
 ref thunk_continuation(ref thunk_ref, ref (*case_cont)(struct hash_map*), struct hash_map* bindings, int case_key, ref update_ref)
 {
     void** thunk = (void**)get_ref(thunk_ref);
-    struct info_table thunk_info = *(struct info_table*)(*thunk);
-    assert(thunk_info.type == 5);
+    struct info_table *thunk_info = (struct info_table*)(*thunk);
+    assert(thunk_info->type == 5);
     push_case_frame(case_cont, case_key, bindings);
     push_update_frame(update_ref);
-    return case_continuation(update_continuation(thunk_info.extra.thunk_info.return_address(thunk_ref)));
+    thunk_info->type = 6;
+    return case_continuation(update_continuation(thunk_info->extra.thunk_info.return_address(thunk_ref)));
 }
 
 

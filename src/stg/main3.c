@@ -2,6 +2,7 @@
 #include "bindings.h"
 #include "containers/mmanager.h"
 #include "stg/heap.h"
+#include "stg/list/list.h"
 #include <stdio.h>
 
 // TODO each constructor should expose functions to create an instance of the constructor
@@ -13,7 +14,6 @@
 ref inc_cont(ref thunk_ref)
 {
      void** thunk = (void**)get_ref(thunk_ref);
-
      struct hash_map *bindings = (struct hash_map*)thunk[1];
 
      ref pap_ref;
@@ -33,28 +33,6 @@ ref inc_cont(ref thunk_ref)
      *(ref*)(pap + 1) = one_ref;
 
      return pap_ref;
-}
-
-ref list_cont(ref thunk_ref)
-{
-     void** thunk = (void**)get_ref(thunk_ref);
-     struct hash_map *bindings = (struct hash_map*)thunk[1];
-
-    ref list_ref;
-    new_ref(sizeof(void*) + sizeof(ref)*2, &list_ref);
-
-    ref one;
-    get_binding(bindings, 0, &one);
-
-    ref inced;
-    get_binding(bindings, 2, &inced);
-
-    Cons *list = (Cons*)get_ref(list_ref);
-    list->info_ptr = &cons_info_table;
-    list->value = one;
-    list->next = inced;
-
-    return list_ref;
 }
 
 ref tail1_cont(ref thunk_ref)
@@ -127,7 +105,7 @@ ref case_cont(hash_map *bindings)
 main = let one = I# 1
        let inc = THUNK (plus_int one)
        let inced = THUNK (map inc list)
-       let list = THUNK (Cons one inced)
+       let list = Cons one inced
        let element1 = THUNK (head inced)
        let tail1 = THUNK (tail inced)
        let element2 = THUNK (head tail1)
@@ -150,8 +128,9 @@ ref main_function(ref null)
     ref inced = create_thunk(bindings, inced_cont);
     put_binding(bindings, 2, inced);
 
-    ref list = create_thunk(bindings, list_cont);
-    put_binding(bindings, 3, list);
+    NEW_REF(list_ref, Cons*, sizeof(Cons), list)
+    c_cons(one, inced, list);
+    put_binding(bindings, 3, list_ref);
 
     ref element1 = create_thunk(bindings, element1_cont);
     put_binding(bindings, 4, element1);

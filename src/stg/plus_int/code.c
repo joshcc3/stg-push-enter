@@ -6,6 +6,7 @@
 #include "containers/mmanager.h"
 #include "code.h"
 #include "stg/bindings.h"
+#include "stg/heap.h"
 
 
 #define PTR_SIZE sizeof(void*)
@@ -13,34 +14,24 @@
 
 void init_int()
 {
-  struct con con_info = { .arity = 1, .con_num = 0, .con_name = { .char_arr = "I#", .length = 2 } };
   struct arg_entry *con_entries = (struct arg_entry*)new(sizeof(struct arg_entry));
-  struct arg_entry e1 = { .size = sizeof(int), .pointer = false, .offset = 0 };
-  con_entries[0] = e1;
+  con_entries[0] = (arg_entry) { .size = sizeof(int), .pointer = false, .offset = 0 };
 
-  struct layout con_layout = { .num = 1, .entries = con_entries };
-  union info_table_u con_info_ = { .constructor = con_info };
   int_constructor_info_table.type = 1;
-  int_constructor_info_table.extra = con_info_;
-  int_constructor_info_table.layout = con_layout;
+  int_constructor_info_table.extra.constructor = (struct con) {
+    .arity = 1,
+    .con_num = 0,
+    .con_name = { .char_arr = "I#", .length = 2 }
+  };
+  int_constructor_info_table.layout = (struct layout) { .num = 1, .entries = con_entries };
 
   struct arg_entry *plus_entries = (struct arg_entry*)new(sizeof(struct arg_entry)*2);
-  struct arg_entry plus_entry1 = { .size = sizeof(ref), .pointer = true, .offset = 0 };
-  struct arg_entry plus_entry2 = { .size = sizeof(ref), .pointer = true, .offset = sizeof(ref) };
-  plus_entries[0] = plus_entry1;
-  plus_entries[1] = plus_entry2;
-  struct layout plus_layout = { .num = 2, .entries = plus_entries };
+  plus_entries[0] = (arg_entry) { .size = sizeof(ref), .pointer = true, .offset = 0 };
+  plus_entries[1] = (arg_entry) { .size = sizeof(ref), .pointer = true, .offset = sizeof(ref) };
 
-  struct fun plus_extra = {
-    //.fast_entry_point = plus_int_fast,
-    .slow_entry_point = plus_int_slow,
-    .arity = 2
-
-  };
-  union info_table_u plus_extra_ = { .function = plus_extra };
   plus_info_table.type = 0;
-  plus_info_table.extra = plus_extra_;
-  plus_info_table.layout = plus_layout;
+  plus_info_table.extra.function = (struct fun) { .slow_entry_point = plus_int_slow, .arity = 2 };
+  plus_info_table.layout = (struct layout) { .num = 2, .entries = plus_entries };
 }
 
 void c_int(int unboxed_value, ref *ref)
@@ -48,7 +39,7 @@ void c_int(int unboxed_value, ref *ref)
    new_ref(sizeof(void*) + sizeof(int), ref);
    void **ref_ = (void**)get_ref(*ref);
    ref_[0] = &int_constructor_info_table;
-   *(int*)(ref_[1]) = unboxed_value;
+   *(int*)(ref_ + 1) = unboxed_value;
 }
 
 // TODO: I dont think you can free stuff that is on the stack so the hash map which is full of references to the stack will need
@@ -136,59 +127,57 @@ struct ref continuation1(struct hash_map *bindings) {
 
 }
 
-struct ref alternatives_evaluator1(struct hash_map *bindings)
+ref alternatives_evaluator2(struct hash_map *bindings)
 {
 
-  struct ref b_;
-  int b_key = 1;
-  get_binding(bindings, b_key, &b_);
-
-  void *b = get_ref(b_);
+  GET_BINDING(b_ref, void*, b, 1, bindings)
   struct info_table *b_info = *(struct info_table **)b;
-  
-  struct ref y_value_ref;
-  new_ref(sizeof(int*), &y_value_ref);
-  int* y_value = (int*)(get_ref(y_value_ref));
 
   /*
     I# x -> case b of
-		           I# y -> let res = THUNK (x +# y) in 
+		           I# y -> let res = THUNK (x +# y) in
 			   let res2 = I# res in res2
   */
   if(b_info->type == 1)
   {
-    int y_key = 3;
+    NEW_REF(y_ref, int*, sizeof(int*), y)
+    *y = *(int*)(b + sizeof(void*));
 
-    *y_value = *(int*)(b + sizeof(void*));
-    
-    put_binding(bindings, y_key, y_value_ref);
+    put_binding(bindings, 3, y_ref);
     return continuation1(bindings);
   }
-  else
-  {
-    assert(b_info->type == 5);
-    
-    // push the case continuation
-    push_case_frame(continuation1, 3, bindings);
-    
-    // push the update continuation
-    push_update_frame(b_);
-    
-    // set b to a blackhole in the heap
-    b_info->type = 6;
-    
-    // enter the function for the thunk providing the necessary arguments - the address of the thunk
-    struct ref b_computed = (b_info->extra.thunk_info.return_address)(b_);
-    *y_value = *(int*)(get_ref(b_computed) + sizeof(void*));
-    
-    update_continuation(b_computed);
-    return case_continuation(y_value_ref);
-  }
+  // thunk object, case continuation, current bindings, update key for the case, update key for the update cont
+  else return thunk_continuation(b_ref, alternatives_evaluator2, bindings, 1, b_ref);
+
 }
+
+
+ref alternatives_evaluator1(struct hash_map *bindings)
+{
+  GET_BINDING(a_ref, void*, a, 0, bindings)
+  struct info_table *a_info = *(struct info_table **)a;
+
+
+  // We know that the arguments are of type Int which means they can only be the Constructor or Thunks that evaluate to the Constructor
+
+  if(a_info->type == 1)
+  {
+    NEW_REF(x_ref, int*, sizeof(int*), x)
+    // The bindings dont escape this function (for unboxed values they will be copied so no need to worry about this stack getting cleaned up
+    // The payload of a Constructor contains its arguments
+    *x = *(int*)(a + sizeof(void*));
+
+    put_binding(bindings, 2, x_ref);
+    return alternatives_evaluator2(bindings);
+  }
+
+  else return thunk_continuation(a_ref, alternatives_evaluator1, bindings, 0, a_ref);
+}
+
 
 struct ref plus_int_slow(ref null)
 {
-  assert (su_register - stack_pointer <= sizeof(void*)*2);
+  arg_satisfaction_check(sizeof(void*)*2);
   if(su_register - stack_pointer == sizeof(void*)*2)
   {
       ref a_ref;
@@ -206,14 +195,15 @@ struct ref plus_int_slow(ref null)
      ref arg1;
      pop_ptr(&arg1);
 
-     ref pap_ref;
-     new_ref(sizeof(int) + PTR_SIZE, &pap_ref);
+     NEW_REF(pap_ref, void**, sizeof(void*)*2, pap)
+     NEW(struct info_table, pap_info);
 
-     void **pap = (void**)get_ref(pap_ref);
-     pap[0] = (void*)&int_constructor_info_table;
-     *(int*)(pap + 1) = 1;
-     ref* arg1_loc = (ref*)((char*)pap + PTR_SIZE + sizeof(int));
-     *arg1_loc = arg1;
+
+     pap_info->type = 4;
+     pap_info->extra = (union info_table_u){ .pap_info = { .info_ptr = &plus_info_table, .size = 1 } };
+     // pap_info->layout = {};
+     pap[0] = (void*)pap_info;
+     *(ref*)(pap + 1) = arg1;
 
      return pap_ref;
   }
@@ -242,45 +232,11 @@ case (plus_unboxed 1 2) of
   init_hash_map(&bindings, 16, &int_ptr_equals_typeclass, &int_ptr_obj_typeclass);
   // the garbage collector will need to refcount this bindings map and free it when it is done - not sure how this would be implemented.
 
-  void *a = get_ref(a_ref);
-
   int a_key = 0;
   int b_key = 1;
   put_binding(bindings, a_key, a_ref);
   put_binding(bindings, b_key, b_ref);
 
-
-  struct info_table *a_info = *(struct info_table **)a;
-
-  struct ref x_ref;
-  new_ref(sizeof(void*), &x_ref);
-  int *x = (int*)get_ref(x_ref);
-
-  // We know that the arguments are of type Int which means they can only be the Constructor or Thunks that evaluate to the Constructor
-
-  if(a_info->type == 1)
-  {
-    // The bindings dont escape this function (for unboxed values they will be copied so no need to worry about this stack getting cleaned up
-    int x_key = 2;
-    // The payload of a Constructor contains its arguments
-    *x = *(int*)(a + sizeof(void*));
-
-    put_binding(bindings, x_key, x_ref);
-    return alternatives_evaluator1(bindings);
-  }
-  else
-  {
-    assert(a_info->type == 5);
-    push_case_frame(alternatives_evaluator1, 2, bindings);
-    push_update_frame(a_ref);
-    a_info->type = 6;
-
-    // update x
-    struct ref a_computed = (a_info->extra.thunk_info.return_address(a_ref));
-    *x = *(int*)(get_ref(a_computed) + sizeof(void*));
-
-    update_continuation(a_computed);
-    return case_continuation(x_ref);
-  }
+  return alternatives_evaluator1(bindings);
 
 }

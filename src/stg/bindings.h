@@ -8,7 +8,7 @@ struct arr_list *pointer_table;
 
 #define NEW_REF(ref_name, val_type, val_size, val_name) ref ref_name; \
      new_ref(val_size, &ref_name); \
-     val_type val_name = (void**)get_ref(ref_name);
+     val_type val_name = (val_type)get_ref(ref_name);
 
 
 #define GET_BINDING(ref_name, val_type, val_name, binding_key, bindings) ref ref_name;\

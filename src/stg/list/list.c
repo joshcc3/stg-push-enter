@@ -2,6 +2,7 @@
 
 #include "list.h"
 #include "containers/hash_map.h"
+#include "containers/mmanager.h"
 #include "stg/bindings.h"
 #include "stg/plus_int/static.h"
 #include "typeclasses.h"
@@ -25,6 +26,16 @@ void init_list()
     ((Nil*)get_ref(nil_value))->info_ptr = &nil_info_table;
 }
 
+void c_cons(ref value, ref next, Cons* res)
+{
+    struct info_table *tbl = *(struct info_table**)get_ref(next);
+    assert(tbl->type == 5 || tbl->type == 1);
+
+    res->info_ptr = &cons_info_table;
+    res->value = value;
+    res->next = next;
+}
+
 ref map_thunk1(ref thunk)
 {
       hash_map* bindings = THUNK_GET_BINDINGS(thunk);
@@ -40,7 +51,7 @@ ref map_thunk1(ref thunk)
         push_update_frame(f_ref);
         update_continuation(f_info.extra.thunk_info.return_address(f_ref));
         // TODO: should really use a loop over here instead
-        map_thunk1(thunk);
+        return map_thunk1(thunk);
       }
       else if(f_info.type == 4)
       {
@@ -48,7 +59,7 @@ ref map_thunk1(ref thunk)
         unroll_pap(f);
 
         ref null;
-        return f_info.extra.function.slow_entry_point(null);
+        return f_info.extra.pap_info.info_ptr->extra.function.slow_entry_point(null);
       }
       else if(f_info.type == 0)
       {
@@ -65,7 +76,7 @@ ref map_thunk2(ref thunk)
     ref a1;
     ref a2;
     get_binding(bindings, 0, &a1);
-    get_binding(bindings, 0 ,&a2);
+    get_binding(bindings, 3, &a2);
     return map_fast(a1, a2);
 }
 
@@ -89,7 +100,7 @@ ref map_case_cont(struct hash_map* bindings)
     {
         if(l_info->extra.constructor.con_num == 0)
         {
-            Cons *l = (Cons*)l;
+            Cons *l = (Cons*)l_;
             put_binding(bindings, 2, l->value);
             put_binding(bindings, 3, l->next);
             ref thunk1_ref = create_thunk(bindings, map_thunk1);
@@ -158,7 +169,7 @@ ref map_slow(ref null)
 ref head_case_cont(struct hash_map *bindings)
 {
     GET_BINDING(l_ref, void**, l, 0, bindings)
-    struct info_table *l_info = *(struct info_ptr **)l;
+    struct info_table *l_info = *(struct info_table **)l;
 
     if(l_info->type == 1)
     {
@@ -197,7 +208,7 @@ ref tail_case_cont(hash_map* bindings)
 
    if(l_info.type == 1)
    {
-      assert(l_info.extra.constructor.con_num == 1);
+      assert(l_info.extra.constructor.con_num == 0);
       Cons *c = (Cons*)l;
       return c->next;
    }

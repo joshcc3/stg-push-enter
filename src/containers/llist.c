@@ -186,12 +186,14 @@ err_t ll_delete_element(struct linked_list * const linked_list, const int n, con
         node_to_free = old_head;
         linked_list->head = NULL;
         linked_list->tail = NULL;
+        return_code = 0;
     }
     else if(actual_index == 0)
     {
         *result = old_head->element;
         linked_list->head = old_head->next;
         node_to_free = old_head;
+        return_code = 0;
     }
     else
     {
