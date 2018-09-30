@@ -127,6 +127,7 @@ ref map_case_cont(struct hash_map* bindings)
     else return thunk_continuation(list_ref, map_case_cont, bindings, 1, list_ref);
 
 }
+
 // TODO: intialize the layout for every function info table, (plus_int, map)
 
 ref map_fast(ref function, ref list)
@@ -165,6 +166,16 @@ ref map_slow(ref null)
      return pap_ref;
   }
 }
+
+/* index_of :: Int# -> [a] -> a
+   index_of x l = case x of
+                    Cons
+*/
+ref index_of_fast(ref null)
+{
+    if(arg_satisfaction_check(sizeof(ref)*2))
+}
+
 
 ref head_case_cont(struct hash_map *bindings)
 {
