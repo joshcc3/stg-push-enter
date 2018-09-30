@@ -2,12 +2,15 @@ stg-push-enter
 --------------
 
 Implementation of a compiler
- for an [stg](https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/GeneratedCode)-like language
+< for an [stg](https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/GeneratedCode)-like language
 using the push-enter approach based on [this paper](http://simonmar.github.io/bib/papers/evalapplyjfp06.pdf).
 
 # Language Spec
 See the paper (page 4, 5) for a more detailed description of the constructs.
 ```
+atom:  a1 .. an
+
+
 Variables
 var := fn, x, y
 
@@ -19,7 +22,6 @@ alts := C x1 x2 .. xn -> e | x -> e
 Expressions
 e := case x of { alts* } | 
      fn a1 .. an | 
-     primop a1 .. an | 
      lit 
 
 Heap objects
@@ -33,6 +35,8 @@ Programs
 prog := f1 = obj1; f2 = obj2; f3 = obj3 ...
 
 ```
+
+I've changed the grammar slightly and added primops to an 'atom'. This is to allow them to be used in constructors/function calls, etc. Unboxed types are not allowed to be lifted values (values that can evaluate to bottom - thunks mainly) so you can't instantiate them in a let binding.
 
 #Objectives
  - Manually 'compile' stg programs into C
@@ -1377,9 +1381,7 @@ Different compiler/processor optimizations: caching, instruction pre-fecthing, b
  - The pointer table keeps growing - is there a way to shrink it? (considering other stuff holds references into it you can't really move elements around. Check if it's possible to free interior portions of a malloced structure.
  - Todo, create an abstraction in front of our pointer table that allows us to interact with the pointers better - I think I'm actually implementing references here.
  - There is no need to have local bindings - just index straight into the pointer table.
-# TODO
-You create a file that contains the main functino that gets linked against the other stuff 
-
+ - It seems like C doesn't perform tail call optimization
 
 # Makefiles
 Variables are specified as <key> := <value>. The convention is to use capitals for keys.

@@ -8,13 +8,16 @@
 
 #include "data/string_.h"
 #include "stg/bindings.h"
+
+#ifdef DEBUG_OLD 
 #include "stg/list/list.h"
 #include "stg/plus_int/code.h"
+#endif
 
 void init_bindings(hash_map**);
 bool arg_satisfaction_check(int);
 
-struct fun {
+typedef struct fun {
   /*
     takes the function object as the argument
     the fast entry point assumes that all the arguments are on the stack and pops them off
@@ -26,38 +29,38 @@ struct fun {
   // the slow entry point is used when the function is statically unknown (arguments to functions/variables declared in let bindings)
   struct ref (*slow_entry_point)(struct ref);
   int arity;
-};
+} fun;
 
 struct update_info {
   // Closure, the ref points to the object that needs to be updated
   struct ref (*return_address)(struct ref);
 };
 
-struct case_info {
+typedef struct case_info {
   // Closure, the ref points to the bindings of the free variables
   ref (*return_address)(ref);
-};
+} case_info;
 
 
-struct con {
+typedef struct con {
   int arity;
   int con_num;
   struct string_ con_name;
-};
+} con;
 
-struct pap {
+typedef struct pap {
   struct info_table * info_ptr;
   int size;
-};
+} pap;
 
-struct thunk {
+typedef struct thunk {
   // takes the thunk object as the argument
   struct ref (*return_address)(struct ref);
-};
+} thunk;
 
-struct blackhole {
+typedef struct blackhole {
   int a;
-};
+} blackhole;
 
 
 typedef struct arg_entry {
@@ -120,10 +123,10 @@ char *su_register; // used for tracking the current update frames
 
 #define INITIAL_STACK_SIZE 32*1024
 
-
+#ifdef DEBUG_OLD 
 // TODO: where should these go? The defns of the constructor are in code.h
 struct info_table int_constructor_info_table;
 struct info_table plus_info_table;
-
+#endif
 
 #endif

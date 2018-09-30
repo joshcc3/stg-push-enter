@@ -1,9 +1,18 @@
-#define GET_BINDING(ref_name, val_type, val_name, binding_key, bindings) ref ref_name;\
-      get_binding(bindings, binding_key, &ref_name); \
-      val_type val_name = (val_type)get_ref(ref_name);
+void f1(int a);
+void f2(int a);
+
+
+void f1(int a)
+{
+  f2(a - 1);
+}
+
+void f2(int b)
+{
+  f1(b + 1);
+}
 
 int main()
 {
-    GET_BINDING(a, void**, f_ref, 0, bindings)
+  return 0;
 }
-

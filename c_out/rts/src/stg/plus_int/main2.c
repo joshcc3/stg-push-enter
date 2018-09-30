@@ -57,6 +57,8 @@ struct ref alternatives_evaluator(struct hash_map* bindings)
 
 struct ref main_function(struct ref _no_arg)
 {
+  init_int();
+
   // TODO Complete the implementation of the remaining stuff.
   // Build PAPs to see how they work
   // Next implement the prelude and try and create lists and sum lazy lists.
