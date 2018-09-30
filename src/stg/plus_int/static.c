@@ -10,7 +10,7 @@
 #include <assert.h>
 
 
-void init_bindings(hash_map** bindings) { init_hash_map(&bindings, 16, &int_ptr_equals_typeclass, &int_ptr_obj_typeclass); }
+void init_bindings(hash_map** bindings) { init_hash_map(bindings, 16, &int_ptr_equals_typeclass, &int_ptr_obj_typeclass); }
 
 bool arg_satisfaction_check(int size)
 {
@@ -24,13 +24,15 @@ int main()
 {
   stack_pointer = allocate_stack(INITIAL_STACK_SIZE);
   stack_pointer += INITIAL_STACK_SIZE;
-  
+
+  init_pointer_table(64);
+
   init_int();
   init_list();
 
   init_pointer_table(16);
-  
-  struct ref inp;
-  main_function(inp);
+
+  struct ref null;
+  main_function(null);
 }
 

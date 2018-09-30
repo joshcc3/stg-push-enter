@@ -6,6 +6,9 @@
 #include "plus_int/static.h"
 #include "plus_int/stack.h"
 
+#define THUNK_GET_BINDINGS(thunk) (hash_map*)(((void**)get_ref(thunk))[1]);
+
+
 void unroll_pap(void **);
 
 // thunk object, case continuation, current bindings, update key for the case, update key for the update cont

@@ -28,7 +28,7 @@ int hset_size(struct hash_set const *);
 
 bool hset_is_empty(struct hash_set *);
 
-int hset_contains(const struct hash_set *, const void *, struct equals_typeclass const*, struct obj_typeclass  const*);
+int hset_contains(struct hash_set *, const void *, struct equals_typeclass const*, struct obj_typeclass  const*);
 
 err_t hset_insert_element(struct hash_set **, const void *, struct equals_typeclass const*, struct obj_typeclass  const*);
 

@@ -162,7 +162,109 @@ Edit in intellij locally, happy days
 # Notes about C
 `malloc` is contained in `stdlib.h`.
 
+Edit: The reason for the below is probably that the compiler doesn't carry around the type of the struct and just rewrites accessors as offsets.
+You can only use the brackets initializer for structs at variable declaration time. You can't reassign with a bracket initializer. I'm confused by this, looking at the asm generated:
+```
+struct a {
+  int a;
+  int b;
+};
 
+int main()
+{
+    struct a x = { .a = 10, .b = 123 };
+}
+```
+gives:
+```
+main:
+.LFB0:
+	push	rbp
+	mov	rbp, rsp
+	mov	DWORD PTR -8[rbp], 10
+	mov	DWORD PTR -4[rbp], 123
+	mov	eax, 0
+	pop	rbp
+	ret
+```
+
+It looks like bracket initializers refer the variable via its rbp offset so surely reassigning with a bracket initializer should be equally straightforward?
+
+
+## Structs are values example:
+```
+struct a {
+  int a;
+  int b;
+};
+
+int main()
+{
+    struct a x = { .a = 10, .b = 123 };
+    struct a y;
+    y = x;
+    y.a = 345;
+
+}
+```
+
+gives:
+```
+main:
+.LFB0:
+	push	rbp
+	mov	rbp, rsp
+	mov	DWORD PTR -16[rbp], 10
+	mov	DWORD PTR -12[rbp], 123
+	mov	rax, QWORD PTR -16[rbp]
+	mov	QWORD PTR -8[rbp], rax
+	mov	DWORD PTR -8[rbp], 345
+	mov	eax, 0
+	pop	rbp
+	ret
+```
+The compiler optimizes the copying of x to y as a single QWORD load from x to y and then updates the (DWORD)b part of y.
+
+When a struct contains example 3 elements, it'll break it down into a series of QWORD loads ending with the corresponding size.
+
+## Macros
+Macros are created using #define. The gcc pages are a good source but a quick overview:
+#define A 1
+replaces A with 1
+Macro bindings are sequential and 'recursive' (the result of an expansion is also evaluated) so
+```
+#define A 1
+#define B A
+B
+#define A 2
+B
+```
+would yield
+```
+1
+2
+```
+
+You can pass arguments to macros:
+```
+#define A(x, y) x + y
+```
+It's replaced only if the token matches the argument name so
+```
+#define A(x) x_ref // no effect
+```
+
+Multiline macros are resolved like so:
+```
+#define GET_BINDING(ref_name, val_type, val_name, binding_key, bindings) ref ref_name;\
+      get_binding(bindings, binding_key, &ref_name); \
+      val_type val_name = (val_type)get_ref(ref_name);
+
+int main()
+{
+    ref a; get_binding(bindings, 0, &a); void** f_ref = (void**)get_ref(a);
+}
+```
 
 ## Lessons
 Especially for arithmetic functions don't forget to assert the domain of functions as well as the range. (e.g. % division by 0)

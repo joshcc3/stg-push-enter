@@ -242,8 +242,8 @@ err_t ll_map(struct linked_list const * const linked_list, err_t map_fn(void**))
     for(int ix = 0; ix < old_size; ix++)
     {
         assert(pointer);
-	    const void ** reference = &((*pointer).element);
-        return_code = return_code & map_fn(reference);
+	    const void * reference = ((*pointer).element);
+        return_code = return_code & map_fn(&reference);
         pointer = pointer->next;
     }
 

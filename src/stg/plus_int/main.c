@@ -15,7 +15,6 @@ void* main_function(void* no_arg)
        I# z -> print_int z
    */
 
-
   struct ref a_ref;
   new_ref(sizeof(struct i_hash), &a_ref);
   struct i_hash *a_ptr = get_ref(a_ref);
@@ -41,6 +40,7 @@ void* main_function(void* no_arg)
     con_result = (con_tbl->extra.thunk_info.return_address)(res_ref);
   }
   else if(con_tbl->type == 1) con_result = res_ref;
+  else assert(false);
 
   struct info_table *con_info_tbl = *(struct info_table**)get_ref(con_result);
   assert(con_info_tbl->type == 1);

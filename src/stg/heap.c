@@ -13,8 +13,7 @@ ref create_thunk(hash_map* bindings, ref (*return_address)(ref))
     new_ref(sizeof(void*)*2, &thunk_ref);
     void** thunk = (void**)get_ref;
     thunk[0] = thunk_info_ptr;
-    thunk[1] = (void*)
-    bindings;
+    thunk[1] = (void*) bindings;
 
     return thunk_ref;
 }

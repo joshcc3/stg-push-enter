@@ -195,7 +195,7 @@ err_t hset_get_element(struct hash_set *inp,
     return return_code;
 }
 
-int hset_contains(const struct hash_set *inp, const void *element, struct equals_typeclass const* e_t, struct obj_typeclass  const* o_t)
+int hset_contains(struct hash_set *inp, const void *element, struct equals_typeclass const* e_t, struct obj_typeclass  const* o_t)
  {
     std_pre(inp);
 
