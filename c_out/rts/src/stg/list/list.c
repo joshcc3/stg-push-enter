@@ -109,9 +109,7 @@ ref map_case_cont(struct hash_map* bindings)
             ref thunk2_ref = create_thunk(bindings, map_thunk2);
             put_binding(bindings, 5, thunk2_ref);
 
-            ref cons_ref;
-            new_ref(sizeof(Cons), &cons_ref);
-            Cons *cons = (Cons *)get_ref(cons_ref);
+            NEW_REF(cons_ref, Cons*, sizeof(Cons), cons)
             cons->info_ptr = &cons_info_table;
             cons->value = thunk1_ref;
             cons->next = thunk2_ref;
@@ -162,20 +160,10 @@ ref map_slow(ref null)
      pap_info->type = 4;
      pap_info->extra.pap_info = (struct pap){ .info_ptr = &map_info_table, .size = 1 };
      pap_[0] = pap_info;
-     *(ref*)pap_ = arg1;
+     *(ref*)(pap_ + 1) = arg1;
      return pap_ref;
   }
 }
-
-/* index_of :: Int# -> [a] -> a
-   index_of x l = case x of
-                    Cons
-*/
-ref index_of_fast(ref null)
-{
-    if(arg_satisfaction_check(sizeof(ref)*2))
-}
-
 
 ref head_case_cont(struct hash_map *bindings)
 {

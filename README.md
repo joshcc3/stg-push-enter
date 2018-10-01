@@ -466,9 +466,7 @@ The rule for modulus `a%b == z` is `b*x + z = a` so, `-10%7 == -3` as `7*-1 + (-
  - The pointer table keeps growing - is there a way to shrink it? (considering other stuff holds references into it you can't really move elements around. Check if it's possible to free interior portions of a malloced structure.
  - Todo, create an abstraction in front of our pointer table that allows us to interact with the pointers better - I think I'm actually implementing references here.
  - There is no need to have local bindings - just index straight into the pointer table.
-# TODO
-You create a file that contains the main functino that gets linked against the other stuff 
-
+ - It seems like C doesn't perform tail call optimization
 
 # Makefiles
 Variables are specified as <key> := <value>. The convention is to use capitals for keys.

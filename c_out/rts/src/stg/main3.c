@@ -16,21 +16,11 @@ ref inc_cont(ref thunk_ref)
      void** thunk = (void**)get_ref(thunk_ref);
      struct hash_map *bindings = (struct hash_map*)thunk[1];
 
-     NEW_REF(pap_ref, void**, sizeof(void*) + sizeof(ref), pap)
-
-     NEW(struct info_table, pap_info)
-     pap_info->type = 4;
-     struct pap pap_info_extra = { .info_ptr = &plus_info_table, .size = 1 };
-     pap_info->extra.pap_info = pap_info_extra;
-
-     pap[0] = (void*)pap_info;
-
      ref one_ref;
      get_binding(bindings, 0, &one_ref);
+     push_ptr(one_ref);
 
-     *(ref*)(pap + 1) = one_ref;
-
-     return pap_ref;
+     return plus_int_slow(one_ref);
 }
 
 ref tail1_cont(ref thunk_ref)
@@ -61,7 +51,7 @@ ref element1_cont(ref thunk_ref)
      struct hash_map *bindings = (struct hash_map*)thunk[1];
 
      ref inced;
-     get_binding(bindings, 2, &inced);
+     get_binding(bindings, 3, &inced);
 
      return head_fast(inced);
 }
