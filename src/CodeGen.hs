@@ -1,16 +1,57 @@
+import Utils
+
+{-
+Notes:
+Env:
+Binding key of free variables
+
+Mapping from the constructor name to its info table in Haskell
+Mapping from the constructor name to its accessor names
+// no default patterns
+case l of
+	Cons x xs -> x
+
+ref cont(hash_map *bindings)
+{
+	GETBINDING(l_ref, void**, l, <l key>, bindings)
+	info_table *l_info = *(info_table **)l;
+	if(l_info->type == 1)
+	{
+		assert(l_info->extra.constructor.con_num == <con_num>);
+		Cons *c = (Cons*)l;
+		return c-><field>;
+	}
+	else
+	{
+		// if the matches were for a constructor then this must be a thunk
+		assert(l_info->type == 5);
+		return thunk_continuation(l_ref, cont, bindings, update_key, l_ref);
+	}
+}
+-}
+ifSt = undefined
 
 
-eval (L (I x)) = show x
-eval (V x) = x
-eval (Let s o e) = do
-            ref <- createThunk "bindings" o
-            bind s ref
-            eval e
-eval (Case e alts) = do
-  pushCaseFrame contName updateid "bindings"
-  returnCaseCont e alts
-eval (Primop "+#" [L (I x), L (I y)]) = show (x + y)
-eval (Primop "+#" [V a, z]) = eval (Case (V a) alts)
-    where
-      alts = [Alt "I#" [newVar] 
-            
+eval :: Expression -> String
+eval (Case (V varName) alts) = func_formatter returnType name args body
+  where
+	l_key = undefined -- get from the environment
+	prefix = undefined -- get from the environment
+	ifBody = undefined -- TODO need to write
+	elseSt = undefined -- TODO Need to write
+
+    info_table = s "$$_info" [varName]
+    var_ref = s "$$_ref" [varName]
+    arg1 = "bindings"
+    returnType = "ref"
+    name = s "$$_$$" [prefix, "cont"]
+	args = [("hash_map*", "bindings")]
+	cond = s "$$->type == $$" [info_table]
+	body =[
+		bindingMacro var_ref "void**" var_name l_key arg1,
+		decl_case "info_table*" info_table "*(info_table**)", varName],
+		ifSt cond ifBody [elseSt]
+	]
+
+
+

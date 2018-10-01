@@ -6,7 +6,12 @@ data Object = THUNK Expression | FUNC Function | CON Constructor | BLACKHOLE | P
 type Var = String
 data Atom = L Literal | V Var
 data Literal = I Int            
-data Expression = Atom | Let String Object Expression | Case Expression [Alt] | Primop String [Atom] | FuncCall String [Atom]
+data Expression =
+	  Atom
+	| Let String Object Expression
+	| Case Expression [Alt]
+	| Primop String [Atom]
+	| FuncCall String [Atom]
 data Alt = Alt String [Var] Expression
 
 data Function = Fun [String] Expression
