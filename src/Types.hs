@@ -7,11 +7,11 @@ type Var = String
 data Atom = L Literal | V Var
 data Literal = I Int            
 data Expression =
-	  Atom
-	| Let String Object Expression
-	| Case Expression [Alt]
-	| Primop String [Atom]
-	| FuncCall String [Atom]
+    Atom Atom
+        | Let String Object Expression
+        | Case Atom [Alt]
+        | Primop String [Atom]
+        | FuncCall String [Atom]
 
 data Alt = AltCase String [Var] Expression | AltForce String Expression
 

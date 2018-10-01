@@ -1,3 +1,4 @@
+import Types
 import Utils
 
 {-
@@ -31,27 +32,32 @@ ref cont(hash_map *bindings)
 -}
 ifSt = undefined
 
+declCase = undefined
 
+funcFormatter = undefined
+
+bindingMacro = undefined                 
+       
 eval :: Expression -> String
-eval (Case (V varName) [AltCase conName freeVars exp]) = func_formatter returnType name args body
+eval (Case (V var_name) [AltCase conName freeVars exp]) = funcFormatter returnType name args body
   where
-	l_key = undefined -- get from the environment
-	prefix = undefined -- get from the environment
-	ifBody = undefined -- TODO need to write
-	elseSt = undefined -- TODO Need to write
-
-    info_table = s "$$_info" [varName]
-    var_ref = s "$$_ref" [varName]
+    var_key = undefined -- get from the environment
+    prefix = undefined -- get from the environment
+    ifBody = undefined -- TODO need to write
+    elseSt = undefined -- TODO Need to write
+    
+    info_table = s "$$_info" [var_name]
+    var_ref = s "$$_ref" [var_name]
     arg1 = "bindings"
     returnType = "ref"
     name = s "$$_$$" [prefix, "cont"]
-	args = [("hash_map*", "bindings")]
-	cond = s "$$->type == $$" [info_table]
-	body =[
-		bindingMacro var_ref "void**" var_name l_key arg1,
-		decl_case "info_table*" info_table "*(info_table**)", varName],
-		ifSt cond ifBody [elseSt]
-	]
+    args = [("hash_map*", "bindings")]
+    cond = s "$$->type == 1" [info_table]
+    body =[
+         bindingMacro var_ref "void**" var_name var_key arg1,
+         declCase "info_table*" info_table "*(info_table**)", var_name,
+         ifSt cond ifBody [elseSt]
+        ]
 
 
 
