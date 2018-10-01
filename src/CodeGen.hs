@@ -33,7 +33,7 @@ ifSt = undefined
 
 
 eval :: Expression -> String
-eval (Case (V varName) alts) = func_formatter returnType name args body
+eval (Case (V varName) [AltCase conName freeVars exp]) = func_formatter returnType name args body
   where
 	l_key = undefined -- get from the environment
 	prefix = undefined -- get from the environment

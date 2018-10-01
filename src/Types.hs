@@ -12,7 +12,8 @@ data Expression =
 	| Case Expression [Alt]
 	| Primop String [Atom]
 	| FuncCall String [Atom]
-data Alt = Alt String [Var] Expression
+
+data Alt = AltCase String [Var] Expression | AltForce String Expression
 
 data Function = Fun [String] Expression
 data Constructor = Con String [Atom]
