@@ -1,5 +1,22 @@
 module Types where
 
+import Control.Monad.State
+import Data.Map
+
+data C_TopLevel = C_Fun String [C_TopLevel] | C_Var String
+type Bindings = Map String Int
+type CurFun = String
+data FunInfoTable = FInf String Int [(String, ValueType)]
+type FunMap = Map String FunInfoTable
+type ConMap = Map String ConstructorDefn
+type FreshNameSource = Int
+    
+data Env = Env FunMap [Bindings] CurFun FreshNameSource ConMap
+      
+                
+
+
+
 -- name, tag, fields
 data ValueType = Boxed | Unboxed
 data ConstructorDefn = ConDefn String Int [(String, ValueType)]
