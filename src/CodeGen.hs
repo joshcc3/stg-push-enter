@@ -4,18 +4,59 @@ import Types
 import Utils
 
 {-
-  
+Compilation process:
+	First every data declaration gives rise to a new c file and a header file.
+	Every top level function definition is scanned, its presence loaded into the env and its info table initializations are generated.
+	The presence of the main function is verified.
+	Then the main initialization that calls into the initilzations of the data declarations and the functions and ends with a call to fast entry point of the function is generated.
+	Then the fast and slow entry points of the function bodies are generated.
+	includes for my rts c library as well as the data declarations are generated.
+	Dependency analysis of the function bodies is done and they are rendered.
+	The gcc command with the appropriate includes is generated and invoked and if all goes well compilation succeeds.
+
+
+Need a mapping from the function name to
+
+
+Need to generate the contents for the header files as well.
+
+Constructor definitions must be pre-processed seperately
+Notes:
+Env:
+Binding key of free variables
+
+Mapping from var to it's updatekey
+queue of (thunk expressions, thunk names) to generate functions for
+
+Mapping from the constructor name to its info table in Haskell
+  info table must have all the fields
+Mapping from the constructor name to its accessor names
+  This should also go in a seperate file and directory and create a c and header file
+  Also we only deal with top-level definitions of function currently
+For a case, generate a note indicating that you have to generate the actual continuation
+(the continuation needs to come before the place where the case is used. maybe just prepended -
+will need to save the state somehow - maybe add a specific comment in the header.
+The deps should be acyclic, Might be a good idea to compile functions as an individual cunit with
+some metadata like the dependencies and then have the final thing that renders them have fun.
+
+We need to generate the header files as well:
+Everytime you generate a function you'll need to log if it goes in the header file.
+You also need to log which properties go in the header file.
+You also need to log which struct definitions go in the header file.
+
+Need to generate a makefile as well.
+
 -}
+
 
 generatePapSize = undefined -- generate the pap size from the atoms
 assignPapAtoms pap fun atoms = undefined -- gen from env
 toPrimOpArgs = undefined -- gen from env
 knownAndSaturated f as = undefined -- gen from env
 pushFunArgs = undefined -- gen from env
-generatePutBinding = undefined -- update the binding in the environment
 
 initBindings = [decl "hash_map *" "bindings", funCall "init_bindings" (reference "bindings")]
-putBinding = funCall "putBinding" ["bindings", updateKey, thunk_ref_name]
+putBinding updateKey thunk_ref_name = funCall "putBinding" ["bindings", updateKey, thunk_ref_name]
 
 funInfoTableName name = s "$$_info_table" [name]
 
@@ -136,7 +177,7 @@ evalProgram topLevel = topLevel >>= generateTopLevelDefn
             fast_entry_point = funcFormatter "ref" (fast_call_name name) fastArgs body
                 where
 		            fastArgs = map f args
-                    body = initBindings ++ map (generatePutBinding $ zip args [0..]) ++ eval e
+                    body = initBindings ++ map (curry putBinding $ zip args [0..]) ++ eval e
                     f (v, Boxed) = ("ref", v)
                     f (v, Unboxed) = ("int", v)
 {-
@@ -198,7 +239,7 @@ evalConDecl (Decl typeName cons) = funcFormatter "void" name args body
       name = s "init_constructors_$$" [typeName]
       args = []
       body = map generateConDefn cons
-      -- TODO gen from env you also need to save the layout info of the constructor
+      -- TODO you also need to register that the Constructor struct gets put into the header file.
       generateConDefn (ConDefn conName tag l)
           = info_table_name  .= bracketInit "info_table" bs
             where
@@ -212,21 +253,7 @@ evalConDecl (Decl typeName cons) = funcFormatter "void" name args body
                          )]
                                                 
 
-      
 
-{-
-Constructor definitions must be pre-processed seperately
-Notes:
-Env:
-Binding key of free variables
-
-Mapping from var to it's updatekey
-queue of (thunk expressions, thunk names) to generate functions for
-
-Mapping from the constructor name to its info table in Haskell 
-  info table must have all the fields
-Mapping from the constructor name to its accessor names
--}
 
 
 
