@@ -12,8 +12,12 @@ assignPapAtoms pap fun atoms = undefined -- gen from env
 toPrimOpArgs = undefined -- gen from env
 knownAndSaturated f as = undefined -- gen from env
 pushFunArgs = undefined -- gen from env
+generatePutBinding = undefined -- update the binding in the environment
 
+initBindings = [decl "hash_map *" "bindings", funCall "init_bindings" (reference "bindings")]
+putBinding = funCall "putBinding" ["bindings", updateKey, thunk_ref_name]
 
+funInfoTableName name = s "$$_info_table" [name]
 
 tab = map ('\t':)
 
@@ -30,6 +34,7 @@ ifSt cond ifBody elses = [condSt, "{"] ++ tab ifBody ++ ["}"] ++ (
 
 decl typ name = s "$$ $$;" [typ, name]
 declInit typ name val = s "$$ $$ = $$;" [typ, name, val]
+
 funcFormatter returnType name args body = [line1, "{"] ++ body ++ ["}"]
     where
       line1 = s "$$ $$($$)" [returnType, name, commaSep . map (\(a, b) -> s "$$ $$" [a, b]) $ args]
@@ -43,13 +48,16 @@ returnSt st = s "return $$;" [st]
 assert st = s "assert($$);" [st]
 structAccess var field = s "($$).$$" [var, field]
 deref x = s "*($$)" [x]
+reference x = s "&($$)" [x]
 a .= b = s "$$ = $$;" [a, b]
 arrayIndex v i = s "$$[$$]" [v, show i]
 
 funCall name args = s "$$($$)" [name, commaSep args]
 
-commaSep [] = ""
-commaSep xs = s "$$ $$" [init xs >>= \x -> s "$$, " [x], last xs]
+commaSep = charSeperate ','
+
+charSeperate c [] = ""
+charSeperate c xs = s "$$ $$" [init xs >>= \x -> s "$$$$ " [x, [c]], last xs]
 
 
 
@@ -62,21 +70,14 @@ bracketInit typ as = cast typ $ s "{$$}" [commaSep (map assign as)]
     where
       assign (field, val) = s ".$$ = $$" [field, val]
 
+toSize Boxed = "sizeof(ref)"
+toSize Unboxed = "sizeof(int)"
+
 
 {-
 // TODO: intialize the layout for every function info table, (plus_int, map)
 
 
-init_function_map()
-{
-    arg_entry map_entries[2];
-    map_entries[0] = (struct arg_entry) { .pointer = true, .offset = 0 };
-    map_entries[1] = (struct arg_entry) { .pointer = true, .offset = sizeof(ref) };
-    map_info_table = (struct info_table) { .type = 0,
-                       .extra.function = { .arity = 2, .slow_entry_point = map_slow },
-                       .layout = { .num = 2, .entries = map_entries }
-                      };
-}
 
 ref map_fast(ref function, ref list)
 {
@@ -88,6 +89,57 @@ ref map_fast(ref function, ref list)
     return map_case_cont(bindings);
 }
 
+
+
+init_function_map()
+{
+  struct arg_entry *plus_entries = (struct arg_entry*)new(sizeof(struct arg_entry)*2);
+  plus_entries[0] = (arg_entry) { .size = sizeof(ref), .pointer = true, .offset = 0 };
+  plus_entries[1] = (arg_entry) { .size = sizeof(ref), .pointer = true, .offset = sizeof(ref) };
+
+  plus_info_table.type = 0;
+  plus_info_table.extra.function = (struct fun) { .slow_entry_point = plus_int_slow, .arity = 2 };
+  plus_info_table.layout = (struct layout) { .num = 2, .entries = plus_entries };
+
+}
+
+This should also go in a seperate file and directory and create a c and header file
+Also we only deal with top-level definitions of function currently
+-}
+init_arg_entry (ix, (offset, (argName, argType))) = case argType of
+	Boxed -> (arrayIx .= structValue (fields "true" "sizeof(ref)"), s "$$ + sizeof(ref)" [offset])
+	Unboxed -> (arrayIx .= structValue (fields "false" "sizeof(int)"), s "$$ + sizeof(int)" [offset])
+  where
+    arrayIx = arrayIndex "layout_entries" ix
+	structValue = bracketInit "arg_entry"
+    fields isPointer argSize = [("size", argSize), ("pointer", isPointer), (".offset", offset)]
+init_arg_entry (ix, (argName, Unboxed)) =
+evalProgram topLevel = topLevel >>= generateTopLevelDefn
+    where
+      generateTopLevelDefn (name, FUNC (Fun args e)) = info_table_initializer ++ slow_entry_point ++ fast_entry_point
+          where
+            info_table_initializer = funcFormatter "void" name [] body
+                where
+                  name = s "init_function_$$" [name]
+                  body = initLayout name args ++ [funInfoTableName name .= info_table_struct]
+                  initLayout name args = allocateLayoutObject:initializeLayoutEntries
+                    where
+                      allocateLayoutObject = declInit "arg_entry*" "layout_entries" $ castPtr "arg_entry" $ funCall "new" $ s "sizeof(arg_entry)*$$" [len(args)]
+                      (initializeLayoutEntries, offsets) = unzip $ map init_arg_entry $ zip [0..] $ zip (0:offsets) args
+                  layout = bracketInit "struct layout" [("num", 2), ("entries", "layout_entries")]
+                  info_table_struct = bracketInit "info_table" $
+                            [("type", "0"),
+                             ("extra", functionStruct),
+                             ("layout", layout)
+                            ]
+            slow_entry_point = generateSlowCall name args
+            fast_entry_point = funcFormatter "ref" (fast_call_name name) fastArgs body
+                where
+		            fastArgs = map f args
+                    body = initBindings ++ map (generatePutBinding $ zip args [0..]) ++ eval e
+                    f (v, Boxed) = ("ref", v)
+                    f (v, Unboxed) = ("int", v)
+{-
 ref map_slow(ref null)
 {
   if(arg_satisfaction_check(sizeof(ref)*2))
@@ -114,23 +166,18 @@ ref map_slow(ref null)
      return pap_ref;
   }
 }
-
-This should also go in a seperate file and directory and create a c and header file
-Also we only deal with top-level definitions of function currently
 -}
-evalProgram topLevel = topLevel >>= generateTopLevelDefn
-    where
-      generateTopLevelDefn (name, FUNC (Fun args e)) = info_table_initializer ++ slow_entry_point ++ fast_entry_point
-          where
-            info_table_initializer = funcFormatter "void" name [] body
-                where
-                  name = s "init_function_$$" [name]
-                  body = undefined -- TODO
-            slow_entry_point = funcFormatter "ref" slow_name [("ref", "null")] body
-                where
-                  slow_name = undefined
-                  body = undefined -- TODO
-            fast_entry_point = undefined
+generateSlowCall name args = funcFormatter "ref" (slow_call_name name) [("ref", "null")] body
+   where
+     argSatisfactionCondition = funCall "arg_satisfaction_check" argSize
+     argSize = charSeperate '+' (map toSize args)
+     body = ifSt argSatisfactionCondition
+              (generateFastCallFromArgsOnStack name args)
+              [elseSt]
+	generateFastCallFromArgsOnStack name args
+		= map (decl "arg" . fst)  args ++
+	      map (funCall "pop_ptr" . reference . fst) args ++
+	      [returnSt (funCall (fast_call_name name) (commaSep . map fst $ args))]
 
 {-
 data List a = Cons { value :: a, next :: (List a) } | Nil
@@ -280,16 +327,16 @@ eval (FuncCall fun args)
    put_binding(bindings, 4, thunk1_ref);
 
 -}
-eval (Let var obj e) = evalObject thunk_name obj ++ [putBinding] ++ eval e
+eval (Let var obj e) = evalObject thunk_name obj ++ [putBinding updateKey thunk_ref_name] ++ eval e
     where
       thunk_name = s "thunk_$$" [undefined] -- get suffix from the environment
       updateKey = undefined -- get from the environment (need map from var -> updKey)
       thunk_ref_name = s "$$_ref" [thunk_name]
-      putBinding = funCall "putBinding" ["bindings", updateKey, thunk_ref_name]
 eval (Atom (L (I x))) = [show x]
 eval (Atom (V x)) = [x]
 
-evalObject obj_name (THUNK e) = [declInit "ref" obj_name $ funCall "createThunk" ["bindings", thunk_cont]] where thunk_cont = undefined -- get from the environment
+evalObject obj_name (THUNK e) = [declInit "ref" obj_name $ funCall "createThunk" ["bindings", thunk_cont]]
+	where thunk_cont = undefined -- get from the environment, generate a new thunk cont name
 {-
    Cons x' f'
 //

@@ -20,6 +20,6 @@ data Expression =
 
 data Alt = AltCase String [Var] Expression | AltForce String Expression
 
-data Function = Fun [String] Expression
+data Function = Fun [(String, ValueType)] Expression
 data Constructor = Con String [Atom]
 data PartialApp = Pap String [Atom]
