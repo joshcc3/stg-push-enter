@@ -3,6 +3,18 @@
 import Types
 import Utils
 
+{-
+  
+-}
+
+generatePapSize = undefined -- generate the pap size from the atoms
+assignPapAtoms pap fun atoms = undefined -- gen from env
+toPrimOpArgs = undefined -- gen from env
+knownAndSaturated f as = undefined -- gen from env
+pushFunArgs = undefined -- gen from env
+
+
+
 tab = map ('\t':)
 
 ifSt cond ifBody elses = [condSt, "{"] ++ tab ifBody ++ ["}"] ++ (
@@ -17,7 +29,6 @@ ifSt cond ifBody elses = [condSt, "{"] ++ tab ifBody ++ ["}"] ++ (
       condSt = s "if($$)" [cond]
 
 decl typ name = s "$$ $$;" [typ, name]
-generatePapSize = undefined -- generate the pap size from the atoms
 declInit typ name val = s "$$ $$ = $$;" [typ, name, val]
 funcFormatter returnType name args body = [line1, "{"] ++ body ++ ["}"]
     where
@@ -39,17 +50,16 @@ funCall name args = s "$$($$)" [name, commaSep args]
 commaSep [] = ""
 commaSep xs = s "$$ $$" [init xs >>= \x -> s "$$, " [x], last xs]
 
-assignPapAtoms pap fun atoms = undefined -- gen from env
+
 
 extractArgsToFunArgs (V x) = x
 extractArgsToFunArgs (L (I x)) = show x
-toPrimOpArgs = undefined -- gen from env
-knownAndSaturated f as = undefined -- gen from env
 fast_call_name f = s "$$_fast" [f]
 slow_call_name f = s "$$_slow" [f]
-pushFunArgs = undefined -- gen from env
+
 
 {-
+Constructor definitions must be pre-processed seperately
 Notes:
 Env:
 Binding key of free variables
@@ -61,6 +71,8 @@ Mapping from the constructor name to its info table in Haskell
   info table must have all the fields
 Mapping from the constructor name to its accessor names
 -}
+
+
 
 
 {-
@@ -90,33 +102,38 @@ ref cont(hash_map *bindings)
 
 -- TODO: a case doesn't actually compile to this, this is just the case continuation
 -- TODO: A case actually compiles to a return case_name(bindings);
-generateCaseCont (Case (V var_name) [AltCase conName freeVars exp]) = funcFormatter returnType name args body
+generateCaseCont (Case (V var_name) es) = funcFormatter returnType name args $
+     case es of
+        -- For this case we push a case frame and then a 'fake' update frame that restores su and returns the arg that the update frame was called with 
+        [AltForce x e] -> undefined -- TODO Need to handle this case.
+        alts ->  [
+            bindingMacro var_ref "void**" var_name var_key arg1,
+            declInit "info_table*" info_table (deref (castPtr "info_table*" var_name))
+          ] ++ ifSt conCase (alts >>= caseIf) [elseSt]
   where
+    conCase = s "$$->type == 1" [info_table]    
     var_key = undefined -- get from the environment
     func_prefix = undefined -- get from the environment
-    conCasted = castPtr conName var_name
-    ifBody = assert (s "$$ == $$" [actualConNum, expectedConNum]):declInit (s "$$*" [conName]) conInnerName conCasted:{- Todo: need to bind the free vars of the case to the con-} eval exp
-       where
-         conInnerName = undefined -- gen from env
-         fieldName = undefined -- get from the environment
-         actualConNum = structAccess (structAccess (ptrAccess info_table "extra") "constructor") "con_num"
-         expectedConNum = undefined -- get from the environment
+    
     elseSt = [
        assert (s "$$ == $$" [ptrAccess info_table "type", "5"]),
        returnSt (funCall "thunk_continuation" [var_ref, name, "bindings", var_ref])
      ]
-    
+    caseIf (AltCase conName freeVars exp) = ifSt cond ifBody []
+        where
+          cond = assert (s "$$ == $$" [actualConNum, expectedConNum])
+          ifBody = declInit (s "$$*" [conName]) conInnerName conCasted:{- Todo: need to bind the free vars of the case to the con-} eval exp
+          conInnerName = undefined -- gen from env
+          fieldName = undefined -- get from the environment
+          expectedConNum = undefined -- get from the environment
+          conCasted = castPtr conName var_name
+          actualConNum = structAccess (structAccess (ptrAccess info_table "extra") "constructor") "con_num"
     info_table = s "$$_info" [var_name]
     var_ref = s "$$_ref" [var_name]
     arg1 = "bindings"
     returnType = "ref"
     name = s "$$_$$" [func_prefix, "cont"]
     args = [("hash_map*", "bindings")]
-    cond = s "$$->type == 1" [info_table]
-    body =[
-         bindingMacro var_ref "void**" var_name var_key arg1,
-         declInit "info_table*" info_table (deref (castPtr "info_table*" var_name))
-        ] ++  ifSt cond ifBody [elseSt]
 
 
 {-
@@ -157,8 +174,8 @@ eval (FuncCall fun args)
 eval (Let var obj e) = evalObject thunk_name obj ++ [putBinding] ++ eval e
     where
       thunk_name = s "thunk_$$" [undefined] -- get suffix from the environment
-      thunk_ref_name = s "$$_ref" [thunk_name]
       updateKey = undefined -- get from the environment (need map from var -> updKey)
+      thunk_ref_name = s "$$_ref" [thunk_name]
       putBinding = funCall "putBinding" ["bindings", updateKey, thunk_ref_name]
 eval (Atom (L (I x))) = [show x]
 eval (Atom (V x)) = [x]
@@ -199,12 +216,12 @@ evalObject obj_name (CON (Con c atoms)) = [newRefMacro ref_name (s "$$*" [c]) (s
 -}
 evalObject obj_name (PAP (Pap fun atoms)) = [newPap] ++ constructPapInfo ++ assignPapValues
     where
+      pap_info_name = undefined -- gen from the environment
+      funInfoTable = undefined -- gen from the environment
       value_name = obj_name
       papSize = generatePapSize fun (length atoms)
       ref_name = s "$$_ref" [value_name]
       newPap = newRefMacro ref_name "void**" papSize value_name
-      pap_info_name = undefined -- gen from the environment
-      funInfoTable = undefined -- gen from the environment
       newPapInfo = newMacro "info_table" pap_info_name
       assignType = ptrAccess pap_info_name "type" .= show 4
       pap_info_extra_name = s "$$_extra" pap_info_name
