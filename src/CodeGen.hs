@@ -62,7 +62,75 @@ bracketInit typ as = cast typ $ s "{$$}" [commaSep (map assign as)]
     where
       assign (field, val) = s ".$$ = $$" [field, val]
 
-evalProgram = undefined
+
+{-
+// TODO: intialize the layout for every function info table, (plus_int, map)
+
+
+init_function_map()
+{
+    arg_entry map_entries[2];
+    map_entries[0] = (struct arg_entry) { .pointer = true, .offset = 0 };
+    map_entries[1] = (struct arg_entry) { .pointer = true, .offset = sizeof(ref) };
+    map_info_table = (struct info_table) { .type = 0,
+                       .extra.function = { .arity = 2, .slow_entry_point = map_slow },
+                       .layout = { .num = 2, .entries = map_entries }
+                      };
+}
+
+ref map_fast(ref function, ref list)
+{
+    struct hash_map *bindings;
+    init_bindings(&bindings);
+
+    put_binding(bindings, 0, function);
+    put_binding(bindings, 1, list);
+    return map_case_cont(bindings);
+}
+
+ref map_slow(ref null)
+{
+  if(arg_satisfaction_check(sizeof(ref)*2))
+  {
+    ref arg1;
+    ref arg2;
+    pop_ptr(&arg1);
+    pop_ptr(&arg2);
+    return map_fast(arg1, arg2);
+  }
+  else
+  {
+     // at least 1 arg must be present
+     ref arg1;
+     pop_ptr(&arg1);
+
+     NEW_REF(pap_ref, void**, sizeof(void*) + sizeof(ref), pap_)
+
+     struct info_table* pap_info = (struct info_table*)new(sizeof(struct info_table));
+     pap_info->type = 4;
+     pap_info->extra.pap_info = (struct pap){ .info_ptr = &map_info_table, .size = 1 };
+     pap_[0] = pap_info;
+     *(ref*)(pap_ + 1) = arg1;
+     return pap_ref;
+  }
+}
+
+This should also go in a seperate file and directory and create a c and header file
+Also we only deal with top-level definitions of function currently
+-}
+evalProgram topLevel = topLevel >>= generateTopLevelDefn
+    where
+      generateTopLevelDefn (name, FUNC (Fun args e)) = info_table_initializer ++ slow_entry_point ++ fast_entry_point
+          where
+            info_table_initializer = funcFormatter "void" name [] body
+                where
+                  name = s "init_function_$$" [name]
+                  body = undefined -- TODO
+            slow_entry_point = funcFormatter "ref" slow_name [("ref", "null")] body
+                where
+                  slow_name = undefined
+                  body = undefined -- TODO
+            fast_entry_point = undefined
 
 {-
 data List a = Cons { value :: a, next :: (List a) } | Nil
@@ -73,27 +141,19 @@ void init_list()
 
     nil_info_table = (struct info_table){ .type = 1, .extra = { .constructor = { .arity = 0, .con_num = 1 } } };
 
-    arg_entry map_entries[2];
-    map_entries[0] = (struct arg_entry) { .pointer = true, .offset = 0 };
-    map_entries[1] = (struct arg_entry) { .pointer = true, .offset = sizeof(ref) };
-    map_info_table = (struct info_table) { .type = 0,
-                       .extra.function = { .arity = 2, .slow_entry_point = map_slow },
-                       .layout = { .num = 2, .entries = map_entries }
-                      };
-
     new_ref(sizeof(Nil), &nil_value);
     ((Nil*)get_ref(nil_value))->info_ptr = &nil_info_table;
 }
-This should also go in a seperate file and directory and create a c and header file
+
 -}
-evalConDecl (Decl typeName cons) = undefined -- funcFormatter "void" name args body
+evalConDecl (Decl typeName cons) = funcFormatter "void" name args body
     where
-      name = s "init_$$" [typeName]
+      name = s "init_constructors_$$" [typeName]
       args = []
-      body = cons >>= generateConDefn
+      body = map generateConDefn cons
       -- TODO gen from env you also need to save the layout info of the constructor
       generateConDefn (ConDefn conName tag l)
-          = undefined -- info_table_name  .= cast "info_table" (bracketInit bs)
+          = info_table_name  .= bracketInit "info_table" bs
             where
               info_table_name = s "$$_info_table" [conName]
               bs = [ ("type", "1"), ("extra", extra) ]
