@@ -1,5 +1,10 @@
 module Types where
 
+-- name, tag, fields
+data ValueType = Boxed | Unboxed
+data ConstructorDefn = ConDefn String Int [(String, ValueType)]
+data ConDecl = Decl String [ConstructorDefn]
+
 type Program = [(String, Object)]
 data Object = THUNK Expression | FUNC Function | CON Constructor | BLACKHOLE | PAP PartialApp
 

@@ -37,6 +37,7 @@ funcFormatter returnType name args body = [line1, "{"] ++ body ++ ["}"]
 newRefMacro refn typ size valn = s "NEW_REF($$, $$, $$, $$)" [refn, typ, size, valn]
 bindingMacro ref typ val updk bs = s "GET_BINDING($$, $$, $$, $$, $$)" [ref, typ, val, updk, bs]
 ptrAccess v f = s "($$)->$$" [v, f]
+cast t n = s "($$)$$" [t, n]
 castPtr t n = s "($$*)$$" [t, n]
 returnSt st = s "return $$;" [st]
 assert st = s "assert($$);" [st]
@@ -57,6 +58,54 @@ extractArgsToFunArgs (L (I x)) = show x
 fast_call_name f = s "$$_fast" [f]
 slow_call_name f = s "$$_slow" [f]
 
+bracketInit typ as = cast typ $ s "{$$}" [commaSep (map assign as)]
+    where
+      assign (field, val) = s ".$$ = $$" [field, val]
+
+evalProgram = undefined
+
+{-
+data List a = Cons { value :: a, next :: (List a) } | Nil
+
+void init_list()
+{
+    cons_info_table = (struct info_table){ .type = 1, .extra = { .constructor = { .arity = 2, .con_num = 0 } } };
+
+    nil_info_table = (struct info_table){ .type = 1, .extra = { .constructor = { .arity = 0, .con_num = 1 } } };
+
+    arg_entry map_entries[2];
+    map_entries[0] = (struct arg_entry) { .pointer = true, .offset = 0 };
+    map_entries[1] = (struct arg_entry) { .pointer = true, .offset = sizeof(ref) };
+    map_info_table = (struct info_table) { .type = 0,
+                       .extra.function = { .arity = 2, .slow_entry_point = map_slow },
+                       .layout = { .num = 2, .entries = map_entries }
+                      };
+
+    new_ref(sizeof(Nil), &nil_value);
+    ((Nil*)get_ref(nil_value))->info_ptr = &nil_info_table;
+}
+This should also go in a seperate file and directory and create a c and header file
+-}
+evalConDecl (Decl typeName cons) = undefined -- funcFormatter "void" name args body
+    where
+      name = s "init_$$" [typeName]
+      args = []
+      body = cons >>= generateConDefn
+      -- TODO gen from env you also need to save the layout info of the constructor
+      generateConDefn (ConDefn conName tag l)
+          = undefined -- info_table_name  .= cast "info_table" (bracketInit bs)
+            where
+              info_table_name = s "$$_info_table" [conName]
+              bs = [ ("type", "1"), ("extra", extra) ]
+              extra = bracketInit "union info_table_u"
+                        [("constructor",
+                          bracketInit "con"
+                             [("arity", show $ length l),
+                              ("tag", show tag)]
+                         )]
+                                                
+
+      
 
 {-
 Constructor definitions must be pre-processed seperately
