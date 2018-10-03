@@ -18,9 +18,8 @@ type ConMap = Map String ConstructorDefn
 type FreshNameSource = Int
     
 data Env = Env FunMap [Bindings] CurFun FreshNameSource ConMap
-      
-type MonStack = State Env
 
+type MonStack = State Env
 
 -- name, tag, fields
 data ValueType = Boxed | Unboxed

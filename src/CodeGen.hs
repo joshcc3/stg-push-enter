@@ -149,7 +149,7 @@ evalProgram = fmap concat . mapM generateTopLevelDefn
                             ]
             functionStruct = bracketInit "function" [("slow_entry_point", slow_call_name name), ("arity", show $ length args)]
             slowEntryPointDecl = C_Fun slow_entry_name slow_entry_point []
-            (slow_entry_name, slow_entry_point) = (slow_call_name name, generateSlowCall name (snd . unzip $ args))
+            (slow_entry_name, slow_entry_point) = (slow_call_name name, generateSlowCall name args)
             fastEntryPointDecl = C_Fun (fast_call_name name) fast_entry_point []
             fast_entry_point = funcFormatter "ref" (fast_call_name name) fastArgs body
                 where
@@ -187,12 +187,12 @@ ref map_slow(ref null)
 -}
 generateSlowCall name args = funcFormatter "ref" (slow_call_name name) [("ref", "null")] body
    where
-     argSatisfactionCondition = undefined -- funCall "arg_satisfaction_check" argSize
-     argSize = charSeperate '+' (map toSize args)
+     argSatisfactionCondition = funCall "arg_satisfaction_check" [argSize]
+     argSize = charSeperate '+' (map (toSize . snd) args)
      body = ifSt argSatisfactionCondition
-              undefined -- (generateFastCallFromArgsOnStack name args)
+              (generateFastCallFromArgsOnStack name args)
               [elseSt]
-     elseSt = undefined -- TODO create a pap
+     elseSt = undefined -- TODO create a pap (assert args more than 1)
      generateFastCallFromArgsOnStack name args
          = map (decl "arg" . fst)  args ++
            map (funCall "pop_ptr" . (:[]) . reference . fst) args ++
@@ -271,15 +271,18 @@ ref cont(hash_map *bindings)
 
 -- TODO: a case doesn't actually compile to this, this is just the case continuation
 -- TODO: A case actually compiles to a return case_name(bindings);
-generateCaseCont (Case (V var_name) es) = funcFormatter returnType name args $
+generateCaseCont :: Expression -> MonStack C_TopLevel
+generateCaseCont (Case (V var_name) es) = return (C_Fun name statements [])
+  where
+    statements = funcFormatter returnType name args $
      case es of
         -- For this case we push a case frame and then a 'fake' update frame that restores su and returns the arg that the update frame was called with 
         [AltForce x e] -> undefined -- TODO Need to handle this case.
         alts ->  [
-            bindingMacro var_ref "void**" var_name var_key arg1,
+            bindingMacro var_ref "void**" var_name var_key "bindings",
             declInit "info_table*" info_table (deref (castPtr "info_table*" var_name))
           ] ++ ifSt conCase (alts >>= caseIf) [elseSt]
-  where
+
     conCase = s "$$->type == 1" [info_table]    
     var_key = undefined -- get from the environment
     func_prefix = undefined -- get from the environment
@@ -298,7 +301,6 @@ generateCaseCont (Case (V var_name) es) = funcFormatter returnType name args $
           actualConNum = structAccess (structAccess (ptrAccess info_table "extra") "constructor") "con_num"
     info_table = s "$$_info" [var_name]
     var_ref = s "$$_ref" [var_name]
-    arg1 = "bindings"
     returnType = "ref"
     name = s "$$_$$" [func_prefix, "cont"]
     args = [("hash_map*", "bindings")]
