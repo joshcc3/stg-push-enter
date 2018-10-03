@@ -3,12 +3,12 @@ module Types where
 import Control.Monad.State
 import Data.Map
 
-type Statement = [String]
+type Statement = String
 
 data C_TopLevel =
-	  C_Fun String [Statement] [C_TopLevel]
-	| C_Struct String [Statement] [C_TopLevel] ]
-	| C_Var String [Statement]
+    C_Fun String [Statement] [C_TopLevel]
+  | C_Struct String [Statement] [C_TopLevel]
+  | C_Var String [Statement]
 
 type Bindings = Map String Int
 type CurFun = String
@@ -24,7 +24,7 @@ type MonStack = State Env
 
 -- name, tag, fields
 data ValueType = Boxed | Unboxed
-data ConstructorDefn = ConDefn String Int [(String, ValueType)]
+data ConstructorDefn = ConDefn { conName :: String, conArity :: Int, conFields :: [(String, ValueType)] }
 data ConDecl = ConDecl String [ConstructorDefn]
 
 type Program = [(String, Object)]

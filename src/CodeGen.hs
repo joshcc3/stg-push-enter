@@ -127,15 +127,12 @@ init_arg_entry (ix, (offset, (argName, argType))) = case argType of
     structValue = bracketInit "arg_entry"
     fields isPointer argSize = [("size", argSize), ("pointer", isPointer), (".offset", show offset)]
 
-evalProgram :: MonStack [C_TopLevel]
-evalProgram topLevel = topLevel >>= generateTopLevelDefn
+evalProgram :: Program -> MonStack [C_TopLevel]
+evalProgram = fmap concat . mapM generateTopLevelDefn
     where
-      generateTopLevelDefn (name, FUNC (Fun args e)) = return [intoTableInit, slowEntryPointDecl, fastEntryPointDecl]
+      generateTopLevelDefn (name, FUNC (Fun args e)) = return [infoTableInit, slowEntryPointDecl, fastEntryPointDecl]
           where
-			infoTableInit = C_Fun inf
-
-
-            info_table_initializer ++ slow_entry_point ++ fast_entry_point
+            infoTableInit = C_Fun info_table_name info_table_initializer_stmts []
             (info_table_name, info_table_initializer_stmts) = (name, funcFormatter "void" name [] body)
                 where
                   name = s "init_function_$$" [name]
@@ -151,7 +148,9 @@ evalProgram topLevel = topLevel >>= generateTopLevelDefn
                              ("layout", layout)
                             ]
             functionStruct = bracketInit "function" [("slow_entry_point", slow_call_name name), ("arity", show $ length args)]
-            (slow_entry_name, slow_entry_point) =(slow_call_name name, generateSlowCall name (snd . unzip $ args)
+            slowEntryPointDecl = C_Fun slow_entry_name slow_entry_point []
+            (slow_entry_name, slow_entry_point) = (slow_call_name name, generateSlowCall name (snd . unzip $ args))
+            fastEntryPointDecl = C_Fun (fast_call_name name) fast_entry_point []
             fast_entry_point = funcFormatter "ref" (fast_call_name name) fastArgs body
                 where
                   fastArgs = map f args
@@ -222,18 +221,13 @@ void init_list()
 
 -}
 -- Needs to generate the struct and the initialization of its info table
-evalConDecl :: MonStack [C_TopLevel]
+evalConDecl :: ConDecl -> MonStack [C_TopLevel]
 evalConDecl (ConDecl typeName cons) = return (funcDecl:structDecls)
     where
-	  structDecls = map toStructDecl cons
-	  toStructDecl (ConDefn conName _ fields)
-	    = typedef conName (("struct info_table*", "info_ptr"): map toTypes fields)
-	  toTypes (fName, Unboxed) = (fName, "int")
-	  toTypes (fName, Boxed) = (fName, "ref")
-
-	  funcDecl = C_Fun name (funcFormatter "void" name args body) [structDecl]
-	  structInit = typedef typeName cons
-
+      structDecls = map toStructDecl cons
+      toStructDecl (ConDefn conName _ fields) = C_Struct conName ("struct info_table* info_ptr;":typedef conName fields) []
+      funcDecl = C_Fun name (funcFormatter "void" name args body) structDecls
+      structInit = map (typedef typeName . conFields) $ cons
       name = s "init_constructors_$$" [typeName]
       args = []
       body = map generateConDefn cons

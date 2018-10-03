@@ -1,5 +1,8 @@
 module CConstructs where
 
+import Utils
+import Types    
+
 newMacro typ nm = s "NEW($$, $$)" [typ, nm]
 initBindings = [decl "hash_map *" "bindings", funCall "init_bindings" [reference "bindings"]]
 putBinding updateKey thunk_ref_name = funCall "putBinding" ["bindings", show updateKey, thunk_ref_name]
@@ -8,9 +11,10 @@ funInfoTableName name = s "$$_info_table" [name]
 
 tab = map ('\t':)
 
-typedef name fields = [s "$$ struct $$ {": tab (map fieldDecl fields) ++ [s "} $$;" name]
+typedef name fields = s "typedef struct $$ {" [name]: tab (map fieldDecl fields) ++ [s "} $$;" [name]]
   where
-	fieldDecl (f, t) = s "$$ $$;" [f, t]
+    fieldDecl (f, Unboxed) = s "ref $$;" [f]
+    fieldDecl (f, Boxed) = s "int $$;" [f]
 
 ifSt cond ifBody elses = [condSt, "{"] ++ tab ifBody ++ ["}"] ++ (
                          case elses of
