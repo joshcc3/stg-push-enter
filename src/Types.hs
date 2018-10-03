@@ -3,7 +3,8 @@ module Types where
 import Control.Monad.State
 import Data.Map
 
-data C_TopLevel = C_Fun String [C_TopLevel] | C_Var String
+type Statement = String
+data C_TopLevel = C_Fun String [Statement] [C_TopLevel] | C_Var [Statement] String
 type Bindings = Map String Int
 type CurFun = String
 data FunInfoTable = FInf String Int [(String, ValueType)]

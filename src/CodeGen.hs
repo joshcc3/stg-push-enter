@@ -2,6 +2,7 @@
 
 import Types
 import Utils
+import CConstructs
 
 {-
 Compilation process:
@@ -79,71 +80,11 @@ Need to generate a makefile as well.
 
 -}
 
-
 generatePapSize = undefined -- generate the pap size from the atoms
 assignPapAtoms pap fun atoms = undefined -- gen from env
 toPrimOpArgs = undefined -- gen from env
 knownAndSaturated f as = undefined -- gen from env
 pushFunArgs = undefined -- gen from env
-
-initBindings = [decl "hash_map *" "bindings", funCall "init_bindings" [reference "bindings"]]
-putBinding updateKey thunk_ref_name = funCall "putBinding" ["bindings", show updateKey, thunk_ref_name]
-
-funInfoTableName name = s "$$_info_table" [name]
-
-tab = map ('\t':)
-
-ifSt cond ifBody elses = [condSt, "{"] ++ tab ifBody ++ ["}"] ++ (
-                         case elses of
-                           [] -> []
-                           es -> let elseSt = ["else", "{"] ++ tab (last es) ++ ["}"] in 
-                                 let elseifs = init es >>= toElseIf
-                                 in elseifs ++ elseSt
-                                                               )
-    where
-      toElseIf a = s "else $$" [head a] : tab (tail a)
-      condSt = s "if($$)" [cond]
-
-decl typ name = s "$$ $$;" [typ, name]
-declInit typ name val = s "$$ $$ = $$;" [typ, name, val]
-
-funcFormatter returnType name args body = [line1, "{"] ++ body ++ ["}"]
-    where
-      line1 = s "$$ $$($$)" [returnType, name, commaSep . map (\(a, b) -> s "$$ $$" [a, b]) $ args]
-
-newRefMacro refn typ size valn = s "NEW_REF($$, $$, $$, $$)" [refn, typ, size, valn]
-bindingMacro ref typ val updk bs = s "GET_BINDING($$, $$, $$, $$, $$)" [ref, typ, val, updk, bs]
-ptrAccess v f = s "($$)->$$" [v, f]
-cast t n = s "($$)$$" [t, n]
-castPtr t n = s "($$*)$$" [t, n]
-returnSt st = s "return $$;" [st]
-assert st = s "assert($$);" [st]
-structAccess var field = s "($$).$$" [var, field]
-deref x = s "*($$)" [x]
-reference x = s "&($$)" [x]
-a .= b = s "$$ = $$;" [a, b]
-arrayIndex v i = s "$$[$$]" [v, show i]
-
-funCall name args = s "$$($$)" [name, commaSep args]
-
-commaSep = charSeperate ','
-
-charSeperate c [] = ""
-charSeperate c xs = s "$$ $$" [init xs >>= \x -> s "$$$$ " [x, [c]], last xs]
-
-
-
-extractArgsToFunArgs (V x) = x
-extractArgsToFunArgs (L (I x)) = show x
-fast_call_name f = s "$$_fast" [f]
-slow_call_name f = s "$$_slow" [f]
-
-bracketInit typ as = cast typ $ s "{$$}" [commaSep (map assign as)]
-    where
-      assign (field, val) = s ".$$ = $$" [field, val]
-
-toSize Boxed = "sizeof(ref)"
-toSize Unboxed = "sizeof(int)"
 
 
 {-
@@ -448,4 +389,3 @@ evalObject obj_name (PAP (Pap fun atoms)) = [newPap] ++ constructPapInfo ++ assi
       assignPapInfo = arrayIndex value_name 0 .= castPtr "void" pap_info_name
       assignPapValues = assignPapInfo:assignPapAtoms value_name fun atoms
 
-newMacro typ nm = s "NEW($$, $$)" [typ, nm]
