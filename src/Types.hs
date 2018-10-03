@@ -3,8 +3,13 @@ module Types where
 import Control.Monad.State
 import Data.Map
 
-type Statement = String
-data C_TopLevel = C_Fun String [Statement] [C_TopLevel] | C_Var [Statement] String
+type Statement = [String]
+
+data C_TopLevel =
+	  C_Fun String [Statement] [C_TopLevel]
+	| C_Struct String [Statement] [C_TopLevel] ]
+	| C_Var String [Statement]
+
 type Bindings = Map String Int
 type CurFun = String
 data FunInfoTable = FInf String Int [(String, ValueType)]
@@ -14,14 +19,13 @@ type FreshNameSource = Int
     
 data Env = Env FunMap [Bindings] CurFun FreshNameSource ConMap
       
-                
-
+type MonStack = State Env
 
 
 -- name, tag, fields
 data ValueType = Boxed | Unboxed
 data ConstructorDefn = ConDefn String Int [(String, ValueType)]
-data ConDecl = Decl String [ConstructorDefn]
+data ConDecl = ConDecl String [ConstructorDefn]
 
 type Program = [(String, Object)]
 data Object = THUNK Expression | FUNC Function | CON Constructor | BLACKHOLE | PAP PartialApp

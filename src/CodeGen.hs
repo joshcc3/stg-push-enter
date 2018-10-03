@@ -126,11 +126,17 @@ init_arg_entry (ix, (offset, (argName, argType))) = case argType of
     arrayIx = arrayIndex "layout_entries" ix
     structValue = bracketInit "arg_entry"
     fields isPointer argSize = [("size", argSize), ("pointer", isPointer), (".offset", show offset)]
+
+evalProgram :: MonStack [C_TopLevel]
 evalProgram topLevel = topLevel >>= generateTopLevelDefn
     where
-      generateTopLevelDefn (name, FUNC (Fun args e)) = info_table_initializer ++ slow_entry_point ++ fast_entry_point
+      generateTopLevelDefn (name, FUNC (Fun args e)) = return [intoTableInit, slowEntryPointDecl, fastEntryPointDecl]
           where
-            info_table_initializer = funcFormatter "void" name [] body
+			infoTableInit = C_Fun inf
+
+
+            info_table_initializer ++ slow_entry_point ++ fast_entry_point
+            (info_table_name, info_table_initializer_stmts) = (name, funcFormatter "void" name [] body)
                 where
                   name = s "init_function_$$" [name]
                   body = initLayout name args ++ [funInfoTableName name .= info_table_struct]
@@ -145,7 +151,7 @@ evalProgram topLevel = topLevel >>= generateTopLevelDefn
                              ("layout", layout)
                             ]
             functionStruct = bracketInit "function" [("slow_entry_point", slow_call_name name), ("arity", show $ length args)]
-            slow_entry_point = generateSlowCall name (snd . unzip $ args)
+            (slow_entry_name, slow_entry_point) =(slow_call_name name, generateSlowCall name (snd . unzip $ args)
             fast_entry_point = funcFormatter "ref" (fast_call_name name) fastArgs body
                 where
                   fastArgs = map f args
@@ -196,6 +202,14 @@ generateSlowCall name args = funcFormatter "ref" (slow_call_name name) [("ref", 
 {-
 data List a = Cons { value :: a, next :: (List a) } | Nil
 
+
+typedef struct Cons {
+    struct info_table *info_ptr;
+    ref value;
+    ref next;
+} Cons;
+
+
 void init_list()
 {
     cons_info_table = (struct info_table){ .type = 1, .extra = { .constructor = { .arity = 2, .con_num = 0 } } };
@@ -207,12 +221,22 @@ void init_list()
 }
 
 -}
-evalConDecl (Decl typeName cons) = funcFormatter "void" name args body
+-- Needs to generate the struct and the initialization of its info table
+evalConDecl :: MonStack [C_TopLevel]
+evalConDecl (ConDecl typeName cons) = return (funcDecl:structDecls)
     where
+	  structDecls = map toStructDecl cons
+	  toStructDecl (ConDefn conName _ fields)
+	    = typedef conName (("struct info_table*", "info_ptr"): map toTypes fields)
+	  toTypes (fName, Unboxed) = (fName, "int")
+	  toTypes (fName, Boxed) = (fName, "ref")
+
+	  funcDecl = C_Fun name (funcFormatter "void" name args body) [structDecl]
+	  structInit = typedef typeName cons
+
       name = s "init_constructors_$$" [typeName]
       args = []
       body = map generateConDefn cons
-      -- TODO you also need to register that the Constructor struct gets put into the header file.
       generateConDefn (ConDefn conName tag l)
           = info_table_name  .= bracketInit "info_table" bs
             where
@@ -225,11 +249,6 @@ evalConDecl (Decl typeName cons) = funcFormatter "void" name args body
                               ("tag", show tag)]
                          )]
                                                 
-
-
-
-
-
 
 {-
 

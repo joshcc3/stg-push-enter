@@ -8,6 +8,10 @@ funInfoTableName name = s "$$_info_table" [name]
 
 tab = map ('\t':)
 
+typedef name fields = [s "$$ struct $$ {": tab (map fieldDecl fields) ++ [s "} $$;" name]
+  where
+	fieldDecl (f, t) = s "$$ $$;" [f, t]
+
 ifSt cond ifBody elses = [condSt, "{"] ++ tab ifBody ++ ["}"] ++ (
                          case elses of
                            [] -> []
