@@ -3,6 +3,7 @@
 import Types
 import Utils
 import CConstructs
+import qualified Data.Map as M
 
 {-
 Compilation process:
@@ -150,11 +151,13 @@ evalProgram = fmap concat . mapM generateTopLevelDefn
             functionStruct = bracketInit "function" [("slow_entry_point", slow_call_name name), ("arity", show $ length args)]
             slowEntryPointDecl = C_Fun slow_entry_name slow_entry_point []
             (slow_entry_name, slow_entry_point) = (slow_call_name name, generateSlowCall name args)
-            fastEntryPointDecl = C_Fun (fast_call_name name) fast_entry_point []
-            fast_entry_point = funcFormatter "ref" (fast_call_name name) fastArgs body
+            fastEntryPointDecl = (C_Fun (fast_call_name name) fast_entry_point [])
+            fast_entry_point = 
+              funcFormatter "ref" (fast_call_name name) fastArgs body
                 where
                   fastArgs = map f args
-                  body = initBindings ++ map (uncurry putBinding) (zip [0..] (fst . unzip $ args) ) ++ eval e
+                  newBindings =  zip (fst . unzip $ args) [0..]
+                  body = initBindings ++ map (uncurry putBinding) newBindings ++ eval (M.fromList newBindings) e
                   f (v, Boxed) = ("ref", v)
                   f (v, Unboxed) = ("int", v)
 {-
@@ -271,8 +274,8 @@ ref cont(hash_map *bindings)
 
 -- TODO: a case doesn't actually compile to this, this is just the case continuation
 -- TODO: A case actually compiles to a return case_name(bindings);
-generateCaseCont :: Expression -> MonStack C_TopLevel
-generateCaseCont (Case (V var_name) es) = return (C_Fun name statements [])
+generateCaseCont :: Bindings -> Expression -> MonStack C_TopLevel
+generateCaseCont bindings (Case (V var_name) es) = return (C_Fun name statements [])
   where
     statements = funcFormatter returnType name args $
      case es of
@@ -294,7 +297,7 @@ generateCaseCont (Case (V var_name) es) = return (C_Fun name statements [])
     caseIf (AltCase conName freeVars exp) = ifSt cond ifBody []
         where
           cond = assert (s "$$ == $$" [actualConNum, expectedConNum])
-          ifBody = declInit (s "$$*" [conName]) conInnerName conCasted:{- Todo: need to bind the free vars of the case to the con-} eval exp
+          ifBody = declInit (s "$$*" [conName]) conInnerName conCasted:{- Todo: need to bind the free vars of the case to the con-} eval bindings exp
           conInnerName = undefined -- gen from env
           expectedConNum = undefined -- get from the environment
           conCasted = castPtr conName var_name
@@ -317,20 +320,21 @@ generateCaseCont (Case (V var_name) es) = return (C_Fun name statements [])
      return plus_int_slow(one_ref);
 
 -}    
-generateThunkCont funName (THUNK e) = funcFormatter "ref" funName [("ref", "thunk_ref")] body
+generateThunkCont bindings funName (THUNK e) = funcFormatter "ref" funName [("ref", "thunk_ref")] body
     where
-      body = declInit "hash_map*" "bindings" "THUNK_GET_BINDINGS(thunk_ref)":eval e
+      body = declInit "hash_map*" "bindings" "THUNK_GET_BINDINGS(thunk_ref)":eval bindings e
 
 
     
-eval :: Expression -> [String]
-eval (Case _ _) = [returnSt (funCall case_con_name ["bindings"])]
+eval :: Bindings -> Expression -> [String]
+eval bindings (Case _ _) = [returnSt (funCall case_con_name ["bindings"])]
     where
       case_con_name = undefined -- gen from env and record that a case needs to be built
 
 -- (void**)get_binding()
-eval (Primop "+#" [L (I x), L (I y)]) = eval (Atom . L . I $ x + y)
-eval (FuncCall fun args)
+-- TODO Need to handle the actual primops cases
+eval bindings (Primop "+#" [L (I x), L (I y)]) = eval bindings (Atom . L . I $ x + y)
+eval bindings (FuncCall fun args)
      | knownAndSaturated fun args = [funCall (fast_call_name fun) (map extractArgsToFunArgs args)]
      | otherwise = pushFunArgs fun args ++ [decl "ref" tmp, funCall (slow_call_name fun) [tmp]]
      where
@@ -343,16 +347,16 @@ eval (FuncCall fun args)
    put_binding(bindings, 4, thunk1_ref);
 
 -}
-eval (Let var obj e) = evalObject thunk_name obj ++ [putBinding (show updateKey) thunk_ref_name] ++ eval e
+eval bindings (Let var obj e) = evalObject bindings thunk_name obj ++ [putBinding thunk_ref_name  (show updateKey)] ++ eval (M.insert thunk_ref_name updateKey bindings) e
     where
       thunk_name = var
       updateKey :: Int
       updateKey = undefined -- get from the environment (need map from var -> updKey)
       thunk_ref_name = s "$$_ref" [thunk_name]
-eval (Atom (L (I x))) = [show x]
-eval (Atom (V x)) = [x]
+eval bindings (Atom (L (I x))) = [show x]
+eval bindings (Atom (V x)) = [x]
 
-evalObject obj_name (THUNK e) = [declInit "ref" obj_name $ funCall "createThunk" ["bindings", thunk_cont]]
+evalObject bindings obj_name (THUNK e) = [declInit "ref" obj_name $ funCall "createThunk" ["bindings", thunk_cont]]
     where thunk_cont = undefined -- get from the environment, generate a new thunk cont name
 {-
    Cons x' f'
@@ -362,7 +366,7 @@ evalObject obj_name (THUNK e) = [declInit "ref" obj_name $ funCall "createThunk"
    cons->value = thunk1_ref;
    cons->next = thunk2_ref;
 -}
-evalObject obj_name (CON (Con c atoms)) = [newRefMacro ref_name (s "$$*" [c]) (s "sizeof($$)"[c]) val_name] ++ assignInfoPtr:assignFields
+evalObject bindings obj_name (CON (Con c atoms)) = [newRefMacro ref_name (s "$$*" [c]) (s "sizeof($$)"[c]) val_name] ++ assignInfoPtr:assignFields
     where
       val_name = obj_name -- get from env
       c_info_table = undefined -- get from env
@@ -387,7 +391,7 @@ evalObject obj_name (CON (Con c atoms)) = [newRefMacro ref_name (s "$$*" [c]) (s
 
 
 -}
-evalObject obj_name (PAP (Pap fun atoms)) = [newPap] ++ constructPapInfo ++ assignPapValues
+evalObject bindings obj_name (PAP (Pap fun atoms)) = [newPap] ++ constructPapInfo ++ assignPapValues
     where
       pap_info_name = obj_name
       funInfoTable = undefined -- gen from the environment

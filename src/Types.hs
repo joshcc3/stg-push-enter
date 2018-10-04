@@ -17,7 +17,7 @@ type FunMap = Map String FunInfoTable
 type ConMap = Map String ConstructorDefn
 type FreshNameSource = Int
     
-data Env = Env FunMap [Bindings] CurFun FreshNameSource ConMap
+data Env = Env FunMap CurFun FreshNameSource ConMap
 
 type MonStack = State Env
 

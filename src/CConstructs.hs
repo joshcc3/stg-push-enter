@@ -5,7 +5,7 @@ import Types
 
 newMacro typ nm = s "NEW($$, $$)" [typ, nm]
 initBindings = [decl "hash_map *" "bindings", funCall "init_bindings" [reference "bindings"]]
-putBinding updateKey thunk_ref_name = funCall "putBinding" ["bindings", show updateKey, thunk_ref_name]
+putBinding thunk_ref_name updateKey = funCall "putBinding" ["bindings", show updateKey, thunk_ref_name]
 
 funInfoTableName name = s "$$_info_table" [name]
 
