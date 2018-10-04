@@ -4,6 +4,8 @@ import Types
 import Utils
 import CConstructs
 import qualified Data.Map as M
+import Control.Monad.State
+import Control.Lens
 
 {-
 Compilation process:
@@ -81,6 +83,13 @@ Need to generate a makefile as well.
 
 -}
 
+
+freshName :: MonStack String
+freshName = do
+  x <- freshNameSource
+  freshNameSource += 1
+  return (s "var_$$" [x])
+
 generatePapSize = undefined -- generate the pap size from the atoms
 assignPapAtoms pap fun atoms = undefined -- gen from env
 toPrimOpArgs = undefined -- gen from env
@@ -131,7 +140,12 @@ init_arg_entry (ix, (offset, (argName, argType))) = case argType of
 evalProgram :: Program -> MonStack [C_TopLevel]
 evalProgram = fmap concat . mapM generateTopLevelDefn
     where
-      generateTopLevelDefn (name, FUNC (Fun args e)) = return [infoTableInit, slowEntryPointDecl, fastEntryPointDecl]
+      generateTopLevelDefn (name, FUNC (Fun args e))
+          = zoom funMap $
+              ix info_table_name .= infoTableInit
+              ix slow_entry_name slowEntryPointDecl
+              ix (fast_call_name name) fastEntryPointDecl
+              return [infoTableInit, slowEntryPointDecl, fastEntryPointDecl]
           where
             infoTableInit = C_Fun info_table_name info_table_initializer_stmts []
             (info_table_name, info_table_initializer_stmts) = (name, funcFormatter "void" name [] body)
