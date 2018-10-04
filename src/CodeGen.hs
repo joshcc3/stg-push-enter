@@ -91,8 +91,9 @@ Need to generate a makefile as well.
 generateFunction :: [C_TopLevel] -> String -> MonStack [Statement] -> [(Type, Arg)] -> MonStack C_TopLevel
 generateFunction deps name fun_stmts args = do
   funMap.ix name .= funDescr
-  curFun .= name
+  curFun .= Just name
   stmts <- fun_stmts
+  curFun .= Nothing
   return (C_Fun name stmts deps)
       where
         funDescr = FInf name (length args) (map snd args)
@@ -103,12 +104,30 @@ freshName = do
   freshNameSource += 1
   return (s "var_$$" [show x])
 
-generatePapSize = undefined -- generate the pap size from the atoms
-assignPapAtoms pap fun atoms = undefined -- gen from env
-toPrimOpArgs = undefined -- gen from env
-knownAndSaturated f as = undefined -- gen from env
-pushFunArgs = undefined -- gen from env
+generatePapSize :: MonStack String
+generatePapSize fun argLen = do
+  -- you want the first n arguments.
+  args <- funMap.ix fun.fingArgs
+  return . c_sum . map toSize . take argLen $ args
 
+{-
+     *(ref*)(pap + 1) = one_ref;
+-}
+assignPapAtoms pap fun atoms = 
+
+knownAndSaturated :: String -> Int -> MonStack Bool
+knownAndSaturated f as = do
+  args <- use (funMap.ix f.finfArgs)
+  return $ (length args) == as
+
+pushFunArgs :: String -> [Atom] -> MonStack [Statement]
+pushFunArgs fun args = do
+  argTypes <- use (funMap.ix fun.finfArgs)
+  return $ undefined -- zipWith toPushInstr argTypes args
+      where
+        toPushInstr (_, Boxed) x =  s "push_ptr($$);" [x]
+        toPushInstr (_, Unboxed) x =  s "push_int($$);" [x]
+                               
 toCType a@(x, Boxed) = ("ref", a)
 toCType a@(x, Unboxed) = ("int", a)
 
@@ -141,8 +160,6 @@ init_function_map()
   plus_info_table.layout = (struct layout) { .num = 2, .entries = plus_entries };
 
 }
-
-This should also go in a seperate file and directory and create a c and header file
 Also we only deal with top-level definitions of function currently
 -}
 init_arg_entry :: (Int, (String, (String, ValueType))) -> (String, String)
@@ -164,6 +181,7 @@ evalProgram = fmap concat . mapM generateTopLevelDefn
         fastEntry <- generateFunction [] fast_entry_name fast_entry_point (map toCType args)
         return [infoTable, slowEntry, fastEntry]
           where
+            (initializeLayoutEntries, offsets) = unzip $ map init_arg_entry $ zip [0..] $ zip ("0":offsets) args
             info_table_function = Fun [] 
             (info_table_name, info_table_initializer_stmts) = (name, funcFormatter "void" name [] <$> body)
                 where
@@ -172,7 +190,6 @@ evalProgram = fmap concat . mapM generateTopLevelDefn
                   initLayout name args = allocateLayoutObject:initializeLayoutEntries
                     where
                       allocateLayoutObject = declInit "arg_entry*" "layout_entries" $ castPtr "arg_entry" $ funCall "new" $ [s "sizeof(arg_entry)*$$" [show $ length args]]
-                      (initializeLayoutEntries, offsets) = unzip $ map init_arg_entry $ zip [0..] $ zip ("0":offsets) args
                   layout = bracketInit "struct layout" [("num", "2"), ("entries", "layout_entries")]
                   info_table_struct = bracketInit "info_table" $
                             [("type", "0"),
@@ -181,7 +198,7 @@ evalProgram = fmap concat . mapM generateTopLevelDefn
                             ]
             functionStruct = bracketInit "function" [("slow_entry_point", slow_call_name name), ("arity", show $ length args)]
             slowEntryPointDecl = debug -- C_Fun slow_entry_name slow_entry_point []
-            slowEntryPointDescr = FInf slow_entry_name 0 []
+            slowEntryPointDescr = FInf slow_entry_name 0 [] []
             (slow_entry_name, slow_entry_point) = (slow_call_name name, generateSlowCall name args)
             fastEntryPointDecl = debug -- (C_Fun fast_entry_name fast_entry_point [])
             fastEntryPointDescr = FInf fast_entry_name (length args) args
@@ -225,7 +242,7 @@ ref map_slow(ref null)
 generateSlowCall name args = funcFormatter "ref" (slow_call_name name) [("ref", "null")] <$> body
    where
      argSatisfactionCondition = funCall "arg_satisfaction_check" [argSize]
-     argSize = charSeperate '+' (map (toSize . snd) args)
+     argSize = c_sum (map (toSize . snd) args)
      body = return $
              ifSt argSatisfactionCondition
                (generateFastCallFromArgsOnStack name args)
@@ -261,9 +278,11 @@ void init_list()
 -- Needs to generate the struct and the initialization of its info table
 evalConDecl :: ConDecl -> MonStack [C_TopLevel]
 evalConDecl (ConDecl typeName cons) = do
+  conMap %= flip (foldl conMapUpd) cons
   funcDecl <- generateFunction structDecls name (funcFormatter "void" name args <$> body) args
   return (funcDecl:structDecls)
     where
+      conMapUpd mp c = M.insert (conName c) c mp
       structDecls = map toStructDecl cons
       toStructDecl (ConDefn conName _ fields) = C_Struct conName ("struct info_table* info_ptr;":typedef conName fields) []
       structInit = map (typedef typeName . conFields) $ cons
@@ -373,11 +392,15 @@ eval bindings (Case _ _) = [returnSt (funCall case_con_name ["bindings"])]
 -- (void**)get_binding()
 -- TODO Need to handle the actual primops cases
 eval bindings (Primop "+#" [L (I x), L (I y)]) = eval bindings (Atom . L . I $ x + y)
-eval bindings (FuncCall fun args)
-     | knownAndSaturated fun args = [funCall (fast_call_name fun) (map extractArgsToFunArgs args)]
-     | otherwise = pushFunArgs fun args ++ [decl "ref" tmp, funCall (slow_call_name fun) [tmp]]
-     where
-       tmp = undefined -- gen from env
+eval bindings (FuncCall fun args) = do
+  cond <- knownAndSaturated fun (length args)
+  if cond
+  then return [funCall (fast_call_name fun) (map extractArgsToFunArgs args)]
+  else do
+    tmp <- freshName
+    pushStmts <- pushFunArgs fun args
+    return $ pushStmts ++ [decl "ref" tmp, funCall (slow_call_name fun) [tmp]]
+
 
 {-
    let x' = THUNK (f x) in e
@@ -416,7 +439,7 @@ evalObject bindings obj_name (CON (Con c atoms)) = [newRefMacro ref_name (s "$$*
       assignField (f, L (I x)) = ptrAccess val_name f ..= show x
       assignInfoPtr = ptrAccess val_name "info_ptr"  ..= (s "&$$" [c_info_table])
 {-
-     let z = map_slow f
+     let z = map f
 //
      NEW_REF(pap_ref, void**, sizeof(void*) + sizeof(ref), pap)
 
@@ -446,4 +469,3 @@ evalObject bindings obj_name (PAP (Pap fun atoms)) = [newPap] ++ constructPapInf
       constructPapInfo = [newPapInfo, assignType, initExtraInfo, assignExtraInfo]
       assignPapInfo = arrayIndex value_name 0 ..= castPtr "void" pap_info_name
       assignPapValues = assignPapInfo:assignPapAtoms value_name fun atoms
-

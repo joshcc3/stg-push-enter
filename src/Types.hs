@@ -15,25 +15,36 @@ data C_TopLevel =
   | C_Struct String [Statement] [C_TopLevel]
   | C_Var String [Statement] deriving (Eq, Ord, Show)
 
+data ValueType = Boxed | Unboxed deriving (Eq, Ord, Show)
 type Bindings = Map String Int
+data LayoutEntry = LayoutEntry { _leSize :: Int, _leIsPtr :: Bool,  _leOffset :: Int }
+type Layout = [LayoutEntry]
+
 type CurFun = String
-data FunInfoTable = FInf String Int [(String, ValueType)] deriving (Eq, Ord, Show)
+data FunInfoTable = FInf {
+      _finfName :: String,
+      _finfArity :: Int,
+      _finfArgs :: [(String, ValueType)],
+      _finfLayout :: Layout
+    } deriving (Eq, Ord, Show)
+makeLenses ''FunInfoTable                  
 type FunMap = Map String FunInfoTable
 type ConMap = Map String ConstructorDefn
 type FreshNameSource = Int
     
-data ValueType = Boxed | Unboxed deriving (Eq, Ord, Show)
 data ConstructorDefn = ConDefn { conName :: String, conArity :: Int, conFields :: [(String, ValueType)] } deriving (Eq, Ord, Show)
 
-data Env = Env { _funMap :: FunMap, _curFun ::  CurFun, _freshNameSource :: FreshNameSource, _conMap :: ConMap } deriving (Eq, Ord, Show)
+type MonStack = State Env
+
+data Env = Env { _funMap :: FunMap, _curFun ::  Maybe CurFun, _freshNameSource :: FreshNameSource, _conMap :: ConMap, _deferred :: [MonStack C_TopLevel] }
 makeLenses ''Env
 
-type MonStack = State Env
+
     
 -- name, tag, fields
 data ConDecl = ConDecl String [ConstructorDefn] deriving (Eq, Ord, Show)
 
-type Program = [(String, Object)]
+type Program = [(String, Object]
 data Object = THUNK Expression | FUNC Function | CON Constructor | BLACKHOLE | PAP PartialApp deriving (Eq, Ord, Show)
 
 type Var = String

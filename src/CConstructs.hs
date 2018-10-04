@@ -68,3 +68,5 @@ bracketInit typ as = cast typ $ s "{$$}" [commaSep (map assign as)]
 toSize Boxed = "sizeof(ref)"
 toSize Unboxed = "sizeof(int)"
 
+
+c_sum = charSeperate '+'
