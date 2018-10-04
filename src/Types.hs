@@ -17,8 +17,8 @@ data C_TopLevel =
 
 data ValueType = Boxed | Unboxed deriving (Eq, Ord, Show)
 type Bindings = Map String Int
-data LayoutEntry = LayoutEntry { _leSize :: Int, _leIsPtr :: Bool,  _leOffset :: Int }
-type Layout = [LayoutEntry]
+data LayoutEntry = LayoutEntry { _leSize :: String, _leIsPtr :: Bool,  _leOffset :: String } deriving (Eq, Ord, Show, Read)
+type Layout = [LayoutEntry] 
 
 type CurFun = String
 data FunInfoTable = FInf {
@@ -44,7 +44,7 @@ makeLenses ''Env
 -- name, tag, fields
 data ConDecl = ConDecl String [ConstructorDefn] deriving (Eq, Ord, Show)
 
-type Program = [(String, Object]
+type Program = [(String, Object)]
 data Object = THUNK Expression | FUNC Function | CON Constructor | BLACKHOLE | PAP PartialApp deriving (Eq, Ord, Show)
 
 type Var = String
