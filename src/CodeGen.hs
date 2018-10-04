@@ -84,6 +84,13 @@ Need to generate a makefile as well.
 
 -}
 
+generateFunction :: [C_TopLevel] -> String -> [Statement] -> [Arg] -> MonStack C_TopLevel
+generateFunction deps name fun_stmts args = do
+  funMap.ix name .= funDescr
+  return funTopLevel
+      where
+        funTopLevel = C_Fun name fun_stmts deps
+        funDescr = FInf name (length args) args
 
 freshName :: MonStack String
 freshName = do
@@ -143,14 +150,13 @@ evalProgram :: Program -> MonStack [C_TopLevel]
 evalProgram = fmap concat . mapM generateTopLevelDefn
     where
       generateTopLevelDefn (name, FUNC (Fun args e))
-          = zoom funMap $ do
-              ix info_table_name .= infoTableDescr
-              ix slow_entry_name .= slowEntryPointDescr
-              ix (fast_call_name name) .= fastEntryPointDescr
-              return [infoTableInit, slowEntryPointDecl, fastEntryPointDecl]
+          = do
+        infoTable <- generateFunction [] info_table_name info_table_initializer_stmts []
+        slowEntry <- generateFunction [] slow_entry_name slow_entry_point []
+        fastEntry <- generateFunction [] fast_entry_name fast_entry_point args
+        return [infoTable, slowEntry, fastEntry]
           where
-            infoTableInit = C_Fun info_table_name info_table_initializer_stmts []
-            infoTableDescr = FInf info_table_name 0 []
+            info_table_function = Fun [] 
             (info_table_name, info_table_initializer_stmts) = (name, funcFormatter "void" name [] body)
                 where
                   name = s "init_function_$$" [name]
@@ -224,7 +230,7 @@ generateSlowCall name args = funcFormatter "ref" (slow_call_name name) [("ref", 
 {-
 data List a = Cons { value :: a, next :: (List a) } | Nil
 
-
+//
 typedef struct Cons {
     struct info_table *info_ptr;
     ref value;
