@@ -39,7 +39,7 @@ prog := f1 = obj1; f2 = obj2; f3 = obj3 ...
  - Write a parallel generational garbage collector for the runtime based on ()
 
 # Why do we need continuations?
-They're kind of like return addresses with packed info. They are needed because the same sections of code are visited from different points.  (like after a case or after a thunk)
+They're kind of like return addresses with packed info. Since I compile to C, they can be used to implement tail call optimization although I haven't figured out how yet. They are also needed because the same sections of code are visited from different points.  (like after a case or after a thunk). 
 
 
 
@@ -378,7 +378,7 @@ Notably, `p2[0]`, `*p2`, `p2`, `p2[0][0], *p2[0]` have the same address, I think
   printf("4. Should be 12, Value at p2[0][0]%d\n", p2[0][0]);
 ```
 
-
+###
 ### 1 difference between lvalues and rvalues
 ```
    int *arr = malloc(sizeof(int)*10);
@@ -413,38 +413,60 @@ example0:                                                                       
 Assembling to intel syntax via `gcc -S -masm=intel set.c` gives the above. 
 The `&(*arr)` has been optimized away, however when trying with just `*arr` we see:
 ```
-        .section        .rodata                                                                                       │
-.LC0:                                                                                                                 │
-        .string "This is an lvalue: %p"                                                                               │
-        .text                                                                                                         │
-        .globl  example0                                                                                              │
-        .type   example0, @function                                                                                   │
-example0:                                                                                                             │
-.LFB3:                                                                                                                │
-        .cfi_startproc                                                                                                ├────────────────────────────────────────────────────────────
-        push    rbp                                                                                                   │ubuntu@ip-172-31-10-151:~/projects/stg-push-enter$ 
-        .cfi_def_cfa_offset 16                                                                                        │
-        .cfi_offset 6, -16                                                                                            │
-        mov     rbp, rsp                                                                                              │
-        .cfi_def_cfa_register 6                                                                                       │
-        sub     rsp, 16                                                                                               │
-        mov     edi, 40                                                                                               │
-        call    malloc                                                                                                │
-        mov     QWORD PTR [rbp-8], rax                                                                                │
-        mov     rax, QWORD PTR [rbp-8]                                                                                │
-        mov     eax, DWORD PTR [rax]                                                                                  │
-        mov     esi, eax                                                                                              │
-        mov     edi, OFFSET FLAT:.LC0                                                                                 │
-        mov     eax, 0                                                                                                │
-        call    printf                                                                                                │
-        nop                                                                                                           │
-        leave                                                                                                         │
-        .cfi_def_cfa 7, 8                                                                                             │
-        ret                                                                                                           │
-        .cfi_endproc                                                                                                  │
+        .section        .rodata                                                
+.LC0:                                                                          
+        .string "This is an lvalue: %p"                                        
+        .text                                                                  
+        .globl  example0                                                       
+        .type   example0, @function                                            
+example0:                                                                      
+.LFB3:                                                                         
+        .cfi_startproc                                                         
+        push    rbp                                                            
+        .cfi_def_cfa_offset 16                                                 
+        .cfi_offset 6, -16                                                     
+        mov     rbp, rsp                                                       
+        .cfi_def_cfa_register 6                                                
+        sub     rsp, 16                                                        
+        mov     edi, 40                                                        
+        call    malloc                                                         
+        mov     QWORD PTR [rbp-8], rax                                         
+        mov     rax, QWORD PTR [rbp-8]                                         
+        mov     eax, DWORD PTR [rax]                                           
+        mov     esi, eax                                                       
+        mov     edi, OFFSET FLAT:.LC0                                          
+        mov     eax, 0                                                         
+        call    printf                                                         
+        nop                                                                    
+        leave                                                                  
+        .cfi_def_cfa 7, 8                                                      
+        ret                                                                    
+        .cfi_endproc                                                           
 .LFE3:                     
 ```
 Over here, `*arr` is the `DWORD PTR [rax]`. Therefore I think lvalues must have the form `[<register/memory addr>]`.
+
+### Restrict Qualified Pointers
+Taken from https://en.cppreference.com/w/c/language/restrict, a type can be qualified with a subset of 'const', 'volatile' and 'restrict'. Restrict only applies to pointers to object types.
+The 'restrict' qualifier is *just* a compiler hint indicating that all accesses (read/write) to the pointed object will only occur through this pointer. Usages of the pointer that do not obey this principle result in undefined behaviour.
+Example cases where optimizations can be performed as a result of using a restrict qualified pointer:
+```
+void f(int n, int * restrict p, int * restrict q)
+{
+    while(n-- > 0)
+        *p++ = *q++; // none of the objects modified through *p is the same
+                     // as any of the objects read through *q
+                     // compiler free to optimize, vectorize, page map, etc.
+}
+void g(void)
+{
+    extern int d[100];
+    f(50, d + 50, d); // OK
+    f(50, d + 1, d); // Undefined behavior: d[1] is accessed through both p and q in f
+}
+```
+
+
 
 
 ### Modulus
@@ -457,6 +479,191 @@ The rule for modulus `a%b == z` is `b*x + z = a` so, `-10%7 == -3` as `7*-1 + (-
     Output
     x `mod` y == 1, -x `mod` y == -1, x `mod` -y == 1, -x `mod` -y == -1
 ```
+
+
+## PThread Interface
+Common threading interface exposed in unix and is documented in the man pages.
+### pthread_create
+```
+       int pthread_create(pthread_t *restrict thread,
+              const pthread_attr_t *restrict attr,
+              void *(*start_routine)(void*), void *restrict arg);
+```
+This creates and starts the thread calling start_routine with arg. 'thread' is populated with the ID.
+On successful completion 0 is returned. The call can fail when there aren't enough resources/you don't have permission to perform the requested attributes or they are invalid.
+Returning from 'start_routine' implicitly calls pthread_exit with the return value. (although the main function implicitly calls exit())
+
+### pthread_cancel
+       int pthread_cancel(pthread_t thread);
+Runs the cancellation handlers, thread data destructors and then the thread is terminated. (not sure where these handlers are defined).
+
+p_thread_exit should be called on main because it will block on the child threads (whereas otherwise with a call to exit all the children would be killed).
+p_thread_join - waits for the target to exit, and if the value_ptr is non-null it gets the result of the called thread. This can return EDEADLK.
+
+### mutes_init and destry
+cannot reinitialize an undestroyed mutex, cannot destroy a locked mutex. (Get the EBUSY error).
+
+### pthread_mutex_lock, trylock, unlock
+There are different types of mutexes - default, error check, recursive, normal
+Recursive ones are re-entrant. error check returns error values on error conditions - unlocking something unlocked, locking somethhing you own
+Signals are attended to by processes waiting on mutex and then they go back to waiting.
+Trylock returns an EBUSY and does not block if the mutex is locked.
+The scheduling policy determines which thread gets access to the mutex when unlock is called and threads are waiting.
+
+
+## Experiments
+```
+
+void* thread_action(void * null_arg)
+{
+  printf("Start!\n");
+  sleep(2);
+  printf("End!\n");
+}
+
+
+int main()
+{
+  pthread_t tid1;
+  int res = pthread_create(&tid1, NULL, thread_action, NULL);
+  printf("Main thread exits\n");
+  pthread_exit(NULL);
+}
+////
+[jcoutin@loydjcoutin1 concurrent]$ gcc test.c -lpthread
+[jcoutin@loydjcoutin1 concurrent]$ ./a.out
+Main thread exits
+Start!
+End!
+```
+
+Main waits on its child before exiting.
+
+```
+// when you remove the pthread_exit(NULL) it prints out Start!, Start! twice without fail
+
+void* thread_action(void * null_arg)
+{
+  printf("Start!\n");
+  sleep(2);
+  printf("End!\n");
+}
+
+
+int main()
+{
+  pthread_t tid1;
+  int res = pthread_create(&tid1, NULL, thread_action, NULL);
+  printf("Main thread exits\n");
+  //pthread_exit(NULL);
+}
+
+//////
+[jcoutin@loydjcoutin1 concurrent]$ gcc test.c -lpthread
+[jcoutin@loydjcoutin1 concurrent]$ ./a.out
+Main thread exits
+[jcoutin@loydjcoutin1 concurrent]$ ./a.out
+Main thread exits
+Start!
+Start!
+[jcoutin@loydjcoutin1 concurrent]$ ./a.out
+Main thread exits
+[jcoutin@loydjcoutin1 concurrent]$ ./a.out
+Main thread exits
+[jcoutin@loydjcoutin1 concurrent]$ ./a.out
+Main thread exits
+[jcoutin@loydjcoutin1 concurrent]$ ./a.out
+Main thread exits
+Start!
+Start!
+
+```
+
+```
+
+/*
+what happens to a thread when the parent dies:
+  parent is the main function - the child is killed - there can be unintended effects (for example I think the pc of the child thread got overwritten and it reverted to a previous instruction?)
+  parent is not the main function (and we pthread_exit in the main function) - the child is not killed and is preserved.
+
+  Does calling pthread_exit in the parent thread wait for the child thread? (not main)  - yes it does
+  Does calling pthread_exit in the parent thread wait for the grand child thread? (not main) - yes all children in the thread group are waited for if you call pthread_exit somewhere in the hierarchy
+
+  Inference, it's only the exit syscall that actually clears stuff up.
+
+if a thread joins on a deceased thread does is still capture its value?
+ */
+
+
+
+
+void* grand_child_thread(void *null_arg)
+{
+  printf("Grand Child thread about to sleep.\n");
+  sleep(2);
+  printf("Grand Child about to exit.\n");
+}
+void* child_thread(void *null_arg)
+{
+  pthread_t grand_t;
+  pthread_create(&grand_t, NULL, grand_child_thread, NULL);
+  printf("Child Exiting!\n");
+}
+
+void* parent_thread(void * null_arg)
+{
+  pthread_t child_t;
+  pthread_create(&child_t, NULL, child_thread, NULL);
+  printf("Parent thread exiting!\n");
+}
+
+
+int main()
+{
+  pthread_t tid1;
+  int res = pthread_create(&tid1, NULL, parent_thread, NULL);
+  printf("Main thread pexits\n");
+  pthread_exit(NULL);
+}
+```
+
+```
+// any thread can join join on any other thread.
+void* branch1(void *return_val)                                                                                                        |[jcoutin@loydjcoutin1 concurrent]$ gcc -ggdb -pthread test.c
+{                                                                                                                                      |[jcoutin@loydjcoutin1 concurrent]$
+  printf("Branch1 sleeping for 5 seconds\n");                                                                                          |[jcoutin@loydjcoutin1 concurrent]$
+  sleep(5);                                                                                                                            |[jcoutin@loydjcoutin1 concurrent]$
+  *(int*)return_val = 10;                                                                                                              |[jcoutin@loydjcoutin1 concurrent]$ ./a.out
+  printf("Branch1 exiting\n");                                                                                                         |Branch1 sleeping for 5 seconds
+  return return_val;                                                                                                                   |Branch2 joining branch1
+}                                                                                                                                      |a.out: test.c:84: main: Assertion `res == 10' failed.
+                                                                                                                                       |Aborted
+void* branch2(void *thread_to_wait)                                                                                                    |[jcoutin@loydjcoutin1 concurrent]$
+{                                                                                                                                      |[jcoutin@loydjcoutin1 concurrent]$
+  int *result;                                                                                                                         |[jcoutin@loydjcoutin1 concurrent]$ gcc -ggdb -pthread test.c
+  pthread_t *branch1 = (pthread_t*)thread_to_wait;                                                                                     |[jcoutin@loydjcoutin1 concurrent]$ ./a.out
+  printf("Branch2 joining branch1\n");                                                                                                 |Branch1 sleeping for 5 seconds
+  pthread_join(*branch1, (void**)&result);                                                                                             |Branch2 joining branch1
+  printf("Branch2 reports that the return value of branch1 is %d\n", *result);                                                         |Branch1 exiting
+  assert(*result == 10);                                                                                                               |Branch2 reports that the return value of branch1 is 10
+  return NULL;                                                                                                                         |[jcoutin@loydjcoutin1 concurrent]$
+}                                                                                                                                      |
+                                                                                                                                       |
+int main()                                                                                                                             |
+{                                                                                                                                      |
+  pthread_t b1;                                                                                                                        |
+  pthread_t b2;                                                                                                                        |
+                                                                                                                                       |
+  int res;                                                                                                                             |
+                                                                                                                                       |
+  pthread_create(&b1, NULL, branch1, (void*)&res);                                                                                     |
+  pthread_create(&b2, NULL, branch2, &b1);                                                                                             |
+                                                                                                                                       |
+  pthread_exit(NULL);                                                                                                                  |
+                                                                                                                                       |
+}
+```
+
 
 # TODO
  - One of the issues of using these refs to pass pointers is that you no longer have types which sucks. Maybe create a macro that takes the name of the ref, the name of the value and the type of the value and casts creates a new ref, gets the value and casts the ref to the value. Alternatively for the longer route - dont think you really need this - I think there is a way to automatically generate definitions and the corresponding bindings functions for a ref of a new type using macros but haven't investigated yet. For e.g., you'd hava ref_int, ref_hash_map etc.
