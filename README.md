@@ -664,6 +664,19 @@ int main()                                                                      
 }
 ```
 
+### pthread_cond_wait
+
+cond_wait takes a mutex and a cond_wait object. A pre-condition is that the calling thread must hold the lock on the mutex. The operation of cond_wait is to atomically release the mutex and sleep on the condition variable. The thread wakes up when a cond_signal/cond_broadcast has been sent. It then attempts to reacquire the mutex.
+When the thread returns from pthread_cond_wait:
+Throughout the lifetime of the pthread_cond_wait function, it will have held the lock, then blocked on cond, then woken up on a signal and then acquired the mutex.
+
+## Question
+ - Are the signals persistent? If a signal has been sent will something that subsequently wait on it be immediately woken up? - No, The pthread_cond_signal() and pthread_cond_broadcast() functions have no effect if there are no threads currently blocked on cond.
+ - Can multiple threads block on the mutex? of course, otherwise there would be no reason for a broadcast.
+ - Are the threads woken up in order?
+
+conds are associated with a boolean predicate. Spurious wake ups may occur and the condition variable should always be checked before proceeding.
+
 
 # TODO
  - One of the issues of using these refs to pass pointers is that you no longer have types which sucks. Maybe create a macro that takes the name of the ref, the name of the value and the type of the value and casts creates a new ref, gets the value and casts the ref to the value. Alternatively for the longer route - dont think you really need this - I think there is a way to automatically generate definitions and the corresponding bindings functions for a ref of a new type using macros but haven't investigated yet. For e.g., you'd hava ref_int, ref_hash_map etc.
