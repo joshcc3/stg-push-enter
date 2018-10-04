@@ -8,6 +8,8 @@ import Control.Lens
 
 type Statement = String
 
+type Type = String 
+
 data C_TopLevel = 
     C_Fun String [Statement] [C_TopLevel]
   | C_Struct String [Statement] [C_TopLevel]
@@ -47,7 +49,7 @@ data Expression =
 
 data Alt = AltCase String [Var] Expression | AltForce String Expression deriving (Eq, Ord, Show)
 
-type Arg = (String, ValueType)         
+type Arg = (String, ValueType)
 data Function = Fun [Arg] Expression deriving (Eq, Ord, Show)
 data Constructor = Con String [Atom] deriving (Eq, Ord, Show)
 data PartialApp = Pap String [Atom] deriving (Eq, Ord, Show)
