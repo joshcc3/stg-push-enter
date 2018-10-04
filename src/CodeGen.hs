@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 
 import Types
@@ -86,9 +87,9 @@ Need to generate a makefile as well.
 
 freshName :: MonStack String
 freshName = do
-  x <- freshNameSource
+  x <- use freshNameSource 
   freshNameSource += 1
-  return (s "var_$$" [x])
+  return (s "var_$$" [show x])
 
 generatePapSize = undefined -- generate the pap size from the atoms
 assignPapAtoms pap fun atoms = undefined -- gen from env
@@ -129,9 +130,10 @@ init_function_map()
 This should also go in a seperate file and directory and create a c and header file
 Also we only deal with top-level definitions of function currently
 -}
+init_arg_entry :: (Int, (String, (String, ValueType))) -> (String, String)
 init_arg_entry (ix, (offset, (argName, argType))) = case argType of
-        Boxed -> (arrayIx .= structValue (fields "true" "sizeof(ref)"), s "$$ + sizeof(ref)" [show offset])
-        Unboxed -> (arrayIx .= structValue (fields "false" "sizeof(int)"), s "$$ + sizeof(int)" [show offset])
+        Boxed -> (arrayIx ..= structValue (fields "true" "sizeof(ref)"), s "$$ + sizeof(ref)" [show offset])
+        Unboxed -> (arrayIx ..= structValue (fields "false" "sizeof(int)"), s "$$ + sizeof(int)" [show offset])
   where
     arrayIx = arrayIndex "layout_entries" ix
     structValue = bracketInit "arg_entry"
@@ -141,17 +143,18 @@ evalProgram :: Program -> MonStack [C_TopLevel]
 evalProgram = fmap concat . mapM generateTopLevelDefn
     where
       generateTopLevelDefn (name, FUNC (Fun args e))
-          = zoom funMap $
-              ix info_table_name .= infoTableInit
-              ix slow_entry_name slowEntryPointDecl
-              ix (fast_call_name name) fastEntryPointDecl
+          = zoom funMap $ do
+              ix info_table_name .= infoTableDescr
+              ix slow_entry_name .= slowEntryPointDescr
+              ix (fast_call_name name) .= fastEntryPointDescr
               return [infoTableInit, slowEntryPointDecl, fastEntryPointDecl]
           where
             infoTableInit = C_Fun info_table_name info_table_initializer_stmts []
+            infoTableDescr = FInf info_table_name 0 []
             (info_table_name, info_table_initializer_stmts) = (name, funcFormatter "void" name [] body)
                 where
                   name = s "init_function_$$" [name]
-                  body = initLayout name args ++ [funInfoTableName name .= info_table_struct]
+                  body = initLayout name args ++ [funInfoTableName name ..= info_table_struct]
                   initLayout name args = allocateLayoutObject:initializeLayoutEntries
                     where
                       allocateLayoutObject = declInit "arg_entry*" "layout_entries" $ castPtr "arg_entry" $ funCall "new" $ [s "sizeof(arg_entry)*$$" [show $ length args]]
@@ -164,8 +167,11 @@ evalProgram = fmap concat . mapM generateTopLevelDefn
                             ]
             functionStruct = bracketInit "function" [("slow_entry_point", slow_call_name name), ("arity", show $ length args)]
             slowEntryPointDecl = C_Fun slow_entry_name slow_entry_point []
+            slowEntryPointDescr = FInf slow_entry_name 0 []
             (slow_entry_name, slow_entry_point) = (slow_call_name name, generateSlowCall name args)
-            fastEntryPointDecl = (C_Fun (fast_call_name name) fast_entry_point [])
+            fastEntryPointDecl = (C_Fun fast_entry_name fast_entry_point [])
+            fastEntryPointDescr = FInf fast_entry_name (length args) args
+            fast_entry_name = fast_call_name name
             fast_entry_point = 
               funcFormatter "ref" (fast_call_name name) fastArgs body
                 where
@@ -249,7 +255,7 @@ evalConDecl (ConDecl typeName cons) = return (funcDecl:structDecls)
       args = []
       body = map generateConDefn cons
       generateConDefn (ConDefn conName tag l)
-          = info_table_name  .= bracketInit "info_table" bs
+          = info_table_name  ..= bracketInit "info_table" bs
             where
               info_table_name = s "$$_info_table" [conName]
               bs = [ ("type", "1"), ("extra", extra) ]
@@ -259,7 +265,7 @@ evalConDecl (ConDecl typeName cons) = return (funcDecl:structDecls)
                              [("arity", show $ length l),
                               ("tag", show tag)]
                          )]
-                                                
+
 
 {-
 
@@ -387,9 +393,9 @@ evalObject bindings obj_name (CON (Con c atoms)) = [newRefMacro ref_name (s "$$*
       fields = undefined -- get from env
       ref_name = s "$$_ref" [val_name]
       assignFields = map assignField (zip fields atoms)
-      assignField (f, V x) = (ptrAccess val_name f) .= x
-      assignField (f, L (I x)) = ptrAccess val_name f .= show x
-      assignInfoPtr = ptrAccess val_name "info_ptr"  .= (s "&$$" [c_info_table])
+      assignField (f, V x) = (ptrAccess val_name f) ..= x
+      assignField (f, L (I x)) = ptrAccess val_name f ..= show x
+      assignInfoPtr = ptrAccess val_name "info_ptr"  ..= (s "&$$" [c_info_table])
 {-
      let z = map_slow f
 //
@@ -414,11 +420,11 @@ evalObject bindings obj_name (PAP (Pap fun atoms)) = [newPap] ++ constructPapInf
       ref_name = s "$$_ref" [value_name]
       newPap = newRefMacro ref_name "void**" papSize value_name
       newPapInfo = newMacro "info_table" pap_info_name
-      assignType = ptrAccess pap_info_name "type" .= show 4
+      assignType = ptrAccess pap_info_name "type" ..= show 4
       pap_info_extra_name = undefined -- s "$$_extra" pap_info_name
       initExtraInfo = declInit "struct pap" pap_info_extra_name (s " { .info_ptr = &$$, .size = $$" [funInfoTable, show (length atoms)])
-      assignExtraInfo = structAccess (ptrAccess pap_info_name "extra") "pap_info" .= pap_info_extra_name
+      assignExtraInfo = structAccess (ptrAccess pap_info_name "extra") "pap_info" ..= pap_info_extra_name
       constructPapInfo = [newPapInfo, assignType, initExtraInfo, assignExtraInfo]
-      assignPapInfo = arrayIndex value_name 0 .= castPtr "void" pap_info_name
+      assignPapInfo = arrayIndex value_name 0 ..= castPtr "void" pap_info_name
       assignPapValues = assignPapInfo:assignPapAtoms value_name fun atoms
 

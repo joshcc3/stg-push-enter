@@ -44,7 +44,7 @@ assert st = s "assert($$);" [st]
 structAccess var field = s "($$).$$" [var, field]
 deref x = s "*($$)" [x]
 reference x = s "&($$)" [x]
-a .= b = s "$$ = $$;" [a, b]
+a ..= b = s "$$ = $$;" [a, b]
 arrayIndex v i = s "$$[$$]" [v, show i]
 
 funCall name args = s "$$($$)" [name, commaSep args]
