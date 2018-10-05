@@ -13,16 +13,25 @@ main = let one = I# 1
 -}
 
 program :: Program
-program = [("main", THUNK expression)]
+program = undefined -- [("main", THUNK expression), ("plus_int", FUNC func)]
     where
+      {-func = Fun [("x", Boxed), ("y", Unboxed)]
+                 (Case (Atom $ V "x") [AltCase "I#" ["z"] $
+                              Case (Atom $ V "y")
+                                   [AltCase "I#"  ["a"] $
+                                       Let "b" (THUNK (Primop "+#" ["z", "a"])) $
+                                           Let "c" (CON (Con "I#" ["b"])) (V "c")
+                                           ]])
+       -}
       expression = Let "one" one $
                    Let "inc" inc $
                    Let "list" list $
                    Let "element1" element1 $
                    Let "tail1" tail1 $
                    Let "element2" element2 $
-                   Case (FuncCall "plus_int" [V "element1", V "element2"])
-                        [Alt "I#" ["x"] (Primop "print_int" [V "x"])]
+                   Let "case_expr" (THUNK (FuncCall "plus_int" [V "element1", V "element2"])) $
+                   Case (V "case_expr")
+                        [AltCase "I#" ["x"] (Primop "print_int" [V "x"])]
       one = CON (Con "I#" [L (I 1)])
       inc = PAP (Pap "plus_int" [V "one"])
       inced = THUNK (FuncCall "map" [V "inc", V "list"])

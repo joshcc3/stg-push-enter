@@ -1,46 +1,66 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module Types where
 
 import Control.Monad.State
 import Data.Map
+import Control.Lens
 
 type Statement = String
 
-data C_TopLevel =
+type Type = String 
+
+data C_TopLevel = 
     C_Fun String [Statement] [C_TopLevel]
   | C_Struct String [Statement] [C_TopLevel]
-  | C_Var String [Statement]
+  | C_Var String [Statement] deriving (Eq, Ord, Show)
 
+data ValueType = Boxed | Unboxed deriving (Eq, Ord, Show)
 type Bindings = Map String Int
+data LayoutEntry = LayoutEntry { _leSize :: String, _leIsPtr :: Bool,  _leOffset :: String } deriving (Eq, Ord, Show, Read)
+type Layout = [LayoutEntry] 
+
 type CurFun = String
-data FunInfoTable = FInf String Int [(String, ValueType)]
+data FunInfoTable = FInf {
+      _finfName :: String,
+      _finfArity :: Int,
+      _finfArgs :: [(String, ValueType)],
+      _finfLayout :: Layout
+    } deriving (Eq, Ord, Show)
+makeLenses ''FunInfoTable                  
 type FunMap = Map String FunInfoTable
 type ConMap = Map String ConstructorDefn
 type FreshNameSource = Int
     
-data Env = Env FunMap [Bindings] CurFun FreshNameSource ConMap
+data ConstructorDefn = ConDefn { conName :: String, conTag :: Int, conFields :: [(String, ValueType)] } deriving (Eq, Ord, Show)
 
 type MonStack = State Env
 
+data Env = Env { _funMap :: FunMap, _curFun ::  Maybe CurFun, _freshNameSource :: FreshNameSource, _conMap :: ConMap, _deferred :: [MonStack C_TopLevel] }
+makeLenses ''Env
+
+
+    
 -- name, tag, fields
-data ValueType = Boxed | Unboxed
-data ConstructorDefn = ConDefn { conName :: String, conArity :: Int, conFields :: [(String, ValueType)] }
-data ConDecl = ConDecl String [ConstructorDefn]
+data ConDecl = ConDecl String [ConstructorDefn] deriving (Eq, Ord, Show)
 
 type Program = [(String, Object)]
-data Object = THUNK Expression | FUNC Function | CON Constructor | BLACKHOLE | PAP PartialApp
+data Object = THUNK Expression | FUNC Function | CON Constructor | BLACKHOLE | PAP PartialApp deriving (Eq, Ord, Show)
 
 type Var = String
-data Atom = L Literal | V Var
-data Literal = I Int            
-data Expression =
+data Atom = L Literal | V Var deriving (Eq, Ord, Show)
+data Literal = I Int             deriving (Eq, Ord, Show)
+data Expression = 
     Atom Atom
         | Let String Object Expression
         | Case Atom [Alt]
         | Primop String [Atom]
         | FuncCall String [Atom]
+          deriving (Eq, Ord, Show)
 
-data Alt = AltCase String [Var] Expression | AltForce String Expression
+data Alt = AltCase String [Var] Expression | AltForce String Expression deriving (Eq, Ord, Show)
 
-data Function = Fun [(String, ValueType)] Expression
-data Constructor = Con String [Atom]
-data PartialApp = Pap String [Atom]
+type Arg = (String, ValueType)
+data Function = Fun [Arg] Expression deriving (Eq, Ord, Show)
+data Constructor = Con String [Atom] deriving (Eq, Ord, Show)
+data PartialApp = Pap String [Atom] deriving (Eq, Ord, Show)

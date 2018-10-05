@@ -1,8 +1,16 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE LambdaCase #-}
 
 import Types
 import Utils
 import CConstructs
+import qualified Data.Map as M
+import Control.Monad.State
+import Control.Lens
+import Control.Applicative
+
+debug = undefined
 
 {-
 Compilation process:
@@ -79,18 +87,78 @@ You also need to log which struct definitions go in the header file.
 Need to generate a makefile as well.
 
 -}
+-- Probably a source of bugs - we discard the type information here (just bad design really)
+generateFunction :: [C_TopLevel] -> String -> MonStack [Statement] -> [(Type, Arg)] -> MonStack C_TopLevel
+generateFunction deps name fun_stmts args = do
+  funMap.ix name .= funDescr
+  curFun .= Just name
+  stmts <- fun_stmts
+  curFun .= Nothing
+  return (C_Fun name stmts deps)
+      where
+        funDescr = FInf name (length args) (map snd args) layoutEnts
+        (layoutEnts, offsets) = unzip $ zipWith toLayoutEntry ("0":offsets) args
+            where
+              toLayoutEntry off (_, (_, Boxed)) = (LayoutEntry size True pos, pos)
+                  where
+                    pos = s "$$ + $$" [off, size]
+                    size = "sizeof(ref)"
+freshInt :: MonStack Int
+freshInt = do
+  x <- use freshNameSource
+  freshNameSource += 1
+  return x
+freshName :: MonStack String
+freshName = do
+  x <- freshInt
+  return (s "var_$$" [show x])
 
-generatePapSize = undefined -- generate the pap size from the atoms
-assignPapAtoms pap fun atoms = undefined -- gen from env
-toPrimOpArgs = undefined -- gen from env
-knownAndSaturated f as = undefined -- gen from env
-pushFunArgs = undefined -- gen from env
+freshIntStream :: MonStack [Int]
+freshIntStream = let stream = (:) <$> freshInt <*> stream in stream
+  
+
+generatePapSize :: String -> Int -> MonStack String
+generatePapSize fun argLen = do
+  -- you want the first n arguments.
+  args <- use (funMap.ix fun.finfArgs)
+  return . c_sum . map (toSize . snd)  . take argLen $ args
+
+{-
+     *(ref*)(pap + 1) = one_ref;
+-}
+assignPapAtoms pap fun atoms = do
+  layout <- use (funMap.ix fun.finfLayout)
+  return $ zipWith toAssignment layout atoms
+      where
+        toAssignment (LayoutEntry _ isPtr offs) a
+            = if not isPtr
+              then deref (castPtr "int" location) ..= atomToVal a
+              else deref (castPtr "ref" location) ..= atomToVal a
+            where
+              atomToVal (L i) = show i
+              atomToVal (V v) = v
+              location = s "$$ + $$" [castPtr "char" pap, offs]
+
+knownAndSaturated :: String -> Int -> MonStack Bool
+knownAndSaturated f as = do
+  args <- use (funMap.ix f.finfArgs)
+  return $ (length args) == as
+
+pushFunArgs :: String -> [Atom] -> MonStack [Statement]
+pushFunArgs fun args = do
+  argTypes <- use (funMap.ix fun.finfArgs)
+  return $ zipWith toPushInstr args argTypes
+      where
+        toPushInstr (V x) (_, Boxed) =  s "push_ptr($$);" [x]
+        toPushInstr (V x) (_, Unboxed) =  s "push_int($$);" [x]
+        toPushInstr (L i) (_, Unboxed) =  s "push_int($$);" [show i]
+                               
+toCType a@(x, Boxed) = ("ref", a)
+toCType a@(x, Unboxed) = ("int", a)
 
 
 {-
 // TODO: intialize the layout for every function info table, (plus_int, map)
-
-
 
 ref map_fast(ref function, ref list)
 {
@@ -101,8 +169,6 @@ ref map_fast(ref function, ref list)
     put_binding(bindings, 1, list);
     return map_case_cont(bindings);
 }
-
-
 
 init_function_map()
 {
@@ -115,13 +181,12 @@ init_function_map()
   plus_info_table.layout = (struct layout) { .num = 2, .entries = plus_entries };
 
 }
-
-This should also go in a seperate file and directory and create a c and header file
 Also we only deal with top-level definitions of function currently
 -}
+init_arg_entry :: (Int, (String, (String, ValueType))) -> (String, String)
 init_arg_entry (ix, (offset, (argName, argType))) = case argType of
-        Boxed -> (arrayIx .= structValue (fields "true" "sizeof(ref)"), s "$$ + sizeof(ref)" [show offset])
-        Unboxed -> (arrayIx .= structValue (fields "false" "sizeof(int)"), s "$$ + sizeof(int)" [show offset])
+        Boxed -> (arrayIx ..= structValue (fields "true" "sizeof(ref)"), s "$$ + sizeof(ref)" [show offset])
+        Unboxed -> (arrayIx ..= structValue (fields "false" "sizeof(int)"), s "$$ + sizeof(int)" [show offset])
   where
     arrayIx = arrayIndex "layout_entries" ix
     structValue = bracketInit "arg_entry"
@@ -130,17 +195,23 @@ init_arg_entry (ix, (offset, (argName, argType))) = case argType of
 evalProgram :: Program -> MonStack [C_TopLevel]
 evalProgram = fmap concat . mapM generateTopLevelDefn
     where
-      generateTopLevelDefn (name, FUNC (Fun args e)) = return [infoTableInit, slowEntryPointDecl, fastEntryPointDecl]
+      generateTopLevelDefn (name, FUNC (Fun args e))
+          = do
+        let slowEntryPointDecl = C_Fun slow_entry_name [] 
+        infoTable <- generateFunction [] info_table_name info_table_initializer_stmts []
+        slowEntry <- generateFunction [] slow_entry_name slow_entry_point []
+        fastEntry <- generateFunction [] fast_entry_name fast_entry_point (map toCType args)
+        return [infoTable, slowEntry, fastEntry]
           where
-            infoTableInit = C_Fun info_table_name info_table_initializer_stmts []
-            (info_table_name, info_table_initializer_stmts) = (name, funcFormatter "void" name [] body)
+            (initializeLayoutEntries, offsets) = unzip $ map init_arg_entry $ zip [0..] $ zip ("0":offsets) args
+            info_table_function = Fun [] 
+            (info_table_name, info_table_initializer_stmts) = (name, funcFormatter "void" name [] <$> body)
                 where
                   name = s "init_function_$$" [name]
-                  body = initLayout name args ++ [funInfoTableName name .= info_table_struct]
+                  body = return $ initLayout name args ++ [funInfoTableName name ..= info_table_struct]
                   initLayout name args = allocateLayoutObject:initializeLayoutEntries
                     where
                       allocateLayoutObject = declInit "arg_entry*" "layout_entries" $ castPtr "arg_entry" $ funCall "new" $ [s "sizeof(arg_entry)*$$" [show $ length args]]
-                      (initializeLayoutEntries, offsets) = unzip $ map init_arg_entry $ zip [0..] $ zip ("0":offsets) args
                   layout = bracketInit "struct layout" [("num", "2"), ("entries", "layout_entries")]
                   info_table_struct = bracketInit "info_table" $
                             [("type", "0"),
@@ -148,13 +219,17 @@ evalProgram = fmap concat . mapM generateTopLevelDefn
                              ("layout", layout)
                             ]
             functionStruct = bracketInit "function" [("slow_entry_point", slow_call_name name), ("arity", show $ length args)]
-            slowEntryPointDecl = C_Fun slow_entry_name slow_entry_point []
+
+            slowEntryPointDescr = FInf slow_entry_name 0 [] []
             (slow_entry_name, slow_entry_point) = (slow_call_name name, generateSlowCall name args)
-            fastEntryPointDecl = C_Fun (fast_call_name name) fast_entry_point []
-            fast_entry_point = funcFormatter "ref" (fast_call_name name) fastArgs body
+--            fastEntryPointDecl = C_Fun fast_entry_name fast_entry_point []
+            fastEntryPointDescr = FInf fast_entry_name (length args) args
+            fast_entry_name = fast_call_name name
+            fast_entry_point = funcFormatter "ref" (fast_call_name name) fastArgs <$> body
                 where
                   fastArgs = map f args
-                  body = initBindings ++ map (uncurry putBinding) (zip [0..] (fst . unzip $ args) ) ++ eval e
+                  newBindings =  zip (fst . unzip $ args) [0..]
+                  body = ((initBindings ++ map (uncurry putBinding) newBindings) ++) <$> eval (M.fromList newBindings) e
                   f (v, Boxed) = ("ref", v)
                   f (v, Unboxed) = ("int", v)
 {-
@@ -185,13 +260,14 @@ ref map_slow(ref null)
   }
 }
 -}
-generateSlowCall name args = funcFormatter "ref" (slow_call_name name) [("ref", "null")] body
+generateSlowCall name args = funcFormatter "ref" (slow_call_name name) [("ref", "null")] <$> body
    where
      argSatisfactionCondition = funCall "arg_satisfaction_check" [argSize]
-     argSize = charSeperate '+' (map (toSize . snd) args)
-     body = ifSt argSatisfactionCondition
-              (generateFastCallFromArgsOnStack name args)
-              [elseSt]
+     argSize = c_sum (map (toSize . snd) args)
+     body = return $
+             ifSt argSatisfactionCondition
+               (generateFastCallFromArgsOnStack name args)
+               [elseSt]
      elseSt = undefined -- TODO create a pap (assert args more than 1)
      generateFastCallFromArgsOnStack name args
          = map (decl "arg" . fst)  args ++
@@ -201,7 +277,7 @@ generateSlowCall name args = funcFormatter "ref" (slow_call_name name) [("ref", 
 {-
 data List a = Cons { value :: a, next :: (List a) } | Nil
 
-
+//
 typedef struct Cons {
     struct info_table *info_ptr;
     ref value;
@@ -222,17 +298,20 @@ void init_list()
 -}
 -- Needs to generate the struct and the initialization of its info table
 evalConDecl :: ConDecl -> MonStack [C_TopLevel]
-evalConDecl (ConDecl typeName cons) = return (funcDecl:structDecls)
+evalConDecl (ConDecl typeName cons) = do
+  conMap %= flip (foldl conMapUpd) cons
+  funcDecl <- generateFunction structDecls name (funcFormatter "void" name args <$> body) args
+  return (funcDecl:structDecls)
     where
+      conMapUpd mp c = M.insert (conName c) c mp
       structDecls = map toStructDecl cons
       toStructDecl (ConDefn conName _ fields) = C_Struct conName ("struct info_table* info_ptr;":typedef conName fields) []
-      funcDecl = C_Fun name (funcFormatter "void" name args body) structDecls
       structInit = map (typedef typeName . conFields) $ cons
       name = s "init_constructors_$$" [typeName]
       args = []
-      body = map generateConDefn cons
+      body = return $ map generateConDefn cons
       generateConDefn (ConDefn conName tag l)
-          = info_table_name  .= bracketInit "info_table" bs
+          = info_table_name  ..= bracketInit "info_table" bs
             where
               info_table_name = s "$$_info_table" [conName]
               bs = [ ("type", "1"), ("extra", extra) ]
@@ -242,7 +321,7 @@ evalConDecl (ConDecl typeName cons) = return (funcDecl:structDecls)
                              [("arity", show $ length l),
                               ("tag", show tag)]
                          )]
-                                                
+
 
 {-
 
@@ -271,38 +350,50 @@ ref cont(hash_map *bindings)
 
 -- TODO: a case doesn't actually compile to this, this is just the case continuation
 -- TODO: A case actually compiles to a return case_name(bindings);
-generateCaseCont :: Expression -> MonStack C_TopLevel
-generateCaseCont (Case (V var_name) es) = return (C_Fun name statements [])
+generateCaseCont :: String -> Bindings -> Expression -> MonStack C_TopLevel
+generateCaseCont name bindings (Case (V var_name) es) = do
+    let statements = funcFormatter returnType name args <$> thunkBody name
+    generateFunction [] name statements (args & traverse._2 %~ (,Boxed))
   where
-    statements = funcFormatter returnType name args $
-     case es of
+    thunkBody name = case es of
         -- For this case we push a case frame and then a 'fake' update frame that restores su and returns the arg that the update frame was called with 
         [AltForce x e] -> undefined -- TODO Need to handle this case.
-        alts ->  [
+        alts -> pure ([
             bindingMacro var_ref "void**" var_name var_key "bindings",
             declInit "info_table*" info_table (deref (castPtr "info_table*" var_name))
-          ] ++ ifSt conCase (alts >>= caseIf) [elseSt]
+          ] ++) <*> (ifSt conCase <$> (fmap concat . mapM caseIf $ alts) <*> pure [elseSt name])
 
     conCase = s "$$->type == 1" [info_table]    
-    var_key = undefined -- get from the environment
-    func_prefix = undefined -- get from the environment
-    
-    elseSt = [
+    var_key = show . al $ M.lookup var_name bindings
+    elseSt name = [
        assert (s "$$ == $$" [ptrAccess info_table "type", "5"]),
        returnSt (funCall "thunk_continuation" [var_ref, name, "bindings", var_ref])
      ]
-    caseIf (AltCase conName freeVars exp) = ifSt cond ifBody []
+    caseIf (AltCase conName freeVars exp) = do
+            conDefn <- use (conMap.ix conName)
+            
+            let expectedConNum = conTag conDefn
+                cond = assert (s "$$ == $$" [actualConNum, show expectedConNum])
+            ifBody <- do
+               conInnerName <- freshName
+               intStream <- freshIntStream
+               let init_con_struct = declInit (s "$$*" [conName]) conInnerName conCasted
+                   freeVarBindings = zip (conFields conDefn) intStream
+                   bindings' = foldl updBindings bindings freeVarBindings
+                   bindCaseStmts = map genBindConVarStmts freeVarBindings
+                   updBindings mp ((name, _), i) = M.insert name i mp
+                   genBindConVarStmts = undefined -- need to actually assign the new variables from conInnerName, then need to generate statements to bind the new names to the new ints
+               case_alt_stmts <- eval bindings' exp
+               
+               return $ init_con_struct: bindCaseStmts ++ case_alt_stmts
+
+            return $ ifSt cond ifBody []
         where
-          cond = assert (s "$$ == $$" [actualConNum, expectedConNum])
-          ifBody = declInit (s "$$*" [conName]) conInnerName conCasted:{- Todo: need to bind the free vars of the case to the con-} eval exp
-          conInnerName = undefined -- gen from env
-          expectedConNum = undefined -- get from the environment
           conCasted = castPtr conName var_name
           actualConNum = structAccess (structAccess (ptrAccess info_table "extra") "constructor") "con_num"
     info_table = s "$$_info" [var_name]
     var_ref = s "$$_ref" [var_name]
     returnType = "ref"
-    name = s "$$_$$" [func_prefix, "cont"]
     args = [("hash_map*", "bindings")]
 
 
@@ -317,24 +408,35 @@ generateCaseCont (Case (V var_name) es) = return (C_Fun name statements [])
      return plus_int_slow(one_ref);
 
 -}    
-generateThunkCont funName (THUNK e) = funcFormatter "ref" funName [("ref", "thunk_ref")] body
+generateThunkCont bindings funName (THUNK e)
+    = do
+  let fun_stmts = funcFormatter "ref" funName [("ref", "thunk_ref")] <$> body
+  generateFunction [] funName fun_stmts [("ref", ("thunk_ref", Boxed))]
     where
-      body = declInit "hash_map*" "bindings" "THUNK_GET_BINDINGS(thunk_ref)":eval e
+      body = (declInit "hash_map*" "bindings" "THUNK_GET_BINDINGS(thunk_ref)":) <$> eval bindings e
 
 
     
-eval :: Expression -> [String]
-eval (Case _ _) = [returnSt (funCall case_con_name ["bindings"])]
-    where
-      case_con_name = undefined -- gen from env and record that a case needs to be built
+eval :: Bindings -> Expression -> MonStack [String]
+eval bindings c@(Case _ _) = do
+  func_prefix <- freshName
+  let name = s "$$_$$" [func_prefix, "cont"]
+  deferred %= (generateCaseCont name bindings c:)
+  return [returnSt (funCall name ["bindings"])]
+
 
 -- (void**)get_binding()
-eval (Primop "+#" [L (I x), L (I y)]) = eval (Atom . L . I $ x + y)
-eval (FuncCall fun args)
-     | knownAndSaturated fun args = [funCall (fast_call_name fun) (map extractArgsToFunArgs args)]
-     | otherwise = pushFunArgs fun args ++ [decl "ref" tmp, funCall (slow_call_name fun) [tmp]]
-     where
-       tmp = undefined -- gen from env
+-- TODO Need to handle the actual primops cases
+eval bindings (Primop "+#" [L (I x), L (I y)]) = eval bindings (Atom . L . I $ x + y)
+eval bindings (FuncCall fun args) = do
+  cond <- knownAndSaturated fun (length args)
+  if cond
+  then return [funCall (fast_call_name fun) (map extractArgsToFunArgs args)]
+  else do
+    tmp <- freshName
+    pushStmts <- pushFunArgs fun args
+    return $ pushStmts ++ [decl "ref" tmp, funCall (slow_call_name fun) [tmp]]
+
 
 {-
    let x' = THUNK (f x) in e
@@ -343,17 +445,24 @@ eval (FuncCall fun args)
    put_binding(bindings, 4, thunk1_ref);
 
 -}
-eval (Let var obj e) = evalObject thunk_name obj ++ [putBinding (show updateKey) thunk_ref_name] ++ eval e
+eval bindings (Let var obj e) = do
+                     updateKey <- freshInt
+                     let bs = [putBinding thunk_ref_name  (show updateKey)]
+                     thunkObj <- evalObject bindings thunk_name obj
+                     rest <- eval (M.insert thunk_ref_name updateKey bindings) e
+                     return $ thunkObj ++ bs ++ rest
     where
       thunk_name = var
-      updateKey :: Int
-      updateKey = undefined -- get from the environment (need map from var -> updKey)
       thunk_ref_name = s "$$_ref" [thunk_name]
-eval (Atom (L (I x))) = [show x]
-eval (Atom (V x)) = [x]
 
-evalObject obj_name (THUNK e) = [declInit "ref" obj_name $ funCall "createThunk" ["bindings", thunk_cont]]
-    where thunk_cont = undefined -- get from the environment, generate a new thunk cont name
+eval bindings (Atom (L (I x))) = return [show x]
+eval bindings (Atom (V x)) = return [x]
+
+evalObject :: M.Map String Int -> String -> Object -> MonStack [String]
+evalObject bindings obj_name t@(THUNK e) = do
+  thunk_cont <- freshName
+  deferred %= (generateThunkCont bindings thunk_cont t:)
+  return [declInit "ref" obj_name $ funCall "createThunk" ["bindings", thunk_cont]]
 {-
    Cons x' f'
 //
@@ -362,18 +471,20 @@ evalObject obj_name (THUNK e) = [declInit "ref" obj_name $ funCall "createThunk"
    cons->value = thunk1_ref;
    cons->next = thunk2_ref;
 -}
-evalObject obj_name (CON (Con c atoms)) = [newRefMacro ref_name (s "$$*" [c]) (s "sizeof($$)"[c]) val_name] ++ assignInfoPtr:assignFields
+evalObject bindings obj_name (CON (Con c atoms)) = do
+  constrDefn <- undefined -- use (conMap.ix c)
+  let fields = fst . unzip . conFields $ constrDefn
+      assignFields = zipWith assignField fields atoms
+  return $ [newRefMacro ref_name (s "$$*" [c]) (s "sizeof($$)"[c]) val_name] ++ assignInfoPtr:assignFields
     where
-      val_name = obj_name -- get from env
-      c_info_table = undefined -- get from env
-      fields = undefined -- get from env
+      val_name = obj_name
+      c_info_table = s "$$_info_table" [c]
       ref_name = s "$$_ref" [val_name]
-      assignFields = map assignField (zip fields atoms)
-      assignField (f, V x) = (ptrAccess val_name f) .= x
-      assignField (f, L (I x)) = ptrAccess val_name f .= show x
-      assignInfoPtr = ptrAccess val_name "info_ptr"  .= (s "&$$" [c_info_table])
+      assignField f (V x) = (ptrAccess val_name f) ..= x
+      assignField f (L (I x)) = ptrAccess val_name f ..= show x
+      assignInfoPtr = ptrAccess val_name "info_ptr"  ..= (s "&$$" [c_info_table])
 {-
-     let z = map_slow f
+     let z = map f
 //
      NEW_REF(pap_ref, void**, sizeof(void*) + sizeof(ref), pap)
 
@@ -387,20 +498,19 @@ evalObject obj_name (CON (Con c atoms)) = [newRefMacro ref_name (s "$$*" [c]) (s
 
 
 -}
-evalObject obj_name (PAP (Pap fun atoms)) = [newPap] ++ constructPapInfo ++ assignPapValues
-    where
-      pap_info_name = obj_name
+evalObject bindings obj_name (PAP (Pap fun atoms)) = do
+  papSize <- generatePapSize fun (length atoms)
+  let pap_info_name = obj_name
       funInfoTable = undefined -- gen from the environment
       value_name = obj_name
-      papSize = generatePapSize fun (length atoms)
       ref_name = s "$$_ref" [value_name]
       newPap = newRefMacro ref_name "void**" papSize value_name
       newPapInfo = newMacro "info_table" pap_info_name
-      assignType = ptrAccess pap_info_name "type" .= show 4
+      assignType = ptrAccess pap_info_name "type" ..= show 4
       pap_info_extra_name = undefined -- s "$$_extra" pap_info_name
       initExtraInfo = declInit "struct pap" pap_info_extra_name (s " { .info_ptr = &$$, .size = $$" [funInfoTable, show (length atoms)])
-      assignExtraInfo = structAccess (ptrAccess pap_info_name "extra") "pap_info" .= pap_info_extra_name
+      assignExtraInfo = structAccess (ptrAccess pap_info_name "extra") "pap_info" ..= pap_info_extra_name
       constructPapInfo = [newPapInfo, assignType, initExtraInfo, assignExtraInfo]
-      assignPapInfo = arrayIndex value_name 0 .= castPtr "void" pap_info_name
-      assignPapValues = assignPapInfo:assignPapAtoms value_name fun atoms
-
+      assignPapInfo = arrayIndex value_name 0 ..= castPtr "void" pap_info_name
+  assignPapValues <- (assignPapInfo:) <$> assignPapAtoms value_name fun atoms
+  return $ [newPap] ++ constructPapInfo ++ assignPapValues

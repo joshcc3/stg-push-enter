@@ -5,7 +5,7 @@ import Types
 
 newMacro typ nm = s "NEW($$, $$)" [typ, nm]
 initBindings = [decl "hash_map *" "bindings", funCall "init_bindings" [reference "bindings"]]
-putBinding updateKey thunk_ref_name = funCall "putBinding" ["bindings", show updateKey, thunk_ref_name]
+putBinding thunk_ref_name updateKey = funCall "putBinding" ["bindings", show updateKey, thunk_ref_name]
 
 funInfoTableName name = s "$$_info_table" [name]
 
@@ -44,7 +44,7 @@ assert st = s "assert($$);" [st]
 structAccess var field = s "($$).$$" [var, field]
 deref x = s "*($$)" [x]
 reference x = s "&($$)" [x]
-a .= b = s "$$ = $$;" [a, b]
+a ..= b = s "$$ = $$;" [a, b]
 arrayIndex v i = s "$$[$$]" [v, show i]
 
 funCall name args = s "$$($$)" [name, commaSep args]
@@ -68,3 +68,5 @@ bracketInit typ as = cast typ $ s "{$$}" [commaSep (map assign as)]
 toSize Boxed = "sizeof(ref)"
 toSize Unboxed = "sizeof(int)"
 
+
+c_sum = charSeperate '+'
