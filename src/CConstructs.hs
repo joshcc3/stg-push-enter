@@ -3,6 +3,8 @@ module CConstructs where
 import Utils
 import Types    
 
+to_temp_var i = s "var_$$" [show i]
+
 newMacro typ nm = s "NEW($$, $$)" [typ, nm]
 initBindings = [decl "hash_map *" "bindings", funCall "init_bindings" [reference "bindings"]]
 putBinding thunk_ref_name updateKey = funCall "putBinding" ["bindings", show updateKey, thunk_ref_name]

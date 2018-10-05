@@ -99,19 +99,25 @@ generateFunction deps name fun_stmts args = do
         funDescr = FInf name (length args) (map snd args) layoutEnts
         (layoutEnts, offsets) = unzip $ zipWith toLayoutEntry ("0":offsets) args
             where
-              toLayoutEntry off (_, (_, Boxed)) = (LayoutEntry size True pos, pos)
-                  where
-                    pos = s "$$ + $$" [off, size]
-                    size = "sizeof(ref)"
+              toLayoutEntry off (_, (_, t))
+                  = case t of
+                      Boxed -> let size = "sizeof(ref)" in
+                               let pos = s "$$ + $$" [off, size] in
+                               (LayoutEntry size True pos, pos)
+                      Unboxed -> let size = "sizeof(int)" in
+                                 let pos = s "$$ + $$" [off, size] in
+                                 (LayoutEntry size False pos, pos)
+
 freshInt :: MonStack Int
 freshInt = do
   x <- use freshNameSource
   freshNameSource += 1
   return x
+
 freshName :: MonStack String
 freshName = do
   x <- freshInt
-  return (s "var_$$" [show x])
+  return (to_temp_var x)
 
 freshIntStream :: MonStack [Int]
 freshIntStream = let stream = (:) <$> freshInt <*> stream in stream
@@ -221,7 +227,7 @@ evalProgram = fmap concat . mapM generateTopLevelDefn
             functionStruct = bracketInit "function" [("slow_entry_point", slow_call_name name), ("arity", show $ length args)]
 
             slowEntryPointDescr = FInf slow_entry_name 0 [] []
-            (slow_entry_name, slow_entry_point) = (slow_call_name name, generateSlowCall name args)
+            (slow_entry_name, slow_entry_point) = (slow_call_name name, generateSlowCall name . map (\x -> (V . fst $ x, snd x)) $ args)
 --            fastEntryPointDecl = C_Fun fast_entry_name fast_entry_point []
             fastEntryPointDescr = FInf fast_entry_name (length args) args
             fast_entry_name = fast_call_name name
@@ -260,19 +266,36 @@ ref map_slow(ref null)
   }
 }
 -}
-generateSlowCall name args = funcFormatter "ref" (slow_call_name name) [("ref", "null")] <$> body
+generateSlowCall name args = do
+  elseSt <- elseSt_
+  let body = ifSt argSatisfactionCondition (generateFastCallFromArgsOnStack name args) [elseSt]
+  return $ funcFormatter "ref" (slow_call_name name) [("ref", "null")] body
    where
      argSatisfactionCondition = funCall "arg_satisfaction_check" [argSize]
      argSize = c_sum (map (toSize . snd) args)
-     body = return $
-             ifSt argSatisfactionCondition
-               (generateFastCallFromArgsOnStack name args)
-               [elseSt]
-     elseSt = undefined -- TODO create a pap (assert args more than 1)
+     elseSt_ = do
+       initArgs <- initArgs_
+       return $ map toDecl args ++ map toPopInstr args ++ [newRefMacro "pap_ref" "void**" argSize "pap_"] ++ initStructTable ++ initArgs ++ [returnSt "pap_ref"]
+                  where
+                    initStructTable = [declInit "struct info_table*" "pap_info" (castPtr "struct info_table*" (funCall "new" ["sizeof(info_table)"])),
+                                       ptrAccess "pap_info" "type" ..= "4",
+                                       ptrAccess "pap_info" "extra.pap_info" ..= infoTableStruct,
+                                       arrayIndex "pap_" 0 ..= "pap_info"]
+                    infoTableStruct = bracketInit "struct pap" [("info_ptr", "&pap_info"), ("size", "1")]
+                    initArgs_ = evalObject M.empty "pap_" (PAP (Pap name args_))
+                    args_ = fst . unzip $ args
+                    
+
      generateFastCallFromArgsOnStack name args
-         = map (decl "arg" . fst)  args ++
-           map (funCall "pop_ptr" . (:[]) . reference . fst) args ++
-           [returnSt (funCall (fast_call_name name) [commaSep . map fst $ args])]
+         = map toDecl args
+           ++ map toPopInstr args
+           ++ [returnSt (funCall (fast_call_name name) [commaSep . map (unwrap . fst) $ args])]
+     unwrap (V x) = x
+     toDecl (V x, Boxed) = decl "ref" x
+     toDecl (V x, Unboxed) = decl "int" x
+     toPopInstr (V x, Boxed) = funCall "pop_ptr" . (:[]) . reference $ x
+     toPopInstr (V x, Unboxed) = funCall "pop_int" . (:[]) . reference $ x
+
 
 {-
 data List a = Cons { value :: a, next :: (List a) } | Nil
@@ -370,8 +393,7 @@ generateCaseCont name bindings (Case (V var_name) es) = do
        returnSt (funCall "thunk_continuation" [var_ref, name, "bindings", var_ref])
      ]
     caseIf (AltCase conName freeVars exp) = do
-            conDefn <- use (conMap.ix conName)
-            
+            [conDefn] <- uses (conMap.ix conName) (:[])
             let expectedConNum = conTag conDefn
                 cond = assert (s "$$ == $$" [actualConNum, show expectedConNum])
             ifBody <- do
@@ -380,9 +402,17 @@ generateCaseCont name bindings (Case (V var_name) es) = do
                let init_con_struct = declInit (s "$$*" [conName]) conInnerName conCasted
                    freeVarBindings = zip (conFields conDefn) intStream
                    bindings' = foldl updBindings bindings freeVarBindings
-                   bindCaseStmts = map genBindConVarStmts freeVarBindings
+                   bindCaseStmts = freeVarBindings >>= genBindConVarStmts 
                    updBindings mp ((name, _), i) = M.insert name i mp
-                   genBindConVarStmts = undefined -- need to actually assign the new variables from conInnerName, then need to generate statements to bind the new names to the new ints
+                   genBindConVarStmts ((field_name, value_type), num)
+                       = case value_type of
+                           Unboxed -> [declInit "int*" tmp_var (reference con_field_val), putBinding tmp_var num]
+                           Boxed -> [declInit "ref" tmp_var con_field_val, putBinding tmp_var num]
+                            -- need to actually assign the new variables from conInnerName, then need to generate statements to bind the new names to the new ints
+                       where
+                         tmp_var = to_temp_var num
+                         con_field_val = ptrAccess conInnerName field_name
+                         
                case_alt_stmts <- eval bindings' exp
                
                return $ init_con_struct: bindCaseStmts ++ case_alt_stmts
@@ -414,7 +444,6 @@ generateThunkCont bindings funName (THUNK e)
   generateFunction [] funName fun_stmts [("ref", ("thunk_ref", Boxed))]
     where
       body = (declInit "hash_map*" "bindings" "THUNK_GET_BINDINGS(thunk_ref)":) <$> eval bindings e
-
 
     
 eval :: Bindings -> Expression -> MonStack [String]
@@ -455,8 +484,10 @@ eval bindings (Let var obj e) = do
       thunk_name = var
       thunk_ref_name = s "$$_ref" [thunk_name]
 
+
 eval bindings (Atom (L (I x))) = return [show x]
 eval bindings (Atom (V x)) = return [x]
+
 
 evalObject :: M.Map String Int -> String -> Object -> MonStack [String]
 evalObject bindings obj_name t@(THUNK e) = do
@@ -472,7 +503,7 @@ evalObject bindings obj_name t@(THUNK e) = do
    cons->next = thunk2_ref;
 -}
 evalObject bindings obj_name (CON (Con c atoms)) = do
-  constrDefn <- undefined -- use (conMap.ix c)
+  [constrDefn] <- uses (conMap.ix c) (:[])
   let fields = fst . unzip . conFields $ constrDefn
       assignFields = zipWith assignField fields atoms
   return $ [newRefMacro ref_name (s "$$*" [c]) (s "sizeof($$)"[c]) val_name] ++ assignInfoPtr:assignFields
@@ -500,14 +531,14 @@ evalObject bindings obj_name (CON (Con c atoms)) = do
 -}
 evalObject bindings obj_name (PAP (Pap fun atoms)) = do
   papSize <- generatePapSize fun (length atoms)
+  [funInfoTable] <- uses (funMap.ix fun.finfName) (:[])
   let pap_info_name = obj_name
-      funInfoTable = undefined -- gen from the environment
       value_name = obj_name
       ref_name = s "$$_ref" [value_name]
       newPap = newRefMacro ref_name "void**" papSize value_name
       newPapInfo = newMacro "info_table" pap_info_name
       assignType = ptrAccess pap_info_name "type" ..= show 4
-      pap_info_extra_name = undefined -- s "$$_extra" pap_info_name
+      pap_info_extra_name = s "$$_extra" [pap_info_name]
       initExtraInfo = declInit "struct pap" pap_info_extra_name (s " { .info_ptr = &$$, .size = $$" [funInfoTable, show (length atoms)])
       assignExtraInfo = structAccess (ptrAccess pap_info_name "extra") "pap_info" ..= pap_info_extra_name
       constructPapInfo = [newPapInfo, assignType, initExtraInfo, assignExtraInfo]
