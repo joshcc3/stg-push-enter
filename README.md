@@ -466,7 +466,9 @@ void g(void)
 }
 ```
 
-
+```
+gcc has a __builtin_expect to signal that a if condition is more likely than others so instruction prefetching is not thrashed by a jump
+```
 
 
 ### Modulus
@@ -482,6 +484,63 @@ The rule for modulus `a%b == z` is `b*x + z = a` so, `-10%7 == -3` as `7*-1 + (-
 
 
 ## PThread Interface
+The type pthread_t is opaque - its an 8 byte identifier that is used internally. pthread_mutex_t and pthread_cond_t on ther other hand have the following properties:
+```
+(gdb) p lock
+$5 = {__data = {__lock = 0, __count = 0, __owner = 0, __nusers = 5, __kind = 0, __spins = 0, __elision = 0, __list = {__prev = 0x0,
+      __next = 0x0}}, __size = '\000' <repeats 12 times>, "\005", '\000' <repeats 26 times>, __align = 0}
+
+
+(gdb) p cond
+$6 = {__data = {__lock = 0, __futex = 5, __total_seq = 5, __wakeup_seq = 0, __woken_seq = 0, __mutex = 0x7fffffffe180,
+    __nwaiters = 10, __broadcast_seq = 0},
+  __size = "\000\000\000\000\005\000\000\000\005", '\000' <repeats 23 times>, "\200\341\377\377\377\177\000\000\n\000\000\000\000\000\000", __align = 21474836480}
+```
+On linux in glibc, both conditions and locks are implemented with futexes.
+Looking at the kernel sources for normal mutexes: 
+https://sourceware.org/git/?p=glibc.git;a=blob_plain;f=nptl/pthread_mutex_lock.c;hb=HEAD
+simple:
+      /* Normal mutex.  */
+      LLL_MUTEX_LOCK (mutex);
+      assert (mutex->__data.__owner == 0);
+
+# define LLL_MUTEX_LOCK(mutex) \
+  lll_lock ((mutex)->__data.__lock, PTHREAD_MUTEX_PSHARED (mutex))      
+
+#define lll_lock(futex, private) __lll_lock (&(futex), private)
+
+#define __lll_lock(futex, private)					      \
+  ((void) ({								      \
+    int *__futex = (futex);						      \
+    if (__builtin_expect (atomic_compare_and_exchange_val_acq (__futex,       \
+								1, 0), 0))    \
+      {									      \
+	if (__builtin_constant_p (private) && (private) == LLL_PRIVATE)	      \
+	  __lll_lock_wait_private (__futex);				      \
+	else								      \
+	  __lll_lock_wait (__futex, private);				      \
+      }									      \
+  }))
+
+
+# define atomic_compare_and_exchange_val_acq(mem, newval, oldval) \
+  __atomic_val_bysize (__arch_compare_and_exchange_val,acq,		      \
+		       mem, newval, oldval)
+
+
+__lll_lock_wait (int *futex, int private)
+{
+  if (*futex == 2)
+    lll_futex_wait (futex, 2, private); /* Wait if *futex == 2.  */
+  while (atomic_exchange_acq (futex, 2) != 0)
+    lll_futex_wait (futex, 2, private); /* Wait if *futex == 2.  */
+}
+
+https://chromium.googlesource.com/chromiumos/third_party/glibc-ports/+/factory-2368.B/sysdeps/unix/sysv/linux/arm/nptl/lowlevellock.h for the defintion of lll_lock(futex, private)
+
+
+It has 3 states, 0 - unlocked, 1 - contended, 2 - locked
+
 Common threading interface exposed in unix and is documented in the man pages.
 ### pthread_create
 ```
@@ -669,6 +728,8 @@ int main()                                                                      
 cond_wait takes a mutex and a cond_wait object. A pre-condition is that the calling thread must hold the lock on the mutex. The operation of cond_wait is to atomically release the mutex and sleep on the condition variable. The thread wakes up when a cond_signal/cond_broadcast has been sent. It then attempts to reacquire the mutex.
 When the thread returns from pthread_cond_wait:
 Throughout the lifetime of the pthread_cond_wait function, it will have held the lock, then blocked on cond, then woken up on a signal and then acquired the mutex.
+The reason for the atomic release of the cond var and acquisition of the mutex is that if something wants to broadcast a signal to threads waiting on a signal you can guarentee that the broadcast signal will reach everyone who has started waiting on the signal.
+
 
 ## Question
  - Are the signals persistent? If a signal has been sent will something that subsequently wait on it be immediately woken up? - No, The pthread_cond_signal() and pthread_cond_broadcast() functions have no effect if there are no threads currently blocked on cond.
@@ -676,7 +737,280 @@ Throughout the lifetime of the pthread_cond_wait function, it will have held the
  - Are the threads woken up in order?
 
 conds are associated with a boolean predicate. Spurious wake ups may occur and the condition variable should always be checked before proceeding.
+The reason that conds are always associated with a boolean predicate and not just for sending signals is that signals are lost. 
 
+An example use of monitors might be to synchronize the starting of various threads so that they all begin together
+```
+
+const int NUM_THREADS = 5;
+typedef struct monitor {
+  pthread_cond_t *condition_var;
+  pthread_mutex_t *lock;
+} monitor;
+
+typedef struct waiting_thread {
+  monitor ready_monitor;
+  int *thread_ready_count;
+} waiting_thread;
+
+void* waiter_function(void *args_)
+{
+  pthread_t thread_id = pthread_self();
+  waiting_thread *args = (struct waiting_thread*)args_;
+  int sleep_time = (int)(rand()/(float)RAND_MAX * 10);
+  printf("TID %x: Sleeping for %d\n", thread_id, sleep_time);
+
+  sleep(sleep_time);
+
+  // guarentee
+  // 1. The broadcast signal is only sent when all threads have woken up
+
+  printf("TID %x: About to enter the mutex to increment thread ready count\n", thread_id);
+  pthread_mutex_lock(args->ready_monitor.lock);
+  *args->thread_ready_count += 1;
+  if(*args->thread_ready_count == NUM_THREADS)
+  {
+    printf("TID %x: All %d have started, sending a broadcast signal\n", thread_id, *args->thread_ready_count);
+    pthread_cond_broadcast(args->ready_monitor.condition_var);
+  }
+  else
+  {
+    printf("TID %x: Waiting for all threads to be ready, currently only %d have started\n", thread_id, *args->thread_ready_count);
+    pthread_cond_wait(args->ready_monitor.condition_var, args->ready_monitor.lock);
+    printf("TID %x: just received a signal, woken up and am plowing on\n", thread_id);
+  };
+  pthread_mutex_unlock(args->ready_monitor.lock);
+
+}
+
+
+void init_monitor(monitor *monitor)
+{
+  monitor->lock = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+  monitor->condition_var = (pthread_cond_t*)malloc(sizeof(pthread_cond_t));
+
+  pthread_cond_init(monitor->condition_var, NULL);
+  pthread_mutex_init(monitor->lock, NULL);
+
+}
+
+int main()
+{
+
+
+
+  // test order of wakeups on condition signal
+  int thread_ready_count = 0;
+
+  monitor ready_monitor;
+  init_monitor(&ready_monitor);
+
+  struct waiting_thread ts;
+  ts.ready_monitor = ready_monitor;
+  ts.thread_ready_count = &thread_ready_count;
+
+  pthread_t tids[NUM_THREADS];
+
+
+  printf("MAIN: Spawning the threads\n");
+  for(int i = 0; i < NUM_THREADS; i++)
+  {
+    pthread_t *t = tids + i;
+    pthread_create(t, NULL, waiter_function, (void*)&ts);
+  }
+  printf("MAIN: Completed spawning %d threads\n", NUM_THREADS);
+  pthread_mutex_lock(ts.ready_monitor.lock);
+  while(*ts.thread_ready_count < NUM_THREADS)
+  {
+    printf("MAIN: Waiting for the all clear signal\n");
+    pthread_cond_wait(ts.ready_monitor.condition_var, ts.ready_monitor.lock);
+  }
+  pthread_mutex_unlock(ts.ready_monitor.lock);
+
+  printf("MAIN: Received the all clear, plowing ahead!\n");
+
+  pthread_exit(NULL);
+}
+```
+
+
+## Atomicity of updates to read:
+
+So splitting the read and write into two instructions gives you less than a 0.01% chance of success with 10 threads and not splitting it has the same effect :P
+```
+/*
+Splitting up the read and write
+Total: 10000, Failed: 658, Correct: 9342, Percent Success: 93.420000
+
+real    0m5.818s
+user    0m0.883s
+sys     0m5.416s
+*/
+void* incers(void *null)
+{
+  for(int i = 0; i < INC_COUNT; i++)
+  {
+    int read = protected;
+    protected = read + 1;
+  }
+
+}
+
+
+// Changing the update loop to
+/*
+Total: 10000, Failed: 326, Correct: 9674, Percent Success: 96.740000
+
+real    0m5.754s
+user    0m0.759s
+sys     0m5.402s
+*/
+void* incers(void *null)
+{
+  for(int i = 0; i < INC_COUNT; i++)
+  {
+    //lock(&global_lock);
+    //usleep(rand()*100);
+    protected += 1;
+    //unlock(&global_lock);
+  }
+
+}
+
+// which compiles to: (changing to ++protected, makes no difference)
+.L24:
+        mov     eax, DWORD PTR protected[rip]
+        add     eax, 1
+        mov     DWORD PTR protected[rip], eax
+        add     DWORD PTR [rbp-4], 1
+.L23:
+        mov     eax, 1000
+        cmp     DWORD PTR [rbp-4], eax
+        jl      .L24
+(the 
+
+
+
+// With a proper lock
+void* incers(void *null)
+{
+  for(int i = 0; i < INC_COUNT; i++)
+  {
+    //lock(&global_lock);
+    pthread_mutex_lock(&global);
+    int read = protected;
+    //usleep(rand()*100);
+    protected = read + 1;
+    pthread_mutex_unlock(&global);
+    //unlock(&global_lock);
+  }
+
+}
+
+
+Total: 10000, Failed: 0, Correct: 10000, Percent Success: 1.000000
+
+real    0m7.599s
+user    0m3.279s
+sys     0m6.202s
+
+
+```
+
+Full code here:
+```
+
+
+int NUM_THREADS = 10;
+int INC_COUNT = 1000;
+
+void* incers(void *null)
+{
+  for(int i = 0; i < INC_COUNT; i++)
+  {
+    //lock(&global_lock);
+    int read = protected;
+    //usleep(rand()*100);
+    protected = read + 1;
+    //unlock(&global_lock);
+  }
+
+}
+
+
+typedef struct stats {
+  int correct;
+  int total;
+} stats;
+
+void print_stats(stats st)
+{
+  printf("Total: %d, Failed: %d, Correct: %d, Percent Success: %f\n", st.total, st.total - st.correct, st.correct, 100.0*st.correct/(float)st.total);
+
+}
+
+int main()
+{
+  stats st = { .correct = 0, .total = 0 };
+
+
+  for(int x = 0; x < 10000; x++){
+    global_lock.state = 0;
+
+    pthread_t ts[NUM_THREADS];
+
+    for(int i = 0; i < NUM_THREADS; i++) pthread_create(ts + i, NULL, incers, NULL);
+
+    for(int i = 0; i < NUM_THREADS; i++) pthread_join(ts[i], NULL);
+
+    printf("Checking");
+    if(protected != NUM_THREADS * INC_COUNT) {
+      printf("Iteration: %d, Check Failed!: protected (%d) != NUM_THREADS*INC_COUNT (%d)\n", x, protected, NUM_THREADS * INC_COUNT);
+    }
+    else st.correct++;
+    st.total++;
+  }
+
+  print_stats(st);
+
+  pthread_exit(NULL);
+
+}
+
+```
+
+
+
+
+# Lockless programming
+https://docs.microsoft.com/en-us/windows/desktop/DxTechArts/lockless-programming
+
+Another good example: https://preshing.com/20120612/an-introduction-to-lock-free-programming/
+
+Issues to deal with, non-atomic operations and re-ordering of instructions.
+'inc' operations are non-atomic for a multi-core system but are atomic on a single core system. (read, write incremented value). Reads are not usually re-orderderd relative to other reads and the same for writes. Reads may be re-ordered relative to other writes.
+The main constructs used to prevent reordering of reads and writes are called read-acquire and write-release barriers. A read-acquire is a read of a flag or other variable to gain ownership of a resource, coupled with a barrier against reordering. Similarly, a write-release is a write of a flag or other variable to give away ownership of a resource, coupled with a barrier against reordering.
+The formal definitions, courtesy of Herb Sutter, are:
+
+ - A read-acquire executes before all reads and writes by the same thread that follow it in program order.
+ - A write-release executes after all reads and writes by the same thread that precede it in program order.
+
+If a barrier is not used an example where data-sharing may fail is the following:
+A read to some part of the resource for a read acquire moves ahead of the release from a write release.
+
+Note, all this synchronization only makes sense in the context of cacheable memory. Non cacheable memory is not affected by instruction reordering. The volatile keyword is used to guarentee that the memory location is read/written to directly from memory is not cached. This doesn't mitigate instruction reordering though.
+
+
+Example of a possible case for live-lock:
+```
+while (X == 0)
+{
+    X = 1 - X;
+}
+```
+If t1 and t2 constently perform the update right after each other they will never break out of the loop.
+
+Different compiler/processor optimizations: caching, instruction pre-fecthing, branch prediction, instruction re-ordering.
 
 # TODO
  - One of the issues of using these refs to pass pointers is that you no longer have types which sucks. Maybe create a macro that takes the name of the ref, the name of the value and the type of the value and casts creates a new ref, gets the value and casts the ref to the value. Alternatively for the longer route - dont think you really need this - I think there is a way to automatically generate definitions and the corresponding bindings functions for a ref of a new type using macros but haven't investigated yet. For e.g., you'd hava ref_int, ref_hash_map etc.
@@ -702,3 +1036,5 @@ test/stg/target/stg/plus_int/%.o: src/stg/plus_int/%.c
 	mkdir -p test/stg/target/stg/plus_int
 	$(GCC_CMD) $^ -c -o $@
 ```
+
+
