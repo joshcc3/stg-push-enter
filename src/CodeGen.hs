@@ -2,6 +2,8 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE LambdaCase #-}
 
+module CodeGen where
+
 import Types
 import Utils
 import CConstructs
@@ -87,6 +89,13 @@ You also need to log which struct definitions go in the header file.
 Need to generate a makefile as well.
 
 -}
+
+-- data Env = Env { _funMap :: FunMap, _curFun ::  Maybe CurFun, _freshNameSource :: FreshNameSource, _conMap :: ConMap, _deferred :: [MonStack C_TopLevel] }
+initialEnv = Env M.empty Nothing 0 M.empty []
+    
+
+
+
 -- Probably a source of bugs - we discard the type information here (just bad design really)
 generateFunction :: [C_TopLevel] -> String -> MonStack [Statement] -> [(Type, Arg)] -> MonStack C_TopLevel
 generateFunction deps name fun_stmts args = do

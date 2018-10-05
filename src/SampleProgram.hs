@@ -1,4 +1,7 @@
 import Types
+import CodeGen
+import Control.Monad
+import Control.Monad.State    
 
 {-
 main = let one = I# 1
@@ -11,6 +14,13 @@ main = let one = I# 1
        in case plus_int element1 element2 of
           I# z -> print_int z
 -}
+intConstructor = ConDefn "I#" 0 [("value", Unboxed)]
+
+
+test1 = ([conDecl], [("main", FUNC fun)])
+    where
+      conDecl = ConDecl "Int" [intConstructor]
+      fun = Fun [("x", Boxed)] (Atom $ V "x")
 
 program :: Program
 program = undefined -- [("main", THUNK expression), ("plus_int", FUNC func)]
