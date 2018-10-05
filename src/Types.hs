@@ -32,7 +32,7 @@ type FunMap = Map String FunInfoTable
 type ConMap = Map String ConstructorDefn
 type FreshNameSource = Int
     
-data ConstructorDefn = ConDefn { conName :: String, conArity :: Int, conFields :: [(String, ValueType)] } deriving (Eq, Ord, Show)
+data ConstructorDefn = ConDefn { conName :: String, conTag :: Int, conFields :: [(String, ValueType)] } deriving (Eq, Ord, Show)
 
 type MonStack = State Env
 

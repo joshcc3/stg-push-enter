@@ -113,6 +113,10 @@ freshName = do
   x <- freshInt
   return (s "var_$$" [show x])
 
+freshIntStream :: MonStack [Int]
+freshIntStream = let stream = (:) <$> freshInt <*> stream in stream
+  
+
 generatePapSize :: String -> Int -> MonStack String
 generatePapSize fun argLen = do
   -- you want the first n arguments.
@@ -365,12 +369,26 @@ generateCaseCont name bindings (Case (V var_name) es) = do
        assert (s "$$ == $$" [ptrAccess info_table "type", "5"]),
        returnSt (funCall "thunk_continuation" [var_ref, name, "bindings", var_ref])
      ]
-    caseIf (AltCase conName freeVars exp) = ifSt cond <$> ifBody <*> pure []
+    caseIf (AltCase conName freeVars exp) = do
+            conDefn <- use (conMap.ix conName)
+            
+            let expectedConNum = conTag conDefn
+                cond = assert (s "$$ == $$" [actualConNum, show expectedConNum])
+            ifBody <- do
+               conInnerName <- freshName
+               intStream <- freshIntStream
+               let init_con_struct = declInit (s "$$*" [conName]) conInnerName conCasted
+                   freeVarBindings = zip (conFields conDefn) intStream
+                   bindings' = foldl updBindings bindings freeVarBindings
+                   bindCaseStmts = map genBindConVarStmts freeVarBindings
+                   updBindings mp ((name, _), i) = M.insert name i mp
+                   genBindConVarStmts = undefined -- need to actually assign the new variables from conInnerName, then need to generate statements to bind the new names to the new ints
+               case_alt_stmts <- eval bindings' exp
+               
+               return $ init_con_struct: bindCaseStmts ++ case_alt_stmts
+
+            return $ ifSt cond ifBody []
         where
-          cond = assert (s "$$ == $$" [actualConNum, expectedConNum])
-          ifBody = (declInit (s "$$*" [conName]) conInnerName conCasted:){- Todo: need to bind the free vars of the case to the con-} <$> eval bindings exp
-          conInnerName = undefined -- gen from env
-          expectedConNum = undefined -- get from the environment
           conCasted = castPtr conName var_name
           actualConNum = structAccess (structAccess (ptrAccess info_table "extra") "constructor") "con_num"
     info_table = s "$$_info" [var_name]
