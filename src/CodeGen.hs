@@ -12,8 +12,17 @@ import qualified Data.Map as M
 import Control.Monad.State
 import Control.Lens
 import Control.Applicative
+import Data.List
+
 
 debug = undefined
+
+{-
+  Buglist:
+   - If an expression is evaluated and is the last statement it should return - need to prove this
+
+    
+-}
 
 
 runConDecl_ :: ConDecl -> ([C_TopLevel], Env)
@@ -54,73 +63,26 @@ Compilation process:
 
 
 --------------------------------------------------------------------------------
-
+Environment:
 Need a mapping from the top-level function names, to the function info table representation
 Need to store the map from var name to integer key
 Need to store the current function name for generating case/thunk continuation names
 Need to provide a way to get a fresh variable name that is unused
 Need a mapping from constructor names to the constructor info table
 
-Need to also store a list of functions to be genned and the deps they have
-
---------------------------------------------------------------------------------
-
-    generatePapSize = undefined -- generate the pap size from the atoms
-    assignPapAtoms pap fun atoms = undefined -- gen from env
-    toPrimOpArgs = undefined -- gen from env
-    knownAndSaturated f as = undefined -- gen from env
-    pushFunArgs = undefined -- gen from env
-    [AltForce x e] -> undefined -- TODO Need to handle this case.
-    var_key = undefined -- get from the environment
-    func_prefix = undefined -- get from the environment
-    conInnerName = undefined -- gen from env
-    expectedConNum = undefined -- get from the environment
-    case_con_name = undefined -- gen from env and record that a case needs to be built
-    tmp = undefined -- gen from env
-    updateKey = undefined -- get from the environment (need map from var -> updKey)
-    where thunk_cont = undefined -- get from the environment, generate a new thunk cont name
-    c_info_table = undefined -- get from env
-    fields = undefined -- get from env
-    pap_info_name = undefined -- gen from the environment
-    funInfoTable = undefined -- gen from the environment
-
---------------------------------------------------------------------------------
-
-
-Need to generate the contents for the header files as well.
+Need to also store a list of functions to be genned and the deps they have.
 
 Constructor definitions must be pre-processed seperately
-Notes:
-Env:
-Binding key of free variables
 
-Mapping from var to it's updatekey
-queue of (thunk expressions, thunk names) to generate functions for
 
-Mapping from the constructor name to its info table in Haskell
-  info table must have all the fields
-Mapping from the constructor name to its accessor names
-  This should also go in a seperate file and directory and create a c and header file
-  Also we only deal with top-level definitions of function currently
-For a case, generate a note indicating that you have to generate the actual continuation
 (the continuation needs to come before the place where the case is used. maybe just prepended -
 will need to save the state somehow - maybe add a specific comment in the header.
-The deps should be acyclic, Might be a good idea to compile functions as an individual cunit with
-some metadata like the dependencies and then have the final thing that renders them have fun.
+The deps should be acyclic, Might be a good idea to compile functions as an individual
 
-We need to generate the header files as well:
-Everytime you generate a function you'll need to log if it goes in the header file.
-You also need to log which properties go in the header file.
-You also need to log which struct definitions go in the header file.
 
 Need to generate a makefile as well.
 
 -}
-
--- data Env = Env { _funMap :: FunMap, _curFun ::  Maybe CurFun, _freshNameSource :: FreshNameSource, _conMap :: ConMap, _deferred :: [MonStack C_TopLevel] }
-
-    
-
 
 
 -- Probably a source of bugs - we discard the type information here (just bad design really)
@@ -232,19 +194,20 @@ init_arg_entry (ix, (offset, (argName, argType))) = case argType of
   where
     arrayIx = arrayIndex "layout_entries" ix
     structValue = bracketInit "arg_entry"
-    fields isPointer argSize = [("size", argSize), ("pointer", isPointer), (".offset", show offset)]
+    fields isPointer argSize = [("size", argSize), ("pointer", isPointer), ("offset",  offset)]
 
 evalProgram :: Program -> MonStack [C_TopLevel]
 evalProgram = fmap concat . mapM generateTopLevelDefn
     where
       generateTopLevelDefn (name, FUNC (Fun args e))
           = do
-        let slowEntryPointDecl = C_Fun slow_entry_name [] 
-        -- TODO might need to generate a var representing the var name
+        let slowEntryPointDecl = C_Fun slow_entry_name []
+            info_struct_name = s "$$_info_table" [name]
+            infoTableVar = C_Var info_struct_name [decl "info_table" info_struct_name]
         infoTable <- generateFunction [] info_table_name info_table_initializer_stmts []
         fastEntry <- generateFunction [] fast_entry_name fast_entry_point (map toCType args)
         slowEntry <- generateFunction [] slow_entry_name slow_entry_point []
-        return [infoTable, fastEntry, slowEntry]
+        return [infoTableVar, infoTable, fastEntry, slowEntry]
           where
             (initializeLayoutEntries, offsets) = unzip $ map init_arg_entry $ zip [0..] $ zip ("0":offsets) args
             info_table_function = Fun [] 
@@ -303,36 +266,37 @@ ref map_slow(ref null)
   }
 }
 -}
+
+generateSlowCall :: String -> [(Atom, ValueType)] -> MonStack [String]
 generateSlowCall name args = do
-  elseSt <- elseSt_
-  let body = ifSt argSatisfactionCondition (generateFastCallFromArgsOnStack name args) [elseSt]
+  let genIfCase as = ifSt cond <$> genPapForArgs name as <*> pure [] where cond = funCall "arg_satisfaction_check" [c_sum . map (toSize . snd) $ as]
+  elseStmts <- mapM genIfCase . tail . inits $ args
+  let body = ifSt argSatisfactionCondition (generateFastCallFromArgsOnStack name args) (elseStmts ++ [[assert "false"]])
   return $ funcFormatter "ref" (slow_call_name name) [("ref", "null")] body
    where
      argSatisfactionCondition = funCall "arg_satisfaction_check" [argSize]
      argSize = c_sum (map (toSize . snd) args)
-     elseSt_ = do
-       initArgs <- initArgs_
-       return $ map toDecl args ++ map toPopInstr args ++ [newRefMacro "pap_ref" "void**" argSize "pap_"] ++ initStructTable ++ initArgs ++ [returnSt "pap_ref"]
-                  where
-                    initStructTable = [declInit "struct info_table*" "pap_info" (castPtr "struct info_table*" (funCall "new" ["sizeof(info_table)"])),
-                                       ptrAccess "pap_info" "type" ..= "4",
-                                       ptrAccess "pap_info" "extra.pap_info" ..= infoTableStruct,
-                                       arrayIndex "pap_" 0 ..= "pap_info"]
-                    infoTableStruct = bracketInit "struct pap" [("info_ptr", "&pap_info"), ("size", "1")]
-                    initArgs_ = evalObject M.empty "pap_" (PAP (Pap name args_))
-                    args_ = fst . unzip $ args
-                    
-
      generateFastCallFromArgsOnStack name args
-         = map toDecl args
-           ++ map toPopInstr args
+         = map declare_var_type args
+           ++ map pop_instr args
            ++ [returnSt (funCall (fast_call_name name) [commaSep . map (unwrap . fst) $ args])]
      unwrap (V x) = x
-     toDecl (V x, Boxed) = decl "ref" x
-     toDecl (V x, Unboxed) = decl "int" x
-     toPopInstr (V x, Boxed) = funCall "pop_ptr" . (:[]) . reference $ x
-     toPopInstr (V x, Unboxed) = funCall "pop_int" . (:[]) . reference $ x
 
+
+-- genPapForArgs :: String -> String -> [(Atom, ValueType)]
+genPapForArgs name args  = do
+   let argSize = c_sum (map (toSize . snd) args)
+   initArgs <- initArgs_
+   return $ prepareArgsFromStack ++ initStructTable ++ initArgs ++  [arrayIndex "pap_" 0 ..= "pap_info", returnSt "pap_ref"]
+        where
+          initStructTable = [declInit "struct info_table*" "pap_info" (castPtr "struct info_table*" (funCall "new" ["sizeof(info_table)"])),
+                             ptrAccess "pap_info" "type" ..= "4",
+                             ptrAccess "pap_info" "extra.pap_info" ..= infoTableStruct]
+          infoTableStruct = bracketInit "struct pap" [("info_ptr", "&pap_info"), ("size", "1")]
+          prepareArgsFromStack = map declare_var_type papArgs ++ map pop_instr papArgs
+          papArgs_ = fst . unzip $ papArgs
+          papArgs = args
+          initArgs_ = assignPapAtoms "pap_" name papArgs_
 
 {-
 data List a = Cons { value :: a, next :: (List a) } | Nil
@@ -522,8 +486,8 @@ eval bindings (Let var obj e) = do
       thunk_ref_name = s "$$_ref" [thunk_name]
 
 
-eval bindings (Atom (L (I x))) = return [show x]
-eval bindings (Atom (V x)) = return [x]
+eval bindings (Atom (L (I x))) = return [returnSt $ show x]
+eval bindings (Atom (V x)) = return [returnSt $ x]
 
 
 evalObject :: M.Map String Int -> String -> Object -> MonStack [String]
@@ -531,6 +495,7 @@ evalObject bindings obj_name t@(THUNK e) = do
   thunk_cont <- freshName
   deferred %= (generateThunkCont bindings thunk_cont t:)
   return [declInit "ref" obj_name $ funCall "createThunk" ["bindings", thunk_cont]]
+evalObject _ _ o = error $ s "Cannot evaluate $$" [show o]
 {-
    Cons x' f'
 //
@@ -566,19 +531,3 @@ evalObject bindings obj_name (CON (Con c atoms)) = do
 
 
 -}
-evalObject bindings obj_name (PAP (Pap fun atoms)) = do
-  papSize <- generatePapSize fun (length atoms)
-  [funInfoTable] <- uses (funMap.ix fun.finfName) (:[])
-  let pap_info_name = obj_name
-      value_name = obj_name
-      ref_name = s "$$_ref" [value_name]
-      newPap = newRefMacro ref_name "void**" papSize value_name
-      newPapInfo = newMacro "info_table" pap_info_name
-      assignType = ptrAccess pap_info_name "type" ..= show 4
-      pap_info_extra_name = s "$$_extra" [pap_info_name]
-      initExtraInfo = declInit "struct pap" pap_info_extra_name (s " { .info_ptr = &$$, .size = $$" [funInfoTable, show (length atoms)])
-      assignExtraInfo = structAccess (ptrAccess pap_info_name "extra") "pap_info" ..= pap_info_extra_name
-      constructPapInfo = [newPapInfo, assignType, initExtraInfo, assignExtraInfo]
-      assignPapInfo = arrayIndex value_name 0 ..= castPtr "void" pap_info_name
-  assignPapValues <- (assignPapInfo:) <$> assignPapAtoms value_name fun atoms
-  return $ [newPap] ++ constructPapInfo ++ assignPapValues

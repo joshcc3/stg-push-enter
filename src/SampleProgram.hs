@@ -22,7 +22,6 @@ intConDecl = ConDecl "Int" [intConstructor]
 
 test1 = [("main", FUNC fun)]
     where
-
       fun = Fun [("x", Boxed)] (Atom $ V "x")
 
 program :: Program

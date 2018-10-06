@@ -54,6 +54,7 @@ funCall name args = s "$$($$)" [name, commaSep args]
 commaSep = charSeperate ','
 
 charSeperate c [] = ""
+charSeperate c [x] = x
 charSeperate c xs = s "$$ $$" [init xs >>= \x -> s "$$$$ " [x, [c]], last xs]
 
 
@@ -72,3 +73,9 @@ toSize Unboxed = "sizeof(int)"
 
 
 c_sum = charSeperate '+'
+
+declare_var_type (V x, Boxed) = decl "ref" x
+declare_var_type (V x, Unboxed) = decl "int" x
+pop_instr (V x, Boxed) = funCall "pop_ptr" . (:[]) . reference $ x
+pop_instr (V x, Unboxed) = funCall "pop_int" . (:[]) . reference $ x
+        
