@@ -19,13 +19,17 @@ debug = undefined
 runConDecl_ :: ConDecl -> ([C_TopLevel], Env)
 runConDecl_ c = runState (evalConDecl c) initialEnv
 
+runProgram_ :: Program -> ([C_TopLevel], Env)
+runProgram_ c = runState (evalProgram c) initialEnv
+
 runConDecl = fst . runConDecl_
+runProgram = fst . runProgram_
 
 toStatements :: [C_TopLevel] -> [Statement]
 toStatements top = vars ++ structs ++ funs
     where
       funs = al $ top ^? traverse._C_Fun ^? _Just._2
-      structs = al $ top ^? traverse._C_Struct ^? _Just._2
+      structs = maybe [] id $ top ^? traverse._C_Struct ^? _Just._2
       vars = maybe [] id  $ top ^? traverse._C_Var ^? _Just._2
 
 renderProgram :: [Statement] -> String
@@ -243,9 +247,9 @@ evalProgram = fmap concat . mapM generateTopLevelDefn
           where
             (initializeLayoutEntries, offsets) = unzip $ map init_arg_entry $ zip [0..] $ zip ("0":offsets) args
             info_table_function = Fun [] 
-            (info_table_name, info_table_initializer_stmts) = (name, funcFormatter "void" name [] <$> body)
+            (info_table_name, info_table_initializer_stmts) = (init_func_name, funcFormatter "void" init_func_name [] <$> body)
                 where
-                  name = s "init_function_$$" [name]
+                  init_func_name = s "init_function_$$" [name]
                   body = return $ initLayout name args ++ [funInfoTableName name ..= info_table_struct]
                   initLayout name args = allocateLayoutObject:initializeLayoutEntries
                     where
