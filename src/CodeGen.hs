@@ -4,6 +4,7 @@
 
 module CodeGen where
 
+import Data.Maybe
 import Types
 import Utils
 import CConstructs
@@ -13,6 +14,28 @@ import Control.Lens
 import Control.Applicative
 
 debug = undefined
+
+
+runConDecl_ :: ConDecl -> ([C_TopLevel], Env)
+runConDecl_ c = runState (evalConDecl c) initialEnv
+
+runConDecl = fst . runConDecl_
+
+toStatements :: [C_TopLevel] -> [Statement]
+toStatements top = vars ++ structs ++ funs
+    where
+      funs = al $ top ^? traverse._C_Fun ^? _Just._2
+      structs = al $ top ^? traverse._C_Struct ^? _Just._2
+      vars = maybe [] id  $ top ^? traverse._C_Var ^? _Just._2
+
+renderProgram :: [Statement] -> String
+renderProgram = unlines
+
+toProgram = renderProgram . toStatements
+pprog = putStrLn . toProgram
+               
+initialEnv = Env M.empty Nothing 0 M.empty []
+
 
 {-
 Compilation process:
@@ -91,7 +114,7 @@ Need to generate a makefile as well.
 -}
 
 -- data Env = Env { _funMap :: FunMap, _curFun ::  Maybe CurFun, _freshNameSource :: FreshNameSource, _conMap :: ConMap, _deferred :: [MonStack C_TopLevel] }
-initialEnv = Env M.empty Nothing 0 M.empty []
+
     
 
 
@@ -335,17 +358,17 @@ evalConDecl (ConDecl typeName cons) = do
   funcDecl <- generateFunction structDecls name (funcFormatter "void" name args <$> body) args
   return (funcDecl:structDecls)
     where
+      info_table_name c = s "$$_info_table" [c]
       conMapUpd mp c = M.insert (conName c) c mp
       structDecls = map toStructDecl cons
-      toStructDecl (ConDefn conName _ fields) = C_Struct conName ("struct info_table* info_ptr;":typedef conName fields) []
+      toStructDecl (ConDefn conName _ fields) = C_Struct conName (decl "struct info_table" (info_table_name conName):typedef conName fields) []
       structInit = map (typedef typeName . conFields) $ cons
       name = s "init_constructors_$$" [typeName]
       args = []
       body = return $ map generateConDefn cons
       generateConDefn (ConDefn conName tag l)
-          = info_table_name  ..= bracketInit "info_table" bs
+          = info_table_name conName  ..= bracketInit "info_table" bs
             where
-              info_table_name = s "$$_info_table" [conName]
               bs = [ ("type", "1"), ("extra", extra) ]
               extra = bracketInit "union info_table_u"
                         [("constructor",

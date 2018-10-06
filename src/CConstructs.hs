@@ -32,7 +32,7 @@ ifSt cond ifBody elses = [condSt, "{"] ++ tab ifBody ++ ["}"] ++ (
 decl typ name = s "$$ $$;" [typ, name]
 declInit typ name val = s "$$ $$ = $$;" [typ, name, val]
 
-funcFormatter returnType name args body = [line1, "{"] ++ body ++ ["}"]
+funcFormatter returnType name args body = [line1, "{"] ++ tab body ++ ["}"]
     where
       line1 = s "$$ $$($$)" [returnType, name, commaSep . map (\(a, b) -> s "$$ $$" [a, b]) $ args]
 

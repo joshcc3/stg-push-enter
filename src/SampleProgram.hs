@@ -14,12 +14,14 @@ main = let one = I# 1
        in case plus_int element1 element2 of
           I# z -> print_int z
 -}
-intConstructor = ConDefn "I#" 0 [("value", Unboxed)]
-
-
-test1 = ([conDecl], [("main", FUNC fun)])
+intConDecl = ConDecl "Int" [intConstructor]
     where
-      conDecl = ConDecl "Int" [intConstructor]
+      intConstructor = ConDefn "I#" 0 [("value", Unboxed)]      
+
+
+test1 = [("main", FUNC fun)]
+    where
+
       fun = Fun [("x", Boxed)] (Atom $ V "x")
 
 program :: Program

@@ -14,6 +14,8 @@ data C_TopLevel =
     C_Fun String [Statement] [C_TopLevel]
   | C_Struct String [Statement] [C_TopLevel]
   | C_Var String [Statement] deriving (Eq, Ord, Show)
+makePrisms ''C_TopLevel
+
 
 data ValueType = Boxed | Unboxed deriving (Eq, Ord, Show)
 type Bindings = Map String Int
