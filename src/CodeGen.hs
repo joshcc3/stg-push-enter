@@ -28,14 +28,14 @@ runProgram = fst . runProgram_
 toStatements :: [C_TopLevel] -> [Statement]
 toStatements top = vars ++ structs ++ funs
     where
-      funs = al $ top ^? traverse._C_Fun ^? _Just._2
-      structs = maybe [] id $ top ^? traverse._C_Struct ^? _Just._2
-      vars = maybe [] id  $ top ^? traverse._C_Var ^? _Just._2
+      funs = top ^. traverse._C_Fun._2
+      structs = top ^. traverse._C_Struct._2
+      vars = top ^. traverse._C_Var._2
 
 renderProgram :: [Statement] -> String
 renderProgram = unlines
 
-toProgram = renderProgram . toStatements
+toProgram = renderProgram . toStatements . runProgram
 pprog = putStrLn . toProgram
                
 initialEnv = Env M.empty Nothing 0 M.empty []
@@ -240,10 +240,11 @@ evalProgram = fmap concat . mapM generateTopLevelDefn
       generateTopLevelDefn (name, FUNC (Fun args e))
           = do
         let slowEntryPointDecl = C_Fun slow_entry_name [] 
+        -- TODO might need to generate a var representing the var name
         infoTable <- generateFunction [] info_table_name info_table_initializer_stmts []
-        slowEntry <- generateFunction [] slow_entry_name slow_entry_point []
         fastEntry <- generateFunction [] fast_entry_name fast_entry_point (map toCType args)
-        return [infoTable, slowEntry, fastEntry]
+        slowEntry <- generateFunction [] slow_entry_name slow_entry_point []
+        return [infoTable, fastEntry, slowEntry]
           where
             (initializeLayoutEntries, offsets) = unzip $ map init_arg_entry $ zip [0..] $ zip ("0":offsets) args
             info_table_function = Fun [] 
