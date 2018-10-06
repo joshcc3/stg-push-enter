@@ -100,6 +100,10 @@ main = let one = I# 1
 */
 ref main_function(ref null)
 {
+  init_int();
+  init_list();
+
+
     ref one;
     c_int(1, &one);
 

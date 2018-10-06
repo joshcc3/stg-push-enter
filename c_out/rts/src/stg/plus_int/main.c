@@ -7,6 +7,8 @@
 
 void* main_function(void* no_arg)
 {
+  init_int();
+
   /*
     main = 
      let a = I# 1 in 

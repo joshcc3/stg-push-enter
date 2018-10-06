@@ -27,9 +27,6 @@ int main()
 
   init_pointer_table(64);
 
-  init_int();
-  init_list();
-
   init_pointer_table(16);
 
   struct ref null;

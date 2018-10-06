@@ -13,7 +13,8 @@ type Type = String
 data C_TopLevel = 
     C_Fun String [Statement] [C_TopLevel]
   | C_Struct String [Statement] [C_TopLevel]
-  | C_Var String [Statement] deriving (Eq, Ord, Show)
+  | C_Var String [Statement]
+  | C_Import [Statement]  deriving (Eq, Ord, Show)
 makePrisms ''C_TopLevel
 
 
@@ -50,12 +51,15 @@ makeLenses ''Env
 -- name, tag, fields
 data ConDecl = ConDecl String [ConstructorDefn] deriving (Eq, Ord, Show)
 
-type Program = [(String, Object)]
+
+type FunDef = (String, Object)
+data Program = Program [ConDecl] [FunDef]
+
 data Object = THUNK Expression | FUNC Function | CON Constructor | BLACKHOLE | PAP PartialApp deriving (Eq, Ord, Show)
 
 type Var = String
 data Atom = L Literal | V Var deriving (Eq, Ord, Show)
-data Literal = I Int             deriving (Eq, Ord, Show)
+type Literal = Int             
 data Expression = 
     Atom Atom
         | Let String Object Expression

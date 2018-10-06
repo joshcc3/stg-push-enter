@@ -14,38 +14,47 @@ import Control.Lens
 import Control.Applicative
 import Data.List
 
-
 debug = undefined
 
 {-
   Buglist:
+   - case conts dont actually generate new functions
    - If an expression is evaluated and is the last statement it should return - need to prove this
 
     
 -}
 
-
 runConDecl_ :: ConDecl -> ([C_TopLevel], Env)
 runConDecl_ c = runState (evalConDecl c) initialEnv
 
-runProgram_ :: Program -> ([C_TopLevel], Env)
-runProgram_ c = runState (evalProgram c) initialEnv
+runFunDef_ :: [FunDef] -> ([C_TopLevel], Env)
+runFunDef_ c = runState (evalFunDef c) initialEnv
 
 runConDecl = fst . runConDecl_
-runProgram = fst . runProgram_
+
+runProgram_ :: Program -> MonStack [C_TopLevel]
+runProgram_ (Program conDecls defs) = do
+  cs <- mapM evalConDecl conDecls
+  fs <- evalFunDef defs
+  return $ concat cs ++ fs
+
+runProgram = fst . flip runState initialEnv . runProgram_
 
 toStatements :: [C_TopLevel] -> [Statement]
-toStatements top = vars ++ structs ++ funs
+toStatements top = imps ++ vars ++ structs ++ funs
     where
       funs = top ^. traverse._C_Fun._2
       structs = top ^. traverse._C_Struct._2
       vars = top ^. traverse._C_Var._2
+      imps = top ^. traverse._C_Import
 
 renderProgram :: [Statement] -> String
 renderProgram = unlines
 
 toProgram = renderProgram . toStatements . runProgram
 pprog = putStrLn . toProgram
+
+
                
 initialEnv = Env M.empty Nothing 0 M.empty []
 
@@ -196,8 +205,21 @@ init_arg_entry (ix, (offset, (argName, argType))) = case argType of
     structValue = bracketInit "arg_entry"
     fields isPointer argSize = [("size", argSize), ("pointer", isPointer), ("offset",  offset)]
 
-evalProgram :: Program -> MonStack [C_TopLevel]
-evalProgram = fmap concat . mapM generateTopLevelDefn
+imports = C_Import [
+           includeSys "stdlib.h",
+           includeSys "stdio.h",
+           includeSys "assert.h",                      
+           includeUser "stg/plus_int/static.h",
+           includeUser "stg/bindings.h",
+           includeUser "containers/mmanager.h",
+           includeUser "stg/heap.h"
+          ]
+
+
+evalFunDef :: [FunDef] -> MonStack [C_TopLevel]
+evalFunDef prog = do
+  x <- mapM generateTopLevelDefn prog
+  return $ imports:concat x
     where
       generateTopLevelDefn (name, FUNC (Fun args e))
           = do
@@ -207,7 +229,9 @@ evalProgram = fmap concat . mapM generateTopLevelDefn
         infoTable <- generateFunction [] info_table_name info_table_initializer_stmts []
         fastEntry <- generateFunction [] fast_entry_name fast_entry_point (map toCType args)
         slowEntry <- generateFunction [] slow_entry_name slow_entry_point []
-        return [infoTableVar, infoTable, fastEntry, slowEntry]
+        if name == "main_function"
+        then return [fastEntry]
+        else return [infoTableVar, fastEntry, slowEntry, infoTable]
           where
             (initializeLayoutEntries, offsets) = unzip $ map init_arg_entry $ zip [0..] $ zip ("0":offsets) args
             info_table_function = Fun [] 
@@ -224,14 +248,16 @@ evalProgram = fmap concat . mapM generateTopLevelDefn
                              ("extra", functionStruct),
                              ("layout", layout)
                             ]
-            functionStruct = bracketInit "function" [("slow_entry_point", slow_call_name name), ("arity", show $ length args)]
+            functionStruct = bracketInit "fun" [("slow_entry_point", slow_call_name name), ("arity", show $ length args)]
 
             slowEntryPointDescr = FInf slow_entry_name 0 [] []
             (slow_entry_name, slow_entry_point) = (slow_call_name name, generateSlowCall name . map (\x -> (V . fst $ x, snd x)) $ args)
 --            fastEntryPointDecl = C_Fun fast_entry_name fast_entry_point []
             fastEntryPointDescr = FInf fast_entry_name (length args) args
-            fast_entry_name = fast_call_name name
-            fast_entry_point = funcFormatter "ref" (fast_call_name name) fastArgs <$> body
+            fast_entry_name = if name == "main_function"
+                              then name
+                              else fast_call_name name
+            fast_entry_point = funcFormatter "ref" (fast_entry_name) fastArgs <$> body
                 where
                   fastArgs = map f args
                   newBindings =  zip (fst . unzip $ args) [0..]
@@ -270,7 +296,7 @@ ref map_slow(ref null)
 generateSlowCall :: String -> [(Atom, ValueType)] -> MonStack [String]
 generateSlowCall name args = do
   let genIfCase as = ifSt cond <$> genPapForArgs name as <*> pure [] where cond = funCall "arg_satisfaction_check" [c_sum . map (toSize . snd) $ as]
-  elseStmts <- mapM genIfCase . tail . inits $ args
+  elseStmts <- mapM genIfCase . init . tail . inits $ args
   let body = ifSt argSatisfactionCondition (generateFastCallFromArgsOnStack name args) (elseStmts ++ [[assert "false"]])
   return $ funcFormatter "ref" (slow_call_name name) [("ref", "null")] body
    where
@@ -457,7 +483,7 @@ eval bindings c@(Case _ _) = do
 
 -- (void**)get_binding()
 -- TODO Need to handle the actual primops cases
-eval bindings (Primop "+#" [L (I x), L (I y)]) = eval bindings (Atom . L . I $ x + y)
+eval bindings (Primop "+#" [L x, L y]) = eval bindings (Atom . L $ x + y)
 eval bindings (FuncCall fun args) = do
   cond <- knownAndSaturated fun (length args)
   if cond
@@ -486,7 +512,7 @@ eval bindings (Let var obj e) = do
       thunk_ref_name = s "$$_ref" [thunk_name]
 
 
-eval bindings (Atom (L (I x))) = return [returnSt $ show x]
+eval bindings (Atom (L x)) = return [returnSt $ show x]
 eval bindings (Atom (V x)) = return [returnSt $ x]
 
 
@@ -495,7 +521,6 @@ evalObject bindings obj_name t@(THUNK e) = do
   thunk_cont <- freshName
   deferred %= (generateThunkCont bindings thunk_cont t:)
   return [declInit "ref" obj_name $ funCall "createThunk" ["bindings", thunk_cont]]
-evalObject _ _ o = error $ s "Cannot evaluate $$" [show o]
 {-
    Cons x' f'
 //
@@ -514,8 +539,13 @@ evalObject bindings obj_name (CON (Con c atoms)) = do
       c_info_table = s "$$_info_table" [c]
       ref_name = s "$$_ref" [val_name]
       assignField f (V x) = (ptrAccess val_name f) ..= x
-      assignField f (L (I x)) = ptrAccess val_name f ..= show x
+      assignField f (L x) = ptrAccess val_name f ..= show x
       assignInfoPtr = ptrAccess val_name "info_ptr"  ..= (s "&$$" [c_info_table])
+evalObject _ _ BLACKHOLE = error "<loop>"
+evalObject _ _ (FUNC _) = error "I dont support lambdas yet."
+-- TODO example is in list.c:60 (this might be wrong
+evalObject bindings obj_name (PAP (Pap fun as)) = undefined -- do
+--  return [st$ funCall "unroll_pap" fun, decl "ref" "null", returnSt $ finfo ]
 {-
      let z = map f
 //

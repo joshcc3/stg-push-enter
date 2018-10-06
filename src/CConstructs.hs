@@ -3,11 +3,13 @@ module CConstructs where
 import Utils
 import Types    
 
+st x = s "$$;" [x]
+
 to_temp_var i = s "var_$$" [show i]
 
 newMacro typ nm = s "NEW($$, $$)" [typ, nm]
-initBindings = [decl "hash_map *" "bindings", funCall "init_bindings" [reference "bindings"]]
-putBinding thunk_ref_name updateKey = funCall "putBinding" ["bindings", show updateKey, thunk_ref_name]
+initBindings = [decl "hash_map *" "bindings", st $ st $ funCall "init_bindings" [reference "bindings"]]
+putBinding thunk_ref_name updateKey = st $ funCall "put_binding" ["bindings", show updateKey, thunk_ref_name]
 
 funInfoTableName name = s "$$_info_table" [name]
 
@@ -60,7 +62,7 @@ charSeperate c xs = s "$$ $$" [init xs >>= \x -> s "$$$$ " [x, [c]], last xs]
 
 
 extractArgsToFunArgs (V x) = x
-extractArgsToFunArgs (L (I x)) = show x
+extractArgsToFunArgs (L x) = show x
 fast_call_name f = s "$$_fast" [f]
 slow_call_name f = s "$$_slow" [f]
 
@@ -76,6 +78,8 @@ c_sum = charSeperate '+'
 
 declare_var_type (V x, Boxed) = decl "ref" x
 declare_var_type (V x, Unboxed) = decl "int" x
-pop_instr (V x, Boxed) = funCall "pop_ptr" . (:[]) . reference $ x
-pop_instr (V x, Unboxed) = funCall "pop_int" . (:[]) . reference $ x
+pop_instr (V x, Boxed) = st $ funCall "pop_ptr" . (:[]) . reference $ x
+pop_instr (V x, Unboxed) = st $ funCall "pop_int" . (:[]) . reference $ x
         
+includeSys x = s "#include <$$>" [x]
+includeUser x = s "#include $$" [show x]

@@ -14,7 +14,7 @@
 void init_bindings(hash_map**);
 bool arg_satisfaction_check(int);
 
-struct fun {
+typedef struct fun {
   /*
     takes the function object as the argument
     the fast entry point assumes that all the arguments are on the stack and pops them off
@@ -26,7 +26,7 @@ struct fun {
   // the slow entry point is used when the function is statically unknown (arguments to functions/variables declared in let bindings)
   struct ref (*slow_entry_point)(struct ref);
   int arity;
-};
+} fun;
 
 struct update_info {
   // Closure, the ref points to the object that needs to be updated
