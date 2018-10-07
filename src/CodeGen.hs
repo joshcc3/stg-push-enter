@@ -380,8 +380,7 @@ evalConDecl (ConDecl typeName cons) = do
       info_table_name c = s "$$_info_table" [c]
       conMapUpd mp c = M.insert (conName c) c mp
       structDecls = map toStructDecl cons
-      toStructDecl (ConDefn conName _ fields) = C_Struct conName (decl "struct info_table" (info_table_name conName):typedef conName fields) []
-      structInit = map (typedef typeName . conFields) $ cons
+      toStructDecl (ConDefn conName _ fields) = C_Struct conName (decl "struct info_table" (info_table_name conName):typedef conName fields [("info_table*", "info_ptr")]) []
       name = s "init_constructors_$$" [typeName]
       args = []
       body = return $ map generateConDefn cons
@@ -393,7 +392,7 @@ evalConDecl (ConDecl typeName cons) = do
                         [("constructor",
                           bracketInit "con"
                              [("arity", show $ length l),
-                              ("tag", show tag)]
+                              ("con_num", show tag)]
                          )]
 
 
@@ -454,19 +453,21 @@ generateCaseCont name bindings (Case (V var_name) es) = do
                conInnerName <- freshName
                intStream <- freshIntStream (length . conFields $ conDefn)
                let init_con_struct = declInit (s "$$*" [conName]) conInnerName conCasted
-                   freeVarBindings = zip (conFields conDefn) intStream
+                   (_, valTypes) = unzip $ conFields conDefn
+                   freeVarBindings = zip (zip freeVars valTypes) intStream
                    bindings' = foldl updBindings bindings freeVarBindings
-                   bindCaseStmts = freeVarBindings >>= genBindConVarStmts 
+                   bindCaseStmts = zip (conFields conDefn) intStream >>= genBindConVarStmts
                    updBindings mp ((name, _), i) = M.insert name i mp
                    genBindConVarStmts ((field_name, value_type), num)
                        = case value_type of
-                           Unboxed -> [declInit "int*" tmp_var (reference con_field_val), putBinding tmp_var num]
+                           Unboxed -> [newRefMacro tmp_var "int*" "sizeof(int)" tmp_var_val, tmp_var_val ..= (reference con_field_val), putBinding tmp_var num]
                            Boxed -> [declInit "ref" tmp_var con_field_val, putBinding tmp_var num]
                             -- need to actually assign the new variables from conInnerName, then need to generate statements to bind the new names to the new ints
                        where
                          tmp_var = to_temp_var num
+                         tmp_var_val = s "$$_val" [tmp_var]
                          con_field_val = ptrAccess conInnerName field_name
-
+                                         
                case_alt_stmts <- eval bindings' exp
                
                return $ init_con_struct: bindCaseStmts ++ case_alt_stmts
@@ -516,13 +517,24 @@ For a pap and fun, since we don't know at compile time which function has been c
 -}
 eval bindings (Primop "+#" [L x, L y]) = return [returnSt $ show (x + y)]
 eval bindings (Primop "+#" [V x, V y]) = do
+  if length (bindings ^.. ix x) == 0
+  then error . show $ bindings
+  else return ()
   let [xkey] = bindings ^.. ix x
-      [ykey] = bindings ^.. ix x
+      [ykey] = bindings ^.. ix y
       x_ref = s "$$_ref" [x]
       y_ref = s "$$_ref" [y]
       initX = bindingMacro x_ref "int*" x (show xkey) "bindings"
       initY = bindingMacro y_ref "int*" y (show ykey) "bindings"
-  return $ [returnSt (s "$$ + $$" [x, y])]
+  tmp <- freshName
+  let tmp_ref = s "$$_ref" [tmp]
+  return $ [
+        initX,
+        initY,
+        newRefMacro tmp_ref "int*" "sizeof(int)" tmp,
+        tmp ..= s "$$ + $$" [deref x, deref y],
+        returnSt tmp_ref
+   ]
 eval bindings (FuncCall fun args) = do
   knownAndSaturatedCond <- knownAndSaturated fun (length args)
   knownCond <- knownFunction fun          
@@ -565,7 +577,7 @@ eval bindings (FuncCall fun args) = do
 -}
 eval bindings (Let var obj e) = do
                      updateKey <- freshInt
-                     let bs = [putBinding thunk_ref_name  (show updateKey)]
+                     let bs = [putBinding thunk_ref_name updateKey]
                      thunkObj <- evalObject bindings thunk_ref_name obj
                      rest <- eval (M.insert thunk_ref_name updateKey bindings) e
                      return $ thunkObj ++ bs ++ rest

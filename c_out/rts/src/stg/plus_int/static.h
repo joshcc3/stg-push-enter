@@ -33,31 +33,31 @@ struct update_info {
   struct ref (*return_address)(struct ref);
 };
 
-struct case_info {
+typedef struct case_info {
   // Closure, the ref points to the bindings of the free variables
   ref (*return_address)(ref);
-};
+} case_info;
 
 
-struct con {
+typedef struct con {
   int arity;
   int con_num;
   struct string_ con_name;
-};
+} con;
 
-struct pap {
+typedef struct pap {
   struct info_table * info_ptr;
   int size;
-};
+} pap;
 
-struct thunk {
+typedef struct thunk {
   // takes the thunk object as the argument
   struct ref (*return_address)(struct ref);
-};
+} thunk;
 
-struct blackhole {
+typedef struct blackhole {
   int a;
-};
+} blackhole;
 
 
 typedef struct arg_entry {

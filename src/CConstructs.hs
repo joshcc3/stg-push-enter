@@ -9,14 +9,16 @@ to_temp_var i = s "var_$$" [show i]
 
 newMacro typ nm = s "NEW($$, $$)" [typ, nm]
 initBindings = [decl "hash_map *" "bindings", st $ st $ funCall "init_bindings" [reference "bindings"]]
+putBinding :: String -> Int -> String
 putBinding thunk_ref_name updateKey = st $ funCall "put_binding" ["bindings", show updateKey, castPtr "void" thunk_ref_name]
 
 funInfoTableName name = s "$$_info_table" [name]
 
 tab = map ('\t':)
 
-typedef name fields = s "typedef struct $$ {" [name]: tab (map fieldDecl fields) ++ [s "} $$;" [name]]
+typedef name fields internalFields = s "typedef struct $$ {" [name]: tab (map fieldDecl fields ++ map internalFieldDecl internalFields) ++ [s "} $$;" [name]]
   where
+    internalFieldDecl (t, n) = s "$$ $$;" [t, n]
     fieldDecl (f, Unboxed) = s "int $$;" [f]
     fieldDecl (f, Boxed) = s "ref $$;" [f]
 

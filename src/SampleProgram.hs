@@ -52,7 +52,7 @@ plus_int_test = Program [intConDecl] [("plus_int", FUNC plus_int), ("main_functi
       plus_int = Fun [("x1", Boxed), ("y1", Boxed)] e
           where e = Case (V "x1") [AltCase "I" ["a1"] $
                         Case (V "y1") [AltCase "I" ["b1"] $
-                            Let "c1" (THUNK $ FuncCall "+#" [V "a1", V "b1"]) $
+                            Let "c1" (THUNK $ Primop "+#" [V "a1", V "b1"]) $
                                Atom (V "c1")]]
 
 
