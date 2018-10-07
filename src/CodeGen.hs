@@ -20,7 +20,8 @@ debug = undefined
 
 {-
   Buglist:
-   - Arg assignment for paps is incorrect
+   - I dont seem to handle higher order functions - just add logic to generateCaseCont to always handle all types of heap objects (except fun of course - although this may be poss)
+   - returning primops needs to be done.
    - If an expression is evaluated and is the last statement it should return - need to prove this
 
 -}
@@ -53,7 +54,7 @@ renderProgram :: [Statement] -> String
 renderProgram = unlines
 
 toProgram = renderProgram . toStatements . runProgram
-pprog = putStrLn . toProgram
+
 
 
                
@@ -160,19 +161,33 @@ assignPapAtoms pap fun atoms = do
               atomToVal (V v) = v
               location = s "($$ + $$)" [castPtr "char" pap, offs]
 
+knownFunction :: String -> MonStack Bool
+knownFunction f = use funMap >>= return . M.notMember f
+
 knownAndSaturated :: String -> Int -> MonStack Bool
 knownAndSaturated f as = do
   args <- use (funMap.ix f.finfArgs)
   return $ (length args) == as
 
-pushFunArgs :: String -> [Atom] -> MonStack [Statement]
-pushFunArgs fun args = do
-  argTypes <- use (funMap.ix fun.finfArgs)
-  return $ zipWith toPushInstr args argTypes
+pushArgsFromLayoutInfo :: String -> [Atom] -> [Statement]
+pushArgsFromLayoutInfo infoTable args = foldMap genPushes . reverse $ zip [0..] args
+    where
+      genPushes (index, V x) = ifSt cond [funCall "push_ptr" [x]] [[funCall "push_int" [x]]]
+          where
+            (.) = structAccess
+            cond = arrayIndex (infoTable."layout"."entries") (show index)."pointer"
+
+pushArgTypes :: [Arg] -> [Atom] -> [Statement]
+pushArgTypes argTypes args = zipWith toPushInstr args argTypes
       where
         toPushInstr (V x) (_, Boxed) =  s "push_ptr($$);" [x]
         toPushInstr (V x) (_, Unboxed) =  s "push_int($$);" [x]
         toPushInstr (L i) (_, Unboxed) =  s "push_int($$);" [show i]
+         
+pushFunArgs :: String -> [Atom] -> MonStack [Statement]
+pushFunArgs fun args = do
+  argTypes <- use (funMap.ix fun.finfArgs)
+  return $ pushArgTypes argTypes args
                                
 toCType a@(x, Boxed) = ("ref", a)
 toCType a@(x, Unboxed) = ("int", a)
@@ -423,11 +438,11 @@ generateCaseCont name bindings (Case (V var_name) es) = do
                   bindingMacro var_ref "void**" var_name var_key "bindings",
                   declInit "info_table*" info_table (deref (castPtr "info_table*" var_name))
                ] <*>
-               (ifSt conCase <$> (fmap concat . mapM caseIf $ alts) <*> pure [elseSt name])
-
+               (ifSt conCase <$> (fmap concat . mapM caseIf $ alts) <*>
+                pure [thunkCase name])
     conCase = s "$$->type == 1" [info_table]    
     var_key = show . al $ M.lookup var_name bindings
-    elseSt name = [
+    thunkCase name = [
        assert (s "$$ == $$" [ptrAccess info_table "type", "5"]),
        returnSt (funCall "thunk_continuation" [var_ref, name, "bindings", var_ref])
      ]
@@ -495,17 +510,51 @@ eval bindings c@(Case deb _) = do
 
 
 -- (void**)get_binding()
--- TODO Need to handle the actual primops cases
-eval bindings (Primop "+#" [L x, L y]) = eval bindings (Atom . L $ x + y)
+{-
+If it's a function call thats not to a known function we need to figure out what type it is - thunk, func, pap and then push the args and generate a slow call.
+For a pap and fun, since we don't know at compile time which function has been called and what type the args are, we generate a bunch of case logic from the layout description of the function info table
+-}
+eval bindings (Primop "+#" [L x, L y]) = return [returnSt $ show (x + y)]
+eval bindings (Primop "+#" [V x, V y]) = do
+  let [xkey] = bindings ^.. ix x
+      [ykey] = bindings ^.. ix x
+      x_ref = s "$$_ref" [x]
+      y_ref = s "$$_ref" [y]
+      initX = bindingMacro x_ref "int*" x (show xkey) "bindings"
+      initY = bindingMacro y_ref "int*" y (show ykey) "bindings"
+  return $ [returnSt (s "$$ + $$" [x, y])]
 eval bindings (FuncCall fun args) = do
-  cond <- knownAndSaturated fun (length args)
-  if cond
+  knownAndSaturatedCond <- knownAndSaturated fun (length args)
+  knownCond <- knownFunction fun          
+  if knownAndSaturatedCond
   then return [funCall (fast_call_name fun) (map extractArgsToFunArgs args)]
+  else if knownCond
+       then do
+         tmp <- freshName
+         pushStmts <- pushFunArgs fun args
+         return $ pushStmts ++ [decl "ref" tmp, returnSt $ funCall (slow_call_name fun) [tmp]]
   else do
     tmp <- freshName
-    pushStmts <- pushFunArgs fun args
-    return $ pushStmts ++ [decl "ref" tmp, funCall (slow_call_name fun) [tmp]]
-
+    funArgPushes <- undefined
+    let [funKey] = bindings ^.. ix fun
+        fun_ref = s "$$_ref" [fun]
+        initFun = bindingMacro fun_ref "void**" fun (show funKey) "bindings"
+        initFunTable = declInit "info_table" infoTable
+        funBody = funArgPushes ++ [decl "ref" tmp, returnSt $ funCall (funSlowEntry infoTable) [tmp]]
+        papArgPushes = pushArgsFromLayoutInfo papFunInfoTable args                  
+        papBody = papArgPushes ++ [funCall "unroll_pap" [fun], decl "ref" tmp, returnSt $ funCall papSlowEntry [tmp]]
+        blackholeCase = ifSt blackholeCheck [assert "false"] [] where blackholeCheck = s "$$.type == 6" [infoTable]
+        funcCase = ifSt funcCheck funBody [] where funcCheck = s "$$.type == 0" [infoTable]
+        papCase = ifSt papCheck papBody [] where papCheck = s "$$.type == 4" [infoTable]
+        thunkCase = undefined
+    return $ funcCase ++ papCase ++ thunkCase
+    where
+      infoTable = s "$$_info" [fun]
+      funSlowEntry funTable = structAccess (structAccess (structAccess funTable "extra") "function") "slow_entry_point"
+      papFunInfoTable =  deref $ structAccess (structAccess (structAccess infoTable "extra") "pap_info") "info_ptr"
+      papSlowEntry = funSlowEntry papFunInfoTable
+      
+                                                       
 
 {-
    let x' = THUNK (f x) in e

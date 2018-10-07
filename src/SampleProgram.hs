@@ -1,9 +1,12 @@
+module SampleProgram where
+
 import Types
 import CodeGen
 import Control.Monad
 import Control.Monad.State    
 import Control.Lens
 import Utils
+
 {-
 main = let one = I# 1
        let inc = THUNK (plus_int one)
@@ -39,7 +42,7 @@ test1 = [("main_function", FUNC fun)]
          
   
 -}
-test2 = Program [intConDecl] [("plus_int", FUNC plus_int)] -- , ("main_function", FUNC main_fun)]
+plus_int_test = Program [intConDecl] [("plus_int", FUNC plus_int), ("main_function", FUNC main_fun)]
     where
       main_fun = Fun [("null", Boxed)] e
           where e = Let "x" (CON (Con "I" [L 1])) $
