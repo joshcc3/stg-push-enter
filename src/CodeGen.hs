@@ -16,12 +16,12 @@ import Data.List
 
 debug = undefined
 
+-- TODO: Is there a nice way of implementing a lazy stateful infinite stream that doesn't highjack the state (freshIntStream could be infinite)
+
 {-
   Buglist:
-   - case conts dont actually generate new functions
+   - Arg assignment doesn't actually seem to happen
    - If an expression is evaluated and is the last statement it should return - need to prove this
-
-    
 -}
 
 runConDecl_ :: ConDecl -> ([C_TopLevel], Env)
@@ -126,8 +126,15 @@ freshName = do
   x <- freshInt
   return (to_temp_var x)
 
-freshIntStream :: MonStack [Int]
-freshIntStream = let stream = (:) <$> freshInt <*> stream in stream
+freshIntStream :: Int -> MonStack [Int]
+freshIntStream z = do
+  st <- get
+  result <- stream
+  put st
+  freshNameSource += z
+  return (take z result)
+      where
+        stream = (:) <$> freshInt <*> stream
   
 
 generatePapSize :: String -> Int -> MonStack String
@@ -229,9 +236,10 @@ evalFunDef prog = do
         infoTable <- generateFunction [] info_table_name info_table_initializer_stmts []
         fastEntry <- generateFunction [] fast_entry_name fast_entry_point (map toCType args)
         slowEntry <- generateFunction [] slow_entry_name slow_entry_point []
+        defereds <- use deferred
         if name == "main_function"
         then return [fastEntry]
-        else return [infoTableVar, fastEntry, slowEntry, infoTable]
+        else return $ defereds ++ [infoTableVar, fastEntry, slowEntry, infoTable]
           where
             (initializeLayoutEntries, offsets) = unzip $ map init_arg_entry $ zip [0..] $ zip ("0":offsets) args
             info_table_function = Fun [] 
@@ -408,10 +416,13 @@ generateCaseCont name bindings (Case (V var_name) es) = do
     thunkBody name = case es of
         -- For this case we push a case frame and then a 'fake' update frame that restores su and returns the arg that the update frame was called with 
         [AltForce x e] -> undefined -- TODO Need to handle this case.
-        alts -> pure ([
-            bindingMacro var_ref "void**" var_name var_key "bindings",
-            declInit "info_table*" info_table (deref (castPtr "info_table*" var_name))
-          ] ++) <*> (ifSt conCase <$> (fmap concat . mapM caseIf $ alts) <*> pure [elseSt name])
+        alts -> (++)
+                <$>
+                pure [
+                  bindingMacro var_ref "void**" var_name var_key "bindings",
+                  declInit "info_table*" info_table (deref (castPtr "info_table*" var_name))
+               ] <*>
+               (ifSt conCase <$> (fmap concat . mapM caseIf $ alts) <*> pure [elseSt name])
 
     conCase = s "$$->type == 1" [info_table]    
     var_key = show . al $ M.lookup var_name bindings
@@ -422,10 +433,10 @@ generateCaseCont name bindings (Case (V var_name) es) = do
     caseIf (AltCase conName freeVars exp) = do
             [conDefn] <- uses (conMap.ix conName) (:[])
             let expectedConNum = conTag conDefn
-                cond = assert (s "$$ == $$" [actualConNum, show expectedConNum])
+                cond = s "$$ == $$" [actualConNum, show expectedConNum]
             ifBody <- do
                conInnerName <- freshName
-               intStream <- freshIntStream
+               intStream <- freshIntStream (length . conFields $ conDefn)
                let init_con_struct = declInit (s "$$*" [conName]) conInnerName conCasted
                    freeVarBindings = zip (conFields conDefn) intStream
                    bindings' = foldl updBindings bindings freeVarBindings
@@ -439,7 +450,7 @@ generateCaseCont name bindings (Case (V var_name) es) = do
                        where
                          tmp_var = to_temp_var num
                          con_field_val = ptrAccess conInnerName field_name
-                         
+
                case_alt_stmts <- eval bindings' exp
                
                return $ init_con_struct: bindCaseStmts ++ case_alt_stmts
@@ -474,10 +485,11 @@ generateThunkCont bindings funName (THUNK e)
 
     
 eval :: Bindings -> Expression -> MonStack [String]
-eval bindings c@(Case _ _) = do
+eval bindings c@(Case deb _) = do
   func_prefix <- freshName
   let name = s "$$_$$" [func_prefix, "cont"]
-  deferred %= (generateCaseCont name bindings c:)
+  case_cont <- generateCaseCont name bindings c
+  deferred %= (++[case_cont])
   return [returnSt (funCall name ["bindings"])]
 
 
@@ -504,11 +516,10 @@ eval bindings (FuncCall fun args) = do
 eval bindings (Let var obj e) = do
                      updateKey <- freshInt
                      let bs = [putBinding thunk_ref_name  (show updateKey)]
-                     thunkObj <- evalObject bindings thunk_name obj
+                     thunkObj <- evalObject bindings thunk_ref_name obj
                      rest <- eval (M.insert thunk_ref_name updateKey bindings) e
                      return $ thunkObj ++ bs ++ rest
     where
-      thunk_name = var
       thunk_ref_name = s "$$_ref" [thunk_name]
 
 
@@ -519,8 +530,9 @@ eval bindings (Atom (V x)) = return [returnSt $ x]
 evalObject :: M.Map String Int -> String -> Object -> MonStack [String]
 evalObject bindings obj_name t@(THUNK e) = do
   thunk_cont <- freshName
-  deferred %= (generateThunkCont bindings thunk_cont t:)
-  return [declInit "ref" obj_name $ funCall "createThunk" ["bindings", thunk_cont]]
+  deferred_thunk <- generateThunkCont bindings thunk_cont t
+  deferred %= (++[deferred_thunk])
+  return [declInit "ref" obj_name $ funCall "create_thunk" ["bindings", thunk_cont]]
 {-
    Cons x' f'
 //

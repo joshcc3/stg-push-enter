@@ -17,7 +17,7 @@ main = let one = I# 1
 -}
 intConDecl = ConDecl "Int" [intConstructor]
     where
-      intConstructor = ConDefn "I" 0 [("value", Unboxed)]      
+      intConstructor = ConDefn "I" 0 [("I_value", Unboxed)]      
 
 
 test1 = [("main_function", FUNC fun)]
@@ -39,7 +39,7 @@ test1 = [("main_function", FUNC fun)]
          
   
 -}
-test2 = Program [intConDecl] [("plus_int", FUNC plus_int), ("main_function", FUNC main_fun)]
+test2 = Program [intConDecl] [("plus_int", FUNC plus_int)] -- , ("main_function", FUNC main_fun)]
     where
       main_fun = Fun [("null", Boxed)] e
           where e = Let "x" (CON (Con "I" [L 1])) $
