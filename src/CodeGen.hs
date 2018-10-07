@@ -242,7 +242,8 @@ imports = C_Import [
 evalFunDef :: [FunDef] -> MonStack [C_TopLevel]
 evalFunDef prog = do
   x <- mapM generateTopLevelDefn prog
-  return $ imports:concat x
+  defereds <- use deferred
+  return $ imports:defereds ++ concat x
     where
       generateTopLevelDefn (name, FUNC (Fun args e))
           = do
@@ -252,10 +253,9 @@ evalFunDef prog = do
         infoTable <- generateFunction [] info_table_name info_table_initializer_stmts []
         fastEntry <- generateFunction [] fast_entry_name fast_entry_point (map toCType args)
         slowEntry <- generateFunction [] slow_entry_name slow_entry_point []
-        defereds <- use deferred
         if name == "main_function"
         then return [fastEntry]
-        else return $ defereds ++ [infoTableVar, fastEntry, slowEntry, infoTable]
+        else return $ [infoTableVar, fastEntry, slowEntry, infoTable]
           where
             (initializeLayoutEntries, offsets) = unzip $ map init_arg_entry $ zip [0..] $ zip ("0":offsets) args
             info_table_function = Fun [] 
@@ -335,11 +335,13 @@ generateSlowCall fastName name args = do
 
 -- genPapForArgs :: String -> String -> [(Atom, ValueType)]
 genPapForArgs name args  = do
-   let argSize = c_sum (map (toSize . snd) args)
    initArgs <- initArgs_
-   return $ prepareArgsFromStack ++ initStructTable ++ initArgs ++  [arrayIndex "pap_" 0 ..= "pap_info", returnSt "pap_ref"]
+   return $ prepareArgsFromStack ++ initStructTable ++ declareNewPap:initArgs ++  [arrayIndex "pap_" 0 ..= "pap_info", returnSt "pap_ref"]
         where
-          initStructTable = [declInit "struct info_table*" "pap_info" (castPtr "struct info_table*" (funCall "new" ["sizeof(info_table)"])),
+          argSize = c_sum (map (toSize . snd) args)          
+          -- the pap consists of the arg size + the info pointer
+          declareNewPap = newRefMacro "pap_ref" "void**" (s "$$ + sizeof(void*)" [argSize]) "pap_"
+          initStructTable = [declInit "struct info_table*" "pap_info" (deref $ castPtr "struct info_table*" (funCall "new" ["sizeof(info_table)"])),
                              ptrAccess "pap_info" "type" ..= "4",
                              ptrAccess "pap_info" "extra.pap_info" ..= infoTableStruct]
           infoTableStruct = bracketInit "struct pap" [("info_ptr", "&pap_info"), ("size", "1")]
@@ -443,7 +445,7 @@ generateCaseCont name bindings (Case (V var_name) es) = do
     var_key = show . al $ M.lookup var_name bindings
     thunkCase name = [
        assert (s "$$ == $$" [ptrAccess info_table "type", "5"]),
-       returnSt (funCall "thunk_continuation" [var_ref, name, "bindings", var_ref])
+       returnSt (funCall "thunk_continuation" [var_ref, name, "bindings", var_key, var_ref])
      ]
     caseIf (AltCase conName freeVars exp) = do
             [conDefn] <- uses (conMap.ix conName) (:[])
@@ -515,6 +517,14 @@ eval bindings c@(Case deb _) = do
 If it's a function call thats not to a known function we need to figure out what type it is - thunk, func, pap and then push the args and generate a slow call.
 For a pap and fun, since we don't know at compile time which function has been called and what type the args are, we generate a bunch of case logic from the layout description of the function info table
 -}
+eval bindings (Primop "print_int" [L x]) = return [st $ funCall "printf" ["%d\n", show x]]
+eval bindings (Primop "print_int" [V x]) = do
+  tmp <- freshName
+  let tmp_ref = s "$$_ref" [tmp]
+      [var_key] = bindings ^.. ix x
+      assignPrintVar = bindingMacro tmp_ref "int*" tmp (show var_key) "bindings"
+      printStatement = st $ funCall "printf" ["\"%d\\n\"", deref tmp]
+  return [assignPrintVar, printStatement] 
 eval bindings (Primop "+#" [L x, L y]) = return [returnSt $ show (x + y)]
 eval bindings (Primop "+#" [V x, V y]) = do
   if length (bindings ^.. ix x) == 0
@@ -532,7 +542,7 @@ eval bindings (Primop "+#" [V x, V y]) = do
         initX,
         initY,
         newRefMacro tmp_ref "int*" "sizeof(int)" tmp,
-        tmp ..= s "$$ + $$" [deref x, deref y],
+        deref tmp ..= s "$$ + $$" [deref x, deref y],
         returnSt tmp_ref
    ]
 eval bindings (FuncCall fun args) = do
@@ -578,23 +588,24 @@ eval bindings (FuncCall fun args) = do
 eval bindings (Let var obj e) = do
                      updateKey <- freshInt
                      let bs = [putBinding thunk_ref_name updateKey]
-                     thunkObj <- evalObject bindings thunk_ref_name obj
-                     rest <- eval (M.insert thunk_ref_name updateKey bindings) e
+                     thunkObj <- evalObject bindings var thunk_ref_name obj
+                     rest <- eval (M.insert var updateKey bindings) e
                      return $ thunkObj ++ bs ++ rest
     where
       thunk_ref_name = s "$$_ref" [var]
 
 
 eval bindings (Atom (L x)) = return [returnSt $ show x]
-eval bindings (Atom (V x)) = return [returnSt $ x]
+eval bindings (Atom (V x)) = return [returnSt $ s "$$_ref" [x]]
+eval _ a = error (show a)
 
-
-evalObject :: M.Map String Int -> String -> Object -> MonStack [String]
-evalObject bindings obj_name t@(THUNK e) = do
+evalObject :: M.Map String Int -> String -> String -> Object -> MonStack [String]
+evalObject bindings obj_name obj_ref_name t@(THUNK e) = do
   thunk_cont <- freshName
   deferred_thunk <- generateThunkCont bindings thunk_cont t
   deferred %= (++[deferred_thunk])
-  return [declInit "ref" obj_name $ funCall "create_thunk" ["bindings", thunk_cont]]
+  -- ugh, eval expects the object as a ref
+  return [declInit "ref" obj_ref_name $ funCall "create_thunk" ["bindings", thunk_cont]]
 {-
    Cons x' f'
 //
@@ -603,7 +614,7 @@ evalObject bindings obj_name t@(THUNK e) = do
    cons->value = thunk1_ref;
    cons->next = thunk2_ref;
 -}
-evalObject bindings obj_name (CON (Con c atoms)) = do
+evalObject bindings obj_name obj_ref_name (CON (Con c atoms)) = do
   [constrDefn] <- uses (conMap.ix c) (:[])
   let fields = fst . unzip . conFields $ constrDefn
       assignFields = zipWith assignField fields atoms
@@ -611,14 +622,14 @@ evalObject bindings obj_name (CON (Con c atoms)) = do
     where
       val_name = obj_name
       c_info_table = s "$$_info_table" [c]
-      ref_name = s "$$_ref" [val_name]
+      ref_name = obj_ref_name
       assignField f (V x) = (ptrAccess val_name f) ..= x
       assignField f (L x) = ptrAccess val_name f ..= show x
       assignInfoPtr = ptrAccess val_name "info_ptr"  ..= (s "&$$" [c_info_table])
-evalObject _ _ BLACKHOLE = error "<loop>"
-evalObject _ _ (FUNC _) = error "I dont support lambdas yet."
+evalObject _ _ _ BLACKHOLE = error "<loop>"
+evalObject _ _ _ (FUNC _) = error "I dont support lambdas yet."
 -- TODO example is in list.c:60 (this might be wrong
-evalObject bindings obj_name (PAP (Pap fun as)) = undefined -- do
+evalObject bindings obj_name obj_ref_name (PAP (Pap fun as)) = undefined -- do
 --  return [st$ funCall "unroll_pap" fun, decl "ref" "null", returnSt $ finfo ]
 {-
      let z = map f

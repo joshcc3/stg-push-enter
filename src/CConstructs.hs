@@ -10,7 +10,7 @@ to_temp_var i = s "var_$$" [show i]
 newMacro typ nm = s "NEW($$, $$)" [typ, nm]
 initBindings = [decl "hash_map *" "bindings", st $ st $ funCall "init_bindings" [reference "bindings"]]
 putBinding :: String -> Int -> String
-putBinding thunk_ref_name updateKey = st $ funCall "put_binding" ["bindings", show updateKey, castPtr "void" thunk_ref_name]
+putBinding thunk_ref_name updateKey = st $ funCall "put_binding" ["bindings", show updateKey, thunk_ref_name]
 
 funInfoTableName name = s "$$_info_table" [name]
 
