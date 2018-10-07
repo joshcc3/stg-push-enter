@@ -80,3 +80,4 @@ program = undefined -- [("main", THUNK expression), ("plus_int", FUNC func)]
       element1 = THUNK (FuncCall "head" [V "inced"])
       tail1 = THUNK (FuncCall "tail" [V "inced"])
       element2 = THUNK (FuncCall "head" [V "tail1"])
+

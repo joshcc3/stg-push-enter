@@ -20,8 +20,9 @@ debug = undefined
 
 {-
   Buglist:
-   - Arg assignment doesn't actually seem to happen
+   - Arg assignment for paps is incorrect
    - If an expression is evaluated and is the last statement it should return - need to prove this
+
 -}
 
 runConDecl_ :: ConDecl -> ([C_TopLevel], Env)
@@ -97,7 +98,7 @@ Need to generate a makefile as well.
 -- Probably a source of bugs - we discard the type information here (just bad design really)
 generateFunction :: [C_TopLevel] -> String -> MonStack [Statement] -> [(Type, Arg)] -> MonStack C_TopLevel
 generateFunction deps name fun_stmts args = do
-  funMap.ix name .= funDescr
+  funMap.at name ?= funDescr
   curFun .= Just name
   stmts <- fun_stmts
   curFun .= Nothing
@@ -157,7 +158,7 @@ assignPapAtoms pap fun atoms = do
             where
               atomToVal (L i) = show i
               atomToVal (V v) = v
-              location = s "$$ + $$" [castPtr "char" pap, offs]
+              location = s "($$ + $$)" [castPtr "char" pap, offs]
 
 knownAndSaturated :: String -> Int -> MonStack Bool
 knownAndSaturated f as = do
@@ -259,7 +260,7 @@ evalFunDef prog = do
             functionStruct = bracketInit "fun" [("slow_entry_point", slow_call_name name), ("arity", show $ length args)]
 
             slowEntryPointDescr = FInf slow_entry_name 0 [] []
-            (slow_entry_name, slow_entry_point) = (slow_call_name name, generateSlowCall name . map (\x -> (V . fst $ x, snd x)) $ args)
+            (slow_entry_name, slow_entry_point) = (slow_call_name name, generateSlowCall fast_entry_name name . map (\x -> (V . fst $ x, snd x)) $ args)
 --            fastEntryPointDecl = C_Fun fast_entry_name fast_entry_point []
             fastEntryPointDescr = FInf fast_entry_name (length args) args
             fast_entry_name = if name == "main_function"
@@ -301,9 +302,9 @@ ref map_slow(ref null)
 }
 -}
 
-generateSlowCall :: String -> [(Atom, ValueType)] -> MonStack [String]
-generateSlowCall name args = do
-  let genIfCase as = ifSt cond <$> genPapForArgs name as <*> pure [] where cond = funCall "arg_satisfaction_check" [c_sum . map (toSize . snd) $ as]
+generateSlowCall :: String -> String -> [(Atom, ValueType)] -> MonStack [String]
+generateSlowCall fastName name args = do
+  let genIfCase as = ifSt cond <$> genPapForArgs fastName as <*> pure [] where cond = funCall "arg_satisfaction_check" [c_sum . map (toSize . snd) $ as]
   elseStmts <- mapM genIfCase . init . tail . inits $ args
   let body = ifSt argSatisfactionCondition (generateFastCallFromArgsOnStack name args) (elseStmts ++ [[assert "false"]])
   return $ funcFormatter "ref" (slow_call_name name) [("ref", "null")] body
@@ -520,7 +521,7 @@ eval bindings (Let var obj e) = do
                      rest <- eval (M.insert thunk_ref_name updateKey bindings) e
                      return $ thunkObj ++ bs ++ rest
     where
-      thunk_ref_name = s "$$_ref" [thunk_name]
+      thunk_ref_name = s "$$_ref" [var]
 
 
 eval bindings (Atom (L x)) = return [returnSt $ show x]
