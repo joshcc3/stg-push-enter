@@ -221,8 +221,8 @@ Also we only deal with top-level definitions of function currently
 -}
 init_arg_entry :: (Int, (String, (String, ValueType))) -> (String, String)
 init_arg_entry (ix, (offset, (argName, argType))) = case argType of
-        Boxed -> (arrayIx ..= structValue (fields "true" "sizeof(ref)"), s "$$ + sizeof(ref)" [show offset])
-        Unboxed -> (arrayIx ..= structValue (fields "false" "sizeof(int)"), s "$$ + sizeof(int)" [show offset])
+        Boxed -> (arrayIx ..= structValue (fields "true" "sizeof(ref)"), s "$$ + sizeof(ref)" [offset])
+        Unboxed -> (arrayIx ..= structValue (fields "false" "sizeof(int)"), s "$$ + sizeof(int)" [offset])
   where
     arrayIx = arrayIndex "layout_entries" ix
     structValue = bracketInit "arg_entry"
@@ -344,7 +344,7 @@ genPapForArgs name args  = do
           initStructTable = [declInit "struct info_table*" "pap_info" (deref $ castPtr "struct info_table*" (funCall "new" ["sizeof(info_table)"])),
                              ptrAccess "pap_info" "type" ..= "4",
                              ptrAccess "pap_info" "extra.pap_info" ..= infoTableStruct]
-          infoTableStruct = bracketInit "struct pap" [("info_ptr", "&pap_info"), ("size", "1")]
+          infoTableStruct = bracketInit "struct pap" [("info_ptr", "pap_info"), ("size", "1")]
           prepareArgsFromStack = map declare_var_type papArgs ++ map pop_instr papArgs
           papArgs_ = fst . unzip $ papArgs
           papArgs = args
@@ -474,7 +474,7 @@ generateCaseCont name bindings (Case (V var_name) es) = do
                
                return $ init_con_struct: bindCaseStmts ++ case_alt_stmts
 
-            return $ ifSt cond ifBody []
+            return $ ifSt cond ifBody [[st $ funCall "assert" ["false"]]]
         where
           conCasted = castPtr conName var_name
           actualConNum = structAccess (structAccess (ptrAccess info_table "extra") "constructor") "con_num"
