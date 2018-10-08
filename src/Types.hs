@@ -14,6 +14,8 @@ data C_TopLevel =
     C_Fun String [Statement] [C_TopLevel]
   | C_Struct String [Statement] [C_TopLevel]
   | C_Var String [Statement] deriving (Eq, Ord, Show)
+makePrisms ''C_TopLevel
+
 
 data ValueType = Boxed | Unboxed deriving (Eq, Ord, Show)
 type Bindings = Map String Int
@@ -32,7 +34,11 @@ type FunMap = Map String FunInfoTable
 type ConMap = Map String ConstructorDefn
 type FreshNameSource = Int
     
-data ConstructorDefn = ConDefn { conName :: String, conTag :: Int, conFields :: [(String, ValueType)] } deriving (Eq, Ord, Show)
+data ConstructorDefn = ConDefn {
+      conName :: String,
+      conTag :: Int,
+      conFields :: [(String, ValueType)]
+    } deriving (Eq, Ord, Show)
 
 type MonStack = State Env
 

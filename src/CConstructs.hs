@@ -3,6 +3,8 @@ module CConstructs where
 import Utils
 import Types    
 
+to_temp_var i = s "var_$$" [show i]
+
 newMacro typ nm = s "NEW($$, $$)" [typ, nm]
 initBindings = [decl "hash_map *" "bindings", funCall "init_bindings" [reference "bindings"]]
 putBinding thunk_ref_name updateKey = funCall "putBinding" ["bindings", show updateKey, thunk_ref_name]
@@ -30,7 +32,7 @@ ifSt cond ifBody elses = [condSt, "{"] ++ tab ifBody ++ ["}"] ++ (
 decl typ name = s "$$ $$;" [typ, name]
 declInit typ name val = s "$$ $$ = $$;" [typ, name, val]
 
-funcFormatter returnType name args body = [line1, "{"] ++ body ++ ["}"]
+funcFormatter returnType name args body = [line1, "{"] ++ tab body ++ ["}"]
     where
       line1 = s "$$ $$($$)" [returnType, name, commaSep . map (\(a, b) -> s "$$ $$" [a, b]) $ args]
 
