@@ -88,6 +88,10 @@ declare_var_type (V x, Boxed) = decl "ref" x
 declare_var_type (V x, Unboxed) = decl "int" x
 pop_instr (V x, Boxed) = st $ funCall "pop_ptr" . (:[]) . reference $ x
 pop_instr (V x, Unboxed) = st $ funCall "pop_int" . (:[]) . reference $ x
+
+push_instr (V x, Boxed) = st $ funCall "push_ptr" . (:[]) . reference $ x
+push_instr (V x, Unboxed) = st $ funCall "push_int" . (:[]) . reference $ x
+push_instr (L x, Unboxed) = st $ funCall "push_int" . (:[])  $ show x
         
 includeSys x = s "#include <$$>" [x]
 includeUser x = s "#include $$" [show x]

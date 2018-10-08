@@ -446,7 +446,7 @@ generateCaseCont name bindings (Case (V var_name) es) = do
   where
     thunkBody name = case es of
         -- For this case we push a case frame and then a 'fake' update frame that restores su and returns the arg that the update frame was called with 
-        [AltForce x e] -> undefined -- TODO Need to handle this case.
+        [AltForce x e] -> error (s "AltForce $$ $$" [show x, show e]) -- TODO Need to handle this case.
         alts -> (++)
                 <$>
                 pure [
@@ -582,7 +582,7 @@ eval bindings (FuncCall fun args) = do
          return $ pushStmts ++ [decl "ref" tmp, returnSt $ funCall (slow_call_name fun) [tmp]]
   else do
     tmp <- freshName
-    funArgPushes <- undefined
+    funArgPushes <- error "Dont know what args to give"
     thunkContName <- freshName
     let [funKey] = bindings ^.. ix fun
         fun_ref = s "$$_ref" [fun]
@@ -667,8 +667,14 @@ evalObject bindings obj_name obj_ref_name (CON (Con c atoms)) = do
 evalObject _ _ _ BLACKHOLE = error "<loop>"
 evalObject _ _ _ (FUNC _) = error "I dont support lambdas yet."
 -- TODO example is in list.c:60 (this might be wrong
-evalObject bindings obj_name obj_ref_name (PAP (Pap fun as)) = undefined -- do
---  return [st$ funCall "unroll_pap" fun, decl "ref" "null", returnSt $ finfo ]
+evalObject bindings obj_name obj_ref_name (PAP (Pap fun as)) = do
+  funArgs <- use (funMap.ix fun.finfArgs)
+  let pushSt ((_, typ), argn) = push_instr (argn, typ)
+      pushes = map pushSt (reverse $ zip funArgs as)
+  papStats <- genPapForArgs fun (error "TODO what should the args be here?") -- funArgs
+  return $ pushes ++ papStats
+    
+  -- return [st$ funCall "unroll_pap" fun, decl "ref" "null", returnSt $ finfo ]
 {-
      let z = map f
 //

@@ -125,7 +125,8 @@ map_fn = Fun args body
 {-
 
 -}
-list_test = [("plus_int", FUNC plus_int), ("head", FUNC head_fn), ("tail", FUNC tail_fn), ("map", FUNC map_fn), ("main_", FUNC main_)]
+list_test = Program [intConDecl, listConDecl]
+                    [("plus_int", FUNC plus_int), ("head", FUNC head_fn), ("tail", FUNC tail_fn), ("map", FUNC map_fn), ("main_", FUNC main_)]
     where
       main_ = Fun [] main_exp
       main_exp = Let "one" one $
