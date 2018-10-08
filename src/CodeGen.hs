@@ -583,6 +583,7 @@ eval bindings (FuncCall fun args) = do
   else do
     tmp <- freshName
     funArgPushes <- undefined
+    thunkContName <- freshName
     let [funKey] = bindings ^.. ix fun
         fun_ref = s "$$_ref" [fun]
         initFun = bindingMacro fun_ref "void**" fun (show funKey) "bindings"
@@ -591,9 +592,13 @@ eval bindings (FuncCall fun args) = do
         papArgPushes = pushArgsFromLayoutInfo papFunInfoTable args                  
         papBody = papArgPushes ++ [funCall "unroll_pap" [fun], decl "ref" tmp, returnSt $ funCall papSlowEntry [tmp]]
         blackholeCase = ifSt blackholeCheck [assert "false"] [] where blackholeCheck = s "$$.type == 6" [infoTable]
-        funcCase = ifSt funcCheck funBody [] where funcCheck = s "$$.type == 0" [infoTable]
+        funcCase = ifSt funcCheck funBody [papCase, thunkCase] where funcCheck = s "$$.type == 0" [infoTable]
         papCase = ifSt papCheck papBody [] where papCheck = s "$$.type == 4" [infoTable]
-        thunkCase = error "TODO"
+        thunkCase = [
+           assert (s "$$.type == $$" [infoTable, "5"]),
+           returnSt (funCall "thunk_continuation" [fun_ref, thunkContName, "bindings", show funKey, fun_ref])
+         ]
+            
     return $ funcCase ++ papCase ++ thunkCase
     where
       infoTable = s "$$_info" [fun]
