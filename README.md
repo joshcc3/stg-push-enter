@@ -834,9 +834,108 @@ int main()
 ```
 
 
+## The `time` function in linux
+Time outputs something like this:
+```
+real    0m20.919s
+user    0m11.118s
+sys     0m15.768s
+```
+
+The `times` system call on linux reports the user and system time taken for the process and its children in clock ticks. clock ticks -> seconds is OS dependent and can be retrieved by sysconf(_SC_CLK_TCK). Although I found a definite disparity in their reporting:
+```
+[jcoutin@loydjcoutin1 experiment]$ ./a.out
+User time: 0.000000 us, System Time: 0.000000 us
+[jcoutin@loydjcoutin1 experiment]$ time ./a.out
+User time: 0.000000 us, System Time: 0.000000 us
+
+real    0m1.003s
+user    0m0.002s
+sys     0m0.001s
+```
+Thats the the wall clock time, time spent executing user instructions and time spent in the kernel for the process.
+What is the time distribution for the following scenarios? (2 processors) [The code to test these sections is present inside `c_src/experiment/test_times.c`).
+
+### When a process sleeps for 1 second
+It registers as 0 from the perspective of times (I guess it literally hasn't taken enough of cpu time to really register in terms of clock ticks!)
+### Looping through an array
+Something weird:
+```
+  long large_sum = 0;
+  for(int i = 0; i < 10e6; i++)
+    {
+      large_sum += i;
+    }
+
+  times(&tms);
+  pprint_tms(&tms);
+  /*
+  $ time ./a.out
+RAW: Clock Ticks - User time: 3, System Time: 0
+User time: 30.000000 ms, System Time: 0.000000 ms
+
+real    0m0.035s
+user    0m0.034s
+sys     0m0.002s
+
+But changing the 10e6 to 1000000 gives me 0 on the user time and system time:
+Relevant assembly before change: (its cut 10e6 is actually 10^7) 
+.L30:
+        mov     eax, DWORD PTR [rbp-12]
+        cdqe
+        add     QWORD PTR [rbp-8], rax
+        add     DWORD PTR [rbp-12], 1
+.L29:
+        cvtsi2sd        xmm0, DWORD PTR [rbp-12]
+        movsd   xmm1, QWORD PTR .LC12[rip]
+        ucomisd xmm1, xmm0
+        ja      .L30
+
+
+Relevant assembly after change:
+.L30:
+        mov     eax, DWORD PTR [rbp-12]
+        cdqe
+        add     QWORD PTR [rbp-8], rax
+        add     DWORD PTR [rbp-12], 1
+.L29:
+        cmp     DWORD PTR [rbp-12], 999999
+        jle     .L30
+
+*/
+```
+
+Also A tick is an arbitrary unit for measuring internal system time. There is usually an OS-internal counter for ticks; the current time and date used by various functions of the OS are derived from that counter.
+The tick on my OS is 1/100th of a second.
+
+### What about simple things like printing.
+    - How does the time change with the size of the string.
+### Threads
+ - Creating a thread
+ - Joining a thread
+### Mutexes
+ - Creating a mutex
+ - Taking a lock on a mutex with no contention
+ - Taking a lock on a mutex with contention
+
+How do the following distributions change when we move to a single processor? (you can use `taskset` to manipulate the 'cpu affinity' of existing and new processes)
+### When a process sleeps for 1 second
+### What about simple things like printing.
+    - How does the time change with the size of the string.
+### Threads
+ - Creating a thread
+ - Joining a thread
+### Mutexes
+ - Creating a mutex
+ - Taking a lock on a mutex with no contention
+ - Taking a lock on a mutex with contention
+
+
+
 ## Atomicity of updates to read:
 
-So splitting the read and write into two instructions gives you less than a 0.01% chance of success with 10 threads and not splitting it has the same effect :P
+All of the tests were tried 10000 times.
+So splitting the read and write into two instructions gives a 93.42 chance of success with 10 threads and not splitting it has the same effect. 
 ```
 /*
 Splitting up the read and write
@@ -908,7 +1007,7 @@ void* incers(void *null)
 }
 
 
-Total: 10000, Failed: 0, Correct: 10000, Percent Success: 1.000000
+Total: 10000, Failed: 0, Correct: 10000, Percent Success: 100.000000
 
 real    0m7.599s
 user    0m3.279s
@@ -928,11 +1027,8 @@ void* incers(void *null)
 {
   for(int i = 0; i < INC_COUNT; i++)
   {
-    //lock(&global_lock);
     int read = protected;
-    //usleep(rand()*100);
     protected = read + 1;
-    //unlock(&global_lock);
   }
 
 }
@@ -978,6 +1074,106 @@ int main()
 }
 
 ```
+
+When changing to compile with -O3, the loop is optimized and reduced to an add instruction (I'm not sure what the rip is doing in address but protected is a label). (Interestingly it doesn't use an `inc` instruction even if I remove the loop around it). It also does away with the saving of the base pointer and saving of the args on the stack.
+```
+add protected[rip], 1000`
+incers:
+.LFB13:
+        .loc 1 82 0
+        .cfi_startproc
+.LVL17:
+.LBB12:
+        .loc 1 87 0
+        add     DWORD PTR protected[rip], 1
+.LVL18:
+.LBE12:
+        .loc 1 92 0
+        ret
+        .cfi_endproc
+```
+
+Running for 10000 iterations, with 200 threads:
+Total: 10000, Failed: 446, Correct: 9554, Percent Success: 95.540000
+
+So even an add instruction is not atomic across multiple processors.
+
+When actually running this with `taskset --cpu-list 1 ./a.out` I get no test failures. So `add` is atomic when you have a single processor.
+```
+$ taskset --cpu-list 1 ./a.out
+Total: 1000, Failed: 0, Correct: 1000, Percent Success: 100.000000
+
+real    0m16.085s
+user    0m1.152s
+sys     0m11.765s
+
+
+$ time taskset --cpu-list 0,1 ./a.out
+Total: 1000, Failed: 49, Correct: 951, Percent Success: 95.100000
+
+real    0m13.067s
+user    0m1.270s
+sys     0m12.994s
+
+```
+Looks like a massive amount of time is also spent creating the threads. 1000*200 threads were created here (around 60 microseconds to create a new thread?).
+
+## Implementing my own locks:
+For a basic CAS:
+```
+bool compare_and_swap(lock_t *lock, int a, int b)                               
+{                                                                               
+  pthread_mutex_lock(&cas_lock);                                                
+  if(lock->state != a) {                                                        
+    pthread_mutex_unlock(&cas_lock);                                            
+    return 0;                                                                   
+  }                                                                             
+  lock->state = b;                                                              
+                                                                                
+  pthread_mutex_unlock(&cas_lock);                                              
+                                                                                
+  return 1;                                                                     
+                                                                                
+}
+                                                                                
+//The lock function:
+  while(1)                                                                      
+  {                                                                             
+    if(lock->state == 0)                                                        
+    {                                                                           
+      compare_and_swap(lock, 0, 1);                                             
+    }                                                                           
+    else if(lock->state == 1)                                                   
+    {                                                                           
+      bool result = compare_and_swap(lock, 1, 2);                               
+      if(result) break;                                                         
+    }                                                                           
+    else sleep(SLEEP_INTERVAL);                                                 
+  }   
+
+// Unlock just sets the lock->state = 0
+
+$ time ./a.out
+Starting
+Completed test.Total: 1000, Failed: 0, Correct: 1000, Percent Success: 100.000000
+
+real    0m20.919s
+user    0m11.118s
+sys     0m15.768s
+
+
+```
+
+### How strong a CAS do you really need to implement a lock?
+
+
+
+### Evaluating concurrent algorithms:
+
+Throughput - Number of non-locking operations
+Lock contention:
+ - Number of times a thread sleeps
+
 
 
 
