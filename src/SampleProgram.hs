@@ -42,9 +42,9 @@ test1 = [("main_function", FUNC fun)]
          
   
 -}
-plus_int_test = Program [intConDecl] [("plus_int", FUNC plus_int), ("main_function", FUNC main_fun)]
+plus_int_test = Program [intConDecl] [("plus_int", FUNC plus_int), ("main_", FUNC main_fun)]
     where
-      main_fun = Fun [("null", Boxed)] e
+      main_fun = Fun [] e
           where e = Let "x" (CON (Con "I" [L 1])) $
                     Let "y" (CON (Con "I" [L 2])) $
                     Let "z" (THUNK (FuncCall "plus_int" [V "x", V "y"])) $

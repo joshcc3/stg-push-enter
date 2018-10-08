@@ -11,8 +11,8 @@ type Statement = String
 type Type = String 
 
 data C_TopLevel = 
-    C_Fun String [Statement] [C_TopLevel]
-  | C_Struct String [Statement] [C_TopLevel]
+    C_Fun String [Statement]
+  | C_Struct String [Statement]
   | C_Var String [Statement]
   | C_Import [Statement]  deriving (Eq, Ord, Show)
 makePrisms ''C_TopLevel
@@ -43,7 +43,7 @@ data ConstructorDefn = ConDefn {
 
 type MonStack = State Env
 
-data Env = Env { _funMap :: FunMap, _curFun ::  Maybe CurFun, _freshNameSource :: FreshNameSource, _conMap :: ConMap, _deferred :: [C_TopLevel] } deriving (Eq, Ord, Show)
+data Env = Env { _funMap :: FunMap, _curFun ::  Maybe CurFun, _freshNameSource :: FreshNameSource, _conMap :: ConMap, _deferred :: [C_TopLevel], _funProtos :: [C_TopLevel] } deriving (Eq, Ord, Show)
 makeLenses ''Env
 
 

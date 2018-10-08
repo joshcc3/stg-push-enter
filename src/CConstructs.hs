@@ -3,6 +3,8 @@ module CConstructs where
 import Utils
 import Types    
 
+main_entry_point = "main_"
+
 st x = s "$$;" [x]
 
 to_temp_var i = s "var_$$" [show i]

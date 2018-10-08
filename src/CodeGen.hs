@@ -20,11 +20,15 @@ debug = undefined
 
 {-
   Buglist:
+   - The main function is not generating a call to the inits, 
+   - FuncCall is not hitting the saturated case although it show
+
    - I dont seem to handle higher order functions - just add logic to generateCaseCont to always handle all types of heap objects (except fun of course - although this may be poss)
    - returning primops needs to be done.
    - If an expression is evaluated and is the last statement it should return - need to prove this
 
 -}
+
 
 runConDecl_ :: ConDecl -> ([C_TopLevel], Env)
 runConDecl_ c = runState (evalConDecl c) initialEnv
@@ -38,8 +42,15 @@ runProgram_ :: Program -> MonStack [C_TopLevel]
 runProgram_ (Program conDecls defs) = do
   cs <- mapM evalConDecl conDecls
   fs <- evalFunDef defs
-  return $ concat cs ++ fs
-
+  mainFunc <- mainFunction (concat cs ++ fs)
+  return $ concat cs ++ fs ++ [mainFunc]
+    where
+      mainFunction topLevels = generateFunction "main_function" stmts []
+          where
+            stmts = return $ funcFormatter "ref" "main_function" [] body
+            allInits = topLevels ^.. traverse._C_Fun._1.filtered (\x -> x /= "init_function_main_" && startsWith "init_" x)
+            body = map (st . flip funCall []) allInits ++ [st $ funCall "main_" [bracketInit "ref" []]]
+        
 runProgram = fst . flip runState initialEnv . runProgram_
 
 toStatements :: [C_TopLevel] -> [Statement]
@@ -58,7 +69,7 @@ toProgram = renderProgram . toStatements . runProgram
 
 
                
-initialEnv = Env M.empty Nothing 0 M.empty []
+initialEnv = Env M.empty Nothing 0 M.empty [] []
 
 
 {-
@@ -95,15 +106,15 @@ Need to generate a makefile as well.
 
 -}
 
-
 -- Probably a source of bugs - we discard the type information here (just bad design really)
-generateFunction :: [C_TopLevel] -> String -> MonStack [Statement] -> [(Type, Arg)] -> MonStack C_TopLevel
-generateFunction deps name fun_stmts args = do
+generateFunction :: String -> MonStack [Statement] -> [(Type, Arg)] -> MonStack C_TopLevel
+generateFunction name fun_stmts args = do
   funMap.at name ?= funDescr
   curFun .= Just name
   stmts <- fun_stmts
   curFun .= Nothing
-  return (C_Fun name stmts deps)
+  funProtos %= (C_Var name [st (takeWhile (/= '{') (stmts !! 0))]:)
+  return (C_Fun name stmts)
       where
         funDescr = FInf name (length args) (map snd args) layoutEnts
         (layoutEnts, offsets) = unzip $ zipWith toLayoutEntry ("0":offsets) args
@@ -242,18 +253,19 @@ imports = C_Import [
 evalFunDef :: [FunDef] -> MonStack [C_TopLevel]
 evalFunDef prog = do
   x <- mapM generateTopLevelDefn prog
+  fun_prototypes <- use funProtos
   defereds <- use deferred
-  return $ imports:defereds ++ concat x
+  return $ imports:fun_prototypes ++ defereds ++ concat x
     where
       generateTopLevelDefn (name, FUNC (Fun args e))
           = do
-        let slowEntryPointDecl = C_Fun slow_entry_name []
+        let slowEntryPointDecl = C_Fun slow_entry_name
             info_struct_name = s "$$_info_table" [name]
             infoTableVar = C_Var info_struct_name [decl "info_table" info_struct_name]
-        infoTable <- generateFunction [] info_table_name info_table_initializer_stmts []
-        fastEntry <- generateFunction [] fast_entry_name fast_entry_point (map toCType args)
-        slowEntry <- generateFunction [] slow_entry_name slow_entry_point []
-        if name == "main_function"
+        infoTable <- generateFunction info_table_name info_table_initializer_stmts []
+        fastEntry <- generateFunction fast_entry_name fast_entry_point (map toCType args)
+        slowEntry <- generateFunction slow_entry_name slow_entry_point []
+        if name == main_entry_point
         then return [fastEntry]
         else return $ [infoTableVar, fastEntry, slowEntry, infoTable]
           where
@@ -274,11 +286,10 @@ evalFunDef prog = do
                             ]
             functionStruct = bracketInit "fun" [("slow_entry_point", slow_call_name name), ("arity", show $ length args)]
 
-            slowEntryPointDescr = FInf slow_entry_name 0 [] []
             (slow_entry_name, slow_entry_point) = (slow_call_name name, generateSlowCall fast_entry_name name . map (\x -> (V . fst $ x, snd x)) $ args)
 --            fastEntryPointDecl = C_Fun fast_entry_name fast_entry_point []
             fastEntryPointDescr = FInf fast_entry_name (length args) args
-            fast_entry_name = if name == "main_function"
+            fast_entry_name = if name == main_entry_point
                               then name
                               else fast_call_name name
             fast_entry_point = funcFormatter "ref" (fast_entry_name) fastArgs <$> body
@@ -320,7 +331,7 @@ ref map_slow(ref null)
 generateSlowCall :: String -> String -> [(Atom, ValueType)] -> MonStack [String]
 generateSlowCall fastName name args = do
   let genIfCase as = ifSt cond <$> genPapForArgs fastName as <*> pure [] where cond = funCall "arg_satisfaction_check" [c_sum . map (toSize . snd) $ as]
-  elseStmts <- mapM genIfCase . init . tail . inits $ args
+  elseStmts <- mapM genIfCase . tail . inits $ args
   let body = ifSt argSatisfactionCondition (generateFastCallFromArgsOnStack name args) (elseStmts ++ [[assert "false"]])
   return $ funcFormatter "ref" (slow_call_name name) [("ref", "null")] body
    where
@@ -376,13 +387,13 @@ void init_list()
 evalConDecl :: ConDecl -> MonStack [C_TopLevel]
 evalConDecl (ConDecl typeName cons) = do
   conMap %= flip (foldl conMapUpd) cons
-  funcDecl <- generateFunction structDecls name (funcFormatter "void" name args <$> body) args
+  funcDecl <- generateFunction name (funcFormatter "void" name args <$> body) args
   return (funcDecl:structDecls)
     where
       info_table_name c = s "$$_info_table" [c]
       conMapUpd mp c = M.insert (conName c) c mp
       structDecls = map toStructDecl cons
-      toStructDecl (ConDefn conName _ fields) = C_Struct conName (decl "struct info_table" (info_table_name conName):typedef conName fields [("info_table*", "info_ptr")]) []
+      toStructDecl (ConDefn conName _ fields) = C_Struct conName (decl "struct info_table" (info_table_name conName):typedef conName fields [("info_table*", "info_ptr")])
       name = s "init_constructors_$$" [typeName]
       args = []
       body = return $ map generateConDefn cons
@@ -428,7 +439,7 @@ ref cont(hash_map *bindings)
 generateCaseCont :: String -> Bindings -> Expression -> MonStack C_TopLevel
 generateCaseCont name bindings (Case (V var_name) es) = do
     let statements = funcFormatter returnType name args <$> thunkBody name
-    generateFunction [] name statements (args & traverse._2 %~ (,Boxed))
+    generateFunction name statements (args & traverse._2 %~ (,Boxed))
   where
     thunkBody name = case es of
         -- For this case we push a case frame and then a 'fake' update frame that restores su and returns the arg that the update frame was called with 
@@ -498,7 +509,7 @@ generateCaseCont name bindings (Case (V var_name) es) = do
 generateThunkCont bindings funName (THUNK e)
     = do
   let fun_stmts = funcFormatter "ref" funName [("ref", "thunk_ref")] <$> body
-  generateFunction [] funName fun_stmts [("ref", ("thunk_ref", Boxed))]
+  generateFunction funName fun_stmts [("ref", ("thunk_ref", Boxed))]
     where
       body = (declInit "hash_map*" "bindings" "THUNK_GET_BINDINGS(thunk_ref)":) <$> eval bindings e
 
@@ -517,7 +528,10 @@ eval bindings c@(Case deb _) = do
 If it's a function call thats not to a known function we need to figure out what type it is - thunk, func, pap and then push the args and generate a slow call.
 For a pap and fun, since we don't know at compile time which function has been called and what type the args are, we generate a bunch of case logic from the layout description of the function info table
 -}
-eval bindings (Primop "print_int" [L x]) = return [st $ funCall "printf" ["%d\n", show x]]
+eval bindings (Primop "print_int" [L x]) = return [
+                                            st $ funCall "printf" ["%d\n", show x],
+                                            returnSt $ bracketInit "ref" []
+                                           ]
 eval bindings (Primop "print_int" [V x]) = do
   tmp <- freshName
   let tmp_ref = s "$$_ref" [tmp]
@@ -549,7 +563,9 @@ eval bindings (FuncCall fun args) = do
   knownAndSaturatedCond <- knownAndSaturated fun (length args)
   knownCond <- knownFunction fun          
   if knownAndSaturatedCond
-  then return [funCall (fast_call_name fun) (map extractArgsToFunArgs args)]
+  then do
+    pushStmts <- pushFunArgs fun args
+    return $ pushStmts ++ [funCall (fast_call_name fun) (map extractArgsToFunArgs args)]
   else if knownCond
        then do
          tmp <- freshName

@@ -1,8 +1,12 @@
 #include "data/string_.h"
 #include "static.h"
-#include "code.h"
 #include "containers/mmanager.h"
+
+#ifdef DEBUG_OLD
+#include "code.h"
 #include "main.h"
+#endif
+
 #include "stg/bindings.h"
 #include "containers/hash_map.h"
 #include "typeclasses.h"
@@ -25,11 +29,12 @@ int main()
   stack_pointer = allocate_stack(INITIAL_STACK_SIZE);
   stack_pointer += INITIAL_STACK_SIZE;
 
-  init_pointer_table(64);
+  su_register = stack_pointer;
 
+  init_pointer_table(64);
   init_pointer_table(16);
 
   struct ref null;
-  main_function(null);
+  main_function();
 }
 

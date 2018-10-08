@@ -8,8 +8,11 @@
 
 #include "data/string_.h"
 #include "stg/bindings.h"
+
+#ifdef DEBUG_OLD 
 #include "stg/list/list.h"
 #include "stg/plus_int/code.h"
+#endif
 
 void init_bindings(hash_map**);
 bool arg_satisfaction_check(int);
@@ -120,10 +123,10 @@ char *su_register; // used for tracking the current update frames
 
 #define INITIAL_STACK_SIZE 32*1024
 
-
+#ifdef DEBUG_OLD 
 // TODO: where should these go? The defns of the constructor are in code.h
 struct info_table int_constructor_info_table;
 struct info_table plus_info_table;
-
+#endif
 
 #endif
