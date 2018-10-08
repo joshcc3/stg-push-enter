@@ -8,6 +8,9 @@ using the push-enter approach based on [this paper](http://simonmar.github.io/bi
 # Language Spec
 See the paper (page 4, 5) for a more detailed description of the constructs.
 ```
+atom:  a1 .. an
+
+
 Variables
 var := fn, x, y
 
@@ -19,7 +22,6 @@ alts := C x1 x2 .. xn -> e | x -> e
 Expressions
 e := case x of { alts* } | 
      fn a1 .. an | 
-     primop a1 .. an | 
      lit 
 
 Heap objects
@@ -33,6 +35,8 @@ Programs
 prog := f1 = obj1; f2 = obj2; f3 = obj3 ...
 
 ```
+
+I've changed the grammar slightly and added primops to an 'atom'. This is to allow them to be used in constructors/function calls, etc. Unboxed types are not allowed to be lifted values (values that can evaluate to bottom - thunks mainly) so you can't instantiate them in a let binding.
 
 #Objectives
  - Manually 'compile' stg programs into C

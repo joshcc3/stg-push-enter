@@ -522,6 +522,9 @@ evalPrimop res bindings (Primop "print_int" [L x]) = return [
                                             st $ funCall "printf" ["%d\n", show x],
                                             decl "ref" res
                                            ]
+evalPrimop res bindings (Primop "exception" []) = return [
+                                                   st $ funCall "assert" ["false"]
+                                                   ]
 evalPrimop res bindings (Primop "print_int" [V x]) = do
   tmp <- freshName
   let tmp_ref = s "$$_ref" [tmp]
@@ -590,7 +593,7 @@ eval bindings (FuncCall fun args) = do
         blackholeCase = ifSt blackholeCheck [assert "false"] [] where blackholeCheck = s "$$.type == 6" [infoTable]
         funcCase = ifSt funcCheck funBody [] where funcCheck = s "$$.type == 0" [infoTable]
         papCase = ifSt papCheck papBody [] where papCheck = s "$$.type == 4" [infoTable]
-        thunkCase = undefined
+        thunkCase = error "TODO"
     return $ funcCase ++ papCase ++ thunkCase
     where
       infoTable = s "$$_info" [fun]
