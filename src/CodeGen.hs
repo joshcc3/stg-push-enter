@@ -20,8 +20,11 @@ debug = undefined
 
 {-
   Buglist:
-   - The main function is not generating a call to the inits, 
+   - the thunk cont didn't push any args onto the stack
    - FuncCall is not hitting the saturated case although it show
+
+
+   - The main function is not generating a call to the inits, 
 
    - I dont seem to handle higher order functions - just add logic to generateCaseCont to always handle all types of heap objects (except fun of course - although this may be poss)
    - returning primops needs to be done.
@@ -473,7 +476,7 @@ generateCaseCont name bindings (Case (V var_name) es) = do
                    updBindings mp ((name, _), i) = M.insert name i mp
                    genBindConVarStmts ((field_name, value_type), num)
                        = case value_type of
-                           Unboxed -> [newRefMacro tmp_var "int*" "sizeof(int)" tmp_var_val, tmp_var_val ..= (reference con_field_val), putBinding tmp_var num]
+                           Unboxed -> [newRefMacro tmp_var "int*" "sizeof(int)" tmp_var_val, deref tmp_var_val ..= con_field_val, putBinding tmp_var num]
                            Boxed -> [declInit "ref" tmp_var con_field_val, putBinding tmp_var num]
                             -- need to actually assign the new variables from conInnerName, then need to generate statements to bind the new names to the new ints
                        where
@@ -513,7 +516,38 @@ generateThunkCont bindings funName (THUNK e)
     where
       body = (declInit "hash_map*" "bindings" "THUNK_GET_BINDINGS(thunk_ref)":) <$> eval bindings e
 
+-- would be interesting to implement printf in the Real World State monad
+evalPrimop :: String -> Bindings -> Primop -> MonStack [String]             
+evalPrimop res bindings (Primop "print_int" [L x]) = return [
+                                            st $ funCall "printf" ["%d\n", show x],
+                                            decl "ref" res
+                                           ]
+evalPrimop res bindings (Primop "print_int" [V x]) = do
+  tmp <- freshName
+  let tmp_ref = s "$$_ref" [tmp]
+      [var_key] = bindings ^.. ix x
+      assignPrintVar = bindingMacro tmp_ref "int*" tmp (show var_key) "bindings"
+      printStatement = st $ funCall "printf" ["\"%d\\n\"", deref tmp]
+  return [assignPrintVar, printStatement, decl "ref" res] 
+evalPrimop res bindings (Primop "+#" [L x, L y]) = return [declInit "int" res $ show (x + y)]
+evalPrimop res bindings (Primop "+#" [V x, V y]) = do
+  if length (bindings ^.. ix x) == 0
+  then error . show $ bindings
+  else return ()
+  let [xkey] = bindings ^.. ix x
+      [ykey] = bindings ^.. ix y
+      x_ref = s "$$_ref" [x]
+      y_ref = s "$$_ref" [y]
+      initX = bindingMacro x_ref "int*" x (show xkey) "bindings"
+      initY = bindingMacro y_ref "int*" y (show ykey) "bindings"
+  return $ [
+        initX,
+        initY,
+        declInit "int" res (s "$$ + $$" [deref x, deref y])
+   ]
     
+
+
 eval :: Bindings -> Expression -> MonStack [String]
 eval bindings c@(Case deb _) = do
   func_prefix <- freshName
@@ -528,48 +562,20 @@ eval bindings c@(Case deb _) = do
 If it's a function call thats not to a known function we need to figure out what type it is - thunk, func, pap and then push the args and generate a slow call.
 For a pap and fun, since we don't know at compile time which function has been called and what type the args are, we generate a bunch of case logic from the layout description of the function info table
 -}
-eval bindings (Primop "print_int" [L x]) = return [
-                                            st $ funCall "printf" ["%d\n", show x],
-                                            returnSt $ bracketInit "ref" []
-                                           ]
-eval bindings (Primop "print_int" [V x]) = do
-  tmp <- freshName
-  let tmp_ref = s "$$_ref" [tmp]
-      [var_key] = bindings ^.. ix x
-      assignPrintVar = bindingMacro tmp_ref "int*" tmp (show var_key) "bindings"
-      printStatement = st $ funCall "printf" ["\"%d\\n\"", deref tmp]
-  return [assignPrintVar, printStatement] 
-eval bindings (Primop "+#" [L x, L y]) = return [returnSt $ show (x + y)]
-eval bindings (Primop "+#" [V x, V y]) = do
-  if length (bindings ^.. ix x) == 0
-  then error . show $ bindings
-  else return ()
-  let [xkey] = bindings ^.. ix x
-      [ykey] = bindings ^.. ix y
-      x_ref = s "$$_ref" [x]
-      y_ref = s "$$_ref" [y]
-      initX = bindingMacro x_ref "int*" x (show xkey) "bindings"
-      initY = bindingMacro y_ref "int*" y (show ykey) "bindings"
-  tmp <- freshName
-  let tmp_ref = s "$$_ref" [tmp]
-  return $ [
-        initX,
-        initY,
-        newRefMacro tmp_ref "int*" "sizeof(int)" tmp,
-        deref tmp ..= s "$$ + $$" [deref x, deref y],
-        returnSt tmp_ref
-   ]
 eval bindings (FuncCall fun args) = do
-  knownAndSaturatedCond <- knownAndSaturated fun (length args)
-  knownCond <- knownFunction fun          
+  let fastFun = fast_call_name fun
+  knownAndSaturatedCond <- knownAndSaturated fastFun (length args)
+  knownCond <- knownFunction fastFun
   if knownAndSaturatedCond
   then do
-    pushStmts <- pushFunArgs fun args
-    return $ pushStmts ++ [funCall (fast_call_name fun) (map extractArgsToFunArgs args)]
+    let toArgInit (V x) = [decl "ref" x, getBinding (al $ M.lookup x bindings) x]
+        toArgInit (L _) = [] -- pass them directly
+        initArgsFromBindings = args >>= toArgInit
+    return $ initArgsFromBindings ++ [returnSt $ funCall fastFun (map extractArgsToFunArgs args)]
   else if knownCond
        then do
          tmp <- freshName
-         pushStmts <- pushFunArgs fun args
+         pushStmts <- pushFunArgs fastFun (reverse args)
          return $ pushStmts ++ [decl "ref" tmp, returnSt $ funCall (slow_call_name fun) [tmp]]
   else do
     tmp <- freshName
@@ -613,7 +619,11 @@ eval bindings (Let var obj e) = do
 
 eval bindings (Atom (L x)) = return [returnSt $ show x]
 eval bindings (Atom (V x)) = return [returnSt $ s "$$_ref" [x]]
-eval _ a = error (show a)
+eval bindings (Atom (P p)) = do
+  tmp <- freshName
+  st <- evalPrimop tmp bindings p
+  return $ st ++ [returnSt tmp]
+
 
 evalObject :: M.Map String Int -> String -> String -> Object -> MonStack [String]
 evalObject bindings obj_name obj_ref_name t@(THUNK e) = do
@@ -633,14 +643,18 @@ evalObject bindings obj_name obj_ref_name t@(THUNK e) = do
 evalObject bindings obj_name obj_ref_name (CON (Con c atoms)) = do
   [constrDefn] <- uses (conMap.ix c) (:[])
   let fields = fst . unzip . conFields $ constrDefn
-      assignFields = zipWith assignField fields atoms
-  return $ [newRefMacro ref_name (s "$$*" [c]) (s "sizeof($$)"[c]) val_name] ++ assignInfoPtr:assignFields
+  assignFields <- zipWithM assignField fields atoms
+  return $ [newRefMacro ref_name (s "$$*" [c]) (s "sizeof($$)"[c]) val_name] ++ assignInfoPtr:concat assignFields
     where
       val_name = obj_name
       c_info_table = s "$$_info_table" [c]
       ref_name = obj_ref_name
-      assignField f (V x) = (ptrAccess val_name f) ..= x
-      assignField f (L x) = ptrAccess val_name f ..= show x
+      assignField f (V x) = return [ptrAccess val_name f ..= x]
+      assignField f (L x) = return [ptrAccess val_name f ..= show x]
+      assignField f (P p) = do
+        tmp <- freshName
+        sts <- evalPrimop tmp bindings p
+        return $ sts ++ [ptrAccess val_name f ..= tmp]
       assignInfoPtr = ptrAccess val_name "info_ptr"  ..= (s "&$$" [c_info_table])
 evalObject _ _ _ BLACKHOLE = error "<loop>"
 evalObject _ _ _ (FUNC _) = error "I dont support lambdas yet."

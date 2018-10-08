@@ -38,7 +38,8 @@ test1 = [("main_function", FUNC fun)]
 
   plus_int x1 y1 = case x1 of
                     I# a1 -> case y1 of
-                               I# b1 -> let c1 = THUNK (a1 +# b1) in c1
+                               I# b1 -> let c1 = I# (a1 +# b1) 
+                                        in c1
          
   
 -}
@@ -48,13 +49,15 @@ plus_int_test = Program [intConDecl] [("plus_int", FUNC plus_int), ("main_", FUN
           where e = Let "x" (CON (Con "I" [L 1])) $
                     Let "y" (CON (Con "I" [L 2])) $
                     Let "z" (THUNK (FuncCall "plus_int" [V "x", V "y"])) $
-                    Case (V "z") [AltCase "I" ["a"] $ Primop "print_int" [V "a"]]
+                    Case (V "z") [AltCase "I" ["a"] $ Atom $ P $ Primop "print_int" [V "a"]]
       plus_int = Fun [("x1", Boxed), ("y1", Boxed)] e
           where e = Case (V "x1") [AltCase "I" ["a1"] $
                         Case (V "y1") [AltCase "I" ["b1"] $
-                            Let "c1" (THUNK $ Primop "+#" [V "a1", V "b1"]) $
-                               Atom (V "c1")]]
-
+                            Let "c1" (CON $ Con "I" [primopSum]) $
+                                     Atom (V "c1")
+                                      ]
+                                  ]
+                primopSum = P $ Primop "+#" [V "a1", V "b1"]
 
 program :: Program
 program = undefined -- [("main", THUNK expression), ("plus_int", FUNC func)]
@@ -75,7 +78,7 @@ program = undefined -- [("main", THUNK expression), ("plus_int", FUNC func)]
                    Let "element2" element2 $
                    Let "case_expr" (THUNK (FuncCall "plus_int" [V "element1", V "element2"])) $
                    Case (V "case_expr")
-                        [AltCase "I#" ["x"] (Primop "print_int" [V "x"])]
+                        [AltCase "I#" ["x"] (Atom $ P $ Primop "print_int" [V "x"])]
       one = CON (Con "I#" [L 1])
       inc = PAP (Pap "plus_int" [V "one"])
       inced = THUNK (FuncCall "map" [V "inc", V "list"])

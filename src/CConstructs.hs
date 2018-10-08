@@ -18,7 +18,7 @@ funInfoTableName name = s "$$_info_table" [name]
 
 tab = map ('\t':)
 
-typedef name fields internalFields = s "typedef struct $$ {" [name]: tab (map fieldDecl fields ++ map internalFieldDecl internalFields) ++ [s "} $$;" [name]]
+typedef name fields internalFields = s "typedef struct $$ {" [name]: tab (map internalFieldDecl internalFields ++ map fieldDecl fields) ++ [s "} $$;" [name]]
   where
     internalFieldDecl (t, n) = s "$$ $$;" [t, n]
     fieldDecl (f, Unboxed) = s "int $$;" [f]
@@ -44,6 +44,10 @@ funcFormatter returnType name args body = [line1, "{"] ++ tab body ++ ["}"]
 
 newRefMacro refn typ size valn = s "NEW_REF($$, $$, $$, $$)" [refn, typ, size, valn]
 bindingMacro ref typ val updk bs = s "GET_BINDING($$, $$, $$, $$, $$)" [ref, typ, val, updk, bs]
+
+getBinding :: Int -> String -> String
+getBinding updateKey refName = st $ funCall "get_binding" ["bindings", show updateKey, reference refName]
+
 ptrAccess v f = s "($$)->$$" [v, f]
 cast t n = s "($$)$$" [t, n]
 castPtr t n = s "($$*)$$" [t, n]

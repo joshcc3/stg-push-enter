@@ -58,13 +58,13 @@ data Program = Program [ConDecl] [FunDef]
 data Object = THUNK Expression | FUNC Function | CON Constructor | BLACKHOLE | PAP PartialApp deriving (Eq, Ord, Show)
 
 type Var = String
-data Atom = L Literal | V Var deriving (Eq, Ord, Show)
+data Primop = Primop String [Atom] deriving (Eq, Ord, Show)
+data Atom = L Literal | V Var | P Primop deriving (Eq, Ord, Show)
 type Literal = Int             
 data Expression = 
     Atom Atom
         | Let String Object Expression
         | Case Atom [Alt]
-        | Primop String [Atom]
         | FuncCall String [Atom]
           deriving (Eq, Ord, Show)
 
