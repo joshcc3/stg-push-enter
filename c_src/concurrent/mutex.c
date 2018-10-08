@@ -5,19 +5,44 @@
 #include <stdbool.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/times.h>
+
+
+void pprint_tms(struct tms *tms)
+{
+  double clock_ticks_per_ns = sysconf(_SC_CLK_TCK) * 10e9;
+  double user_time = tms->tms_utime/clock_ticks_per_ns;
+  double sys_time = tms->tms_stime/clock_ticks_per_ns;
+  printf("User time: %f us, System Time: %f us\n", user_time, sys_time);
+}
+
 
 typedef struct lock_t {
   int state;
 } lock_t;
 
-const int SLEEP_INTERVAL = 1;
+struct timespec LOCK_SLEEP_INTERVAL;
+
+pthread_mutex_t cas_lock;
 
 bool compare_and_swap(lock_t *lock, int a, int b)
 {
+  pthread_mutex_lock(&cas_lock);
+  if(lock->state != a) {
+    pthread_mutex_unlock(&cas_lock);
+    return 0;
+  }
   lock->state = b;
+
+  pthread_mutex_unlock(&cas_lock);
+
   return 1;
+
 }
 
+/*
+  
+ */
 void lock(lock_t *lock)
 {
   // state transitions:
@@ -38,7 +63,7 @@ void lock(lock_t *lock)
       bool result = compare_and_swap(lock, 1, 2);
       if(result) break;
     }
-    else sleep(SLEEP_INTERVAL);
+    else nanosleep(LOCK_SLEEP_INTERVAL, NULL);
   }
 
 }
@@ -46,7 +71,7 @@ void lock(lock_t *lock)
 int protected = 0;
 lock_t global_lock;
 
-const int NUM_THREADS = 10;
+const int NUM_THREADS = 200;
 const int INC_COUNT = 1000;
 
 void faulty_lock(lock_t *lock)
@@ -60,7 +85,7 @@ void faulty_lock(lock_t *lock)
       lock->state = 2;
       break;
     }
-    else sleep(SLEEP_INTERVAL);
+    else nanosleep(LOCK_SLEEP_INTERVAL);
   }
   
 }
@@ -73,15 +98,20 @@ void unlock(lock_t *lock)
   else assert(false);
 }
 
+void* inc(void *null)
+{
+  protected++;
+}
+
 void* incers(void *null)
 {
   for(int i = 0; i < INC_COUNT; i++)
   {
-    //lock(&global_lock);
-    //pthread_mutex_lock(&global);
+    lock(&global_lock);
+    // pthread_mutex_lock(&global);
     protected++;
-    //pthread_mutex_unlock(&global);
-    //unlock(&global_lock);
+    // pthread_mutex_unlock(&global);
+    unlock(&global_lock);
   }
 
 }
@@ -100,11 +130,18 @@ void print_stats(stats st)
 
 int main()
 {
+
+  printf("Starting\n");
   stats st = { .correct = 0, .total = 0 };
 
+  pthread_mutex_init(&cas_lock, NULL);
   pthread_mutex_init(&global, NULL);
 
-  for(int x = 0; x < 10000; x++){
+  // Sleep for 500 microseconds
+  LOCK_SLEEP_INTERVAL.tv_sec = 0;
+  LOCK_SLEEP_INTERVAL.tv_nsec = 500000;
+
+  for(int x = 0; x < 1000; x++){
     global_lock.state = 0;
     protected = 0;
 
@@ -121,6 +158,11 @@ int main()
     st.total++;
   }
 
+  struct tms tms;
+  times(&tms);
+  pprint_tms(&tms);
+
+  printf("Completed test.");
   print_stats(st);
 
   pthread_exit(NULL);
