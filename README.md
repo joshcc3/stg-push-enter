@@ -835,6 +835,31 @@ int main()
 
 
 ## The `time` function in linux
+All experiments were done on:
+```
+processor       : 0
+vendor_id       : GenuineIntel
+cpu family      : 6
+model           : 79
+model name      : Intel(R) Xeon(R) CPU E5-2697 v4 @ 2.30GHz
+stepping        : 1
+microcode       : 0xb000025
+cpu MHz         : 2294.686
+cache size      : 46080 KB
+physical id     : 0
+siblings        : 1
+core id         : 0
+cpu cores       : 1
+apicid          : 0
+initial apicid  : 0
+fpu             : yes
+fpu_exception   : yes
+cpuid level     : 13
+wp              : yes
+
+On linux version: 3.10.0-693.11.6.el7.x86_64 #1 SMP 
+```
+
 Time outputs something like this:
 ```
 real    0m20.919s
@@ -906,7 +931,143 @@ Relevant assembly after change:
 ```
 
 Also A tick is an arbitrary unit for measuring internal system time. There is usually an OS-internal counter for ticks; the current time and date used by various functions of the OS are derived from that counter.
-The tick on my OS is 1/100th of a second.
+The tick on the machine that I'm using (Linux 3.10 x64 is 1/100th of a second - so it only has accuracy upto a 10 milliseconds).
+
+### Adding a number:
+```
+  long large_sum = 0;
+  for(long i = 0; i < 1000000000; i++)
+    {
+      large_sum += i;
+    }
+
+///
+.L30:
+        mov     rax, QWORD PTR [rbp-16]
+        add     QWORD PTR [rbp-8], rax
+        add     QWORD PTR [rbp-16], 1
+.L29:
+        cmp     QWORD PTR [rbp-16], 9999999
+        jle     .L30
+```
+User time: 2610.000000 ms, System Time: 0.000000 ms
+User time: 2630.000000 ms, System Time: 0.000000 ms
+User time: 2610.000000 ms, System Time: 0.000000 ms
+User time: 2600.000000 ms, System Time: 0.000000 ms
+User time: 2610.000000 ms, System Time: 0.000000 ms
+User time: 2590.000000 ms, System Time: 0.000000 ms
+User time: 2620.000000 ms, System Time: 0.000000 ms
+User time: 2610.000000 ms, System Time: 0.000000 ms
+User time: 2600.000000 ms, System Time: 0.000000 ms
+User time: 2590.000000 ms, System Time: 0.000000 ms
+User time: 2630.000000 ms, System Time: 0.000000 ms
+Mean: 2609, std dev: 13
+
+So (load, add, add, cmp, jmp) cycle takes 2609/10^9 seconds which is 3microseconds.
+
+Adding in an additional increment to a variable I get:
+User time: 2720.000000 ms, System Time: 0.000000 ms
+User time: 2810.000000 ms, System Time: 0.000000 ms
+User time: 3030.000000 ms, System Time: 0.000000 ms
+User time: 2730.000000 ms, System Time: 0.000000 ms
+User time: 2810.000000 ms, System Time: 0.000000 ms
+User time: 2800.000000 ms, System Time: 0.000000 ms
+User time: 2690.000000 ms, System Time: 0.000000 ms
+User time: 2810.000000 ms, System Time: 0.000000 ms
+User time: 2720.000000 ms, System Time: 0.000000 ms
+User time: 2720.000000 ms, System Time: 0.000000 ms
+User time: 2790.000000 ms, System Time: 0.000000 ms
+User time: 2780.000000 ms, System Time: 0.000000 ms
+User time: 2810.000000 ms, System Time: 0.000000 ms
+User time: 2750.000000 ms, System Time: 0.000000 ms
+User time: 2810.000000 ms, System Time: 10.000000 ms
+User time: 2780.000000 ms, System Time: 0.000000 ms
+User time: 2740.000000 ms, System Time: 0.000000 ms
+User time: 2750.000000 ms, System Time: 0.000000 ms
+User time: 2740.000000 ms, System Time: 0.000000 ms
+User time: 2800.000000 ms, System Time: 0.000000 ms
+Mean: 2779, Std Dev. 70
+
+170ms difference which means that an invidual add instruction takes approximately 17 nanoseconds.
+(Using (-) instead, there's no difference).
+User time: 2690.000000 ms, System Time: 0.000000 ms
+User time: 2720.000000 ms, System Time: 0.000000 ms
+User time: 2770.000000 ms, System Time: 0.000000 ms
+User time: 2780.000000 ms, System Time: 0.000000 ms
+User time: 2690.000000 ms, System Time: 0.000000 ms
+User time: 2820.000000 ms, System Time: 0.000000 ms
+User time: 2700.000000 ms, System Time: 0.000000 ms
+User time: 2830.000000 ms, System Time: 0.000000 ms
+User time: 2820.000000 ms, System Time: 0.000000 ms
+User time: 2780.000000 ms, System Time: 0.000000 ms
+User time: 2700.000000 ms, System Time: 0.000000 ms
+User time: 2830.000000 ms, System Time: 0.000000 ms
+User time: 2840.000000 ms, System Time: 0.000000 ms
+User time: 2790.000000 ms, System Time: 0.000000 ms
+User time: 2750.000000 ms, System Time: 0.000000 ms
+User time: 2780.000000 ms, System Time: 0.000000 ms
+User time: 2860.000000 ms, System Time: 0.000000 ms
+User time: 2750.000000 ms, System Time: 0.000000 ms
+User time: 2780.000000 ms, System Time: 0.000000 ms
+User time: 2820.000000 ms, System Time: 0.000000 ms
+Mean 2775, Std Dev: 53
+
+Creating a thread and noop does nothing (just pthread_exits)
+```
+  for(long i = 0; i < 100000; i++)
+    {
+      large_sum += i;
+      pthread_create(&t, NULL, noop, &val);
+    }
+```
+Without the pthread_creation:
+real    0m0.003s
+user    0m0.001s
+sys     0m0.002s
+With the pthread_creation and a child that does nothing:
+real    0m3.554s
+user    0m0.467s
+sys     0m3.449s
+With the pthread_creation and a child that sums numbers from 1 - 10^7:
+real    7m20.416s
+user    14m17.900s
+sys     0m3.828s
+With the pthread_creation and a child that sums numbers from 1 - 10^6:
+real    0m47.152s
+user    1m26.517s
+sys     0m3.791s
+Sums numbers from 1 - 10^5
+real    0m8.715s
+user    0m8.925s
+sys     0m3.509s
+Sums from 1 - 10^4
+real    0m4.063s
+user    0m1.336s
+sys     0m3.570s
+
+
+A thread takes 3ms to sum 10^6 numbers.
+So, thread creation takes 4 microseconds of user time and 30 microseconds of system time based on the above.
+Looking at the last table it's nice to see that system time does not change - since the threads dont actually do any system related work.
+It's also nice to see that the user time grows by roughly a factor of 10 every time we multiply the number of ops a user thread is doing.
+With the 10^4 loops:
+10^6 ops - 3ms (I think the difference from before lies in the fact that the value must be in the cache - wasn't able to verify this by changing the update variable to volatile).
+1 op - 3ns
+10^4 ops = 30 us (micro) per thread, 10^5 threads, should be 3s total user time, just doing actual ops.
+Then there's 450ms spent in thread creation which gives 3450ms of total user time. With two processors working perfectly that gives 1.725ms of total user time. However, the reporting suggests that it actually takes < 1.4ms. Which means that processing a loop actually takes around 9.5 microseconds.
+
+
+
+
+Throughput:
+
+
+How much time does a thread context switch take?
+Number of threads versus throughput.
+How does blocking IO work with threads?
+ - Does a blocked thread get swapped in for a live one?
+
+
 
 ### What about simple things like printing.
     - How does the time change with the size of the string.
