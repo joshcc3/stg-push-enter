@@ -20,6 +20,12 @@ debug = undefined
 
 {-
   Buglist:
+   - implicit ma_f_slow generation
+   - code generates a 'return pap_ref' when building a pap
+   - doesn't generate an assignment for paps
+   - when building a pap, the size isn't generated properly gives + sizeof(void*)?
+   - when evaluating the result of a let, you dont need to get from the bindings (mayb put in a new local scope?)
+
    - the thunk cont didn't push any args onto the stack
    - FuncCall is not hitting the saturated case although it show
 
@@ -173,20 +179,26 @@ assignPapAtoms pap fun atoms = do
               location = s "($$ + $$)" [castPtr "char" pap, offs]
 
 knownFunction :: String -> MonStack Bool
-knownFunction f = use funMap >>= return . M.notMember f
+knownFunction f = use funMap >>= return . M.member f
 
 knownAndSaturated :: String -> Int -> MonStack Bool
 knownAndSaturated f as = do
   args <- use (funMap.ix f.finfArgs)
   return $ (length args) == as
 
-pushArgsFromLayoutInfo :: String -> [Atom] -> [Statement]
-pushArgsFromLayoutInfo infoTable args = foldMap genPushes . reverse $ zip [0..] args
+pushArgsFromLayoutInfo :: Bindings -> String -> [Atom] -> [Statement]
+pushArgsFromLayoutInfo bindings infoTable args = foldMap genPushes . reverse $ zip [0..] args
     where
-      genPushes (index, V x) = ifSt cond [funCall "push_ptr" [x]] [[funCall "push_int" [x]]]
+      genPushes (index, V x)
+          = ifSt cond [getBinding updateKey (refname x),
+                       push_instr (V (refname x), Boxed)]
+                      [[bindingMacro (refname x) "int*" x (show updateKey) "bindings",
+                        push_instr (V (deref x), Unboxed)]]
           where
+            updateKey = maybe (error "#1") id $ M.lookup x bindings
+            refname = debug -- s "$$_ref" . (:[])
             (.) = structAccess
-            cond = arrayIndex (infoTable."layout"."entries") (show index)."pointer"
+            cond = arrayIndex (infoTable."layout"."entries") index."pointer"
 
 pushArgTypes :: [Arg] -> [Atom] -> [Statement]
 pushArgTypes argTypes args = zipWith toPushInstr args argTypes
@@ -525,7 +537,7 @@ generateThunkCont funName (THUNK e)
 
 -- would be interesting to implement printf in the Real World State monad
 evalPrimop :: String -> Primop -> MonStack [String]             
-evalPrimop res (Primop "print_int" [L x]) = return [
+evalPrimop res (Primop "print_int" [L x]) = return $ [
                                             st $ funCall "printf" ["%d\n", show x],
                                             decl "ref" res
                                            ]
@@ -540,7 +552,7 @@ evalPrimop res (Primop "print_int" [V x]) = do
       [var_key] = bindings ^.. ix x
       assignPrintVar = bindingMacro tmp_ref "int*" tmp (show var_key) "bindings"
       printStatement = st $ funCall "printf" ["\"%d\\n\"", deref tmp]
-  return [assignPrintVar, printStatement, decl "ref" res] 
+  return $ decl "ref" res: newScope [assignPrintVar, printStatement, decl "ref" res] 
 evalPrimop res (Primop "+#" [L x, L y]) = return [declInit "int" res $ show (x + y)]
 evalPrimop res (Primop "+#" [V x, V y]) = do
   bindings <- use stringBindings
@@ -553,10 +565,10 @@ evalPrimop res (Primop "+#" [V x, V y]) = do
       y_ref = s "$$_ref" [y]
       initX = bindingMacro x_ref "int*" x (show xkey) "bindings"
       initY = bindingMacro y_ref "int*" y (show ykey) "bindings"
-  return $ [
+  return $ decl "int" res: newScope [
         initX,
         initY,
-        declInit "int" res (s "$$ + $$" [deref x, deref y])
+        res ..= s "$$ + $$" [deref x, deref y]
    ]
     
 
@@ -592,14 +604,15 @@ eval (FuncCall fun args) = do
          return $ pushStmts ++ [decl "ref" tmp, returnSt $ funCall (slow_call_name fun) [tmp]]
   else do
     tmp <- freshName
-    funArgPushes <- error "Dont know what args to give"
-    thunkContName <- freshName
+    Just thunkContName <- use curFun
     let [funKey] = bindings ^.. ix fun
         fun_ref = s "$$_ref" [fun]
         initFun = bindingMacro fun_ref "void**" fun (show funKey) "bindings"
-        initFunTable = declInit "info_table" infoTable
+        initFunTable = declInit "info_table" infoTable (deref . deref $ castPtr "info_table*" fun)
+        initInfoTable = [initFun, initFunTable]
+        funArgPushes = pushArgsFromLayoutInfo bindings infoTable args
         funBody = funArgPushes ++ [decl "ref" tmp, returnSt $ funCall (funSlowEntry infoTable) [tmp]]
-        papArgPushes = pushArgsFromLayoutInfo papFunInfoTable args                  
+        papArgPushes = pushArgsFromLayoutInfo bindings papFunInfoTable args
         papBody = papArgPushes ++ [funCall "unroll_pap" [fun], decl "ref" tmp, returnSt $ funCall papSlowEntry [tmp]]
         blackholeCase = ifSt blackholeCheck [assert "false"] [] where blackholeCheck = s "$$.type == 6" [infoTable]
         funcCase = ifSt funcCheck funBody [papCase, thunkCase] where funcCheck = s "$$.type == 0" [infoTable]
@@ -609,7 +622,7 @@ eval (FuncCall fun args) = do
            returnSt (funCall "thunk_continuation" [fun_ref, thunkContName, "bindings", show funKey, fun_ref])
          ]
             
-    return $ funcCase ++ papCase ++ thunkCase
+    return $ initInfoTable ++ funcCase
     where
       infoTable = s "$$_info" [fun]
       funSlowEntry funTable = structAccess (structAccess (structAccess funTable "extra") "function") "slow_entry_point"

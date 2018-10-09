@@ -4,6 +4,11 @@
 
 int main()
 {
-    GET_BINDING(a, void**, f_ref, 0, bindings)
+  int a = 1123;
+  {
+    int a= 10;
+    printf("%d\n", a);    
+  }
+  printf("%d\n", a);
 }
 

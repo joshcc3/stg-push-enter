@@ -57,6 +57,7 @@ structAccess var field = s "($$).$$" [var, field]
 deref x = s "*($$)" [x]
 reference x = s "&($$)" [x]
 a ..= b = s "$$ = $$;" [a, b]
+arrayIndex :: String -> Int -> String
 arrayIndex v i = s "$$[$$]" [v, show i]
 
 funCall name args = s "$$($$)" [name, commaSep args]
@@ -89,9 +90,12 @@ declare_var_type (V x, Unboxed) = decl "int" x
 pop_instr (V x, Boxed) = st $ funCall "pop_ptr" . (:[]) . reference $ x
 pop_instr (V x, Unboxed) = st $ funCall "pop_int" . (:[]) . reference $ x
 
-push_instr (V x, Boxed) = st $ funCall "push_ptr" . (:[]) . reference $ x
-push_instr (V x, Unboxed) = st $ funCall "push_int" . (:[]) . reference $ x
-push_instr (L x, Unboxed) = st $ funCall "push_int" . (:[])  $ show x
+push_instr (V x, Boxed) = st $ funCall "push_ptr" . (:[]) $ x
+push_instr (V x, Unboxed) = st $ funCall "push_int" . (:[]) $ x
+push_instr (L x, Unboxed) = st $ funCall "push_int" . (:[]) $ show x
         
 includeSys x = s "#include <$$>" [x]
 includeUser x = s "#include $$" [show x]
+
+newScope :: [Statement] -> [Statement]
+newScope st = "{":tab st ++ ["}"]

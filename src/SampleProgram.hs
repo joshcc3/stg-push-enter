@@ -116,7 +116,7 @@ map_fn = Fun args body
                         Let "ma_new_v" (THUNK (FuncCall "ma_f" [V "ma_n"])) $
                             Let "ma_new_n" (THUNK (FuncCall "map" [V "ma_f", V "ma_n"]))$
                                 Let "ma_new_res" (CON (cons (V "ma_new_v") (V "ma_new_n"))) $
-                                  Atom (V "new_res"),
+                                  Atom (V "ma_new_res"),
                                                    
                 AltCase "Nil" [] (Let "ma_z" (CON nil) (Atom $ V "ma_z"))
               ]
