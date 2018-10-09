@@ -131,14 +131,15 @@ list_test = Program [intConDecl, listConDecl]
       main_ = Fun [] main_exp
       main_exp = Let "one" one $
               Let "inc" inc $
+              Let "inced" inced $
               Let "list" list $
               Let "element1" element1 $
               Let "tail1" tail1 $
               Let "element2" element2 $
               Let "case_expr" (THUNK (FuncCall "plus_int" [V "element1", V "element2"])) $
               Case (V "case_expr")
-                        [AltCase "I#" ["x"] (Atom $ P $ Primop "print_int" [V "x"])]
-      one = CON (Con "I#" [L 1])
+                        [AltCase "I" ["x"] (Atom $ P $ Primop "print_int" [V "x"])]
+      one = CON (Con "I" [L 1])
       inc = PAP (Pap "plus_int" [V "one"])
       inced = THUNK (FuncCall "map" [V "inc", V "list"])
       list = CON (Con "Cons" [V "one", V "inced"])

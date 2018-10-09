@@ -69,10 +69,7 @@ renderProgram = unlines
 
 toProgram = renderProgram . toStatements . runProgram
 
-
-
-               
-initialEnv = Env M.empty Nothing 0 M.empty [] []
+initialEnv = Env M.empty Nothing 0 M.empty [] [] M.empty
 
 
 {-
@@ -299,7 +296,10 @@ evalFunDef prog = do
                 where
                   fastArgs = map f args
                   newBindings =  zip (fst . unzip $ args) [0..]
-                  body = ((initBindings ++ map (uncurry putBinding) newBindings) ++) <$> eval (M.fromList newBindings) e
+                  body = do
+                    stringBindings %= M.union (M.fromList newBindings)
+                    _e <- eval e
+                    return $ initBindings ++ map (uncurry putBinding) newBindings ++ _e
                   f (v, Boxed) = ("ref", v)
                   f (v, Unboxed) = ("int", v)
 {-
@@ -333,7 +333,11 @@ ref map_slow(ref null)
 
 generateSlowCall :: String -> String -> [(Atom, ValueType)] -> MonStack [String]
 generateSlowCall fastName name args = do
-  let genIfCase as = ifSt cond <$> genPapForArgs fastName as <*> pure [] where cond = funCall "arg_satisfaction_check" [c_sum . map (toSize . snd) $ as]
+  let genIfCase as = ifSt cond <$> body <*> pure []
+          where
+            cond = funCall "arg_satisfaction_check" [c_sum . map (toSize . snd) $ as]
+            prepareArgsFromStack = map declare_var_type as ++ map pop_instr as
+            body = (prepareArgsFromStack++) <$> genPapForArgs fastName as
   elseStmts <- mapM genIfCase . tail . inits $ args
   let body = ifSt argSatisfactionCondition (generateFastCallFromArgsOnStack name args) (elseStmts ++ [[assert "false"]])
   return $ funcFormatter "ref" (slow_call_name name) [("ref", "null")] body
@@ -347,10 +351,10 @@ generateSlowCall fastName name args = do
      unwrap (V x) = x
 
 
--- genPapForArgs :: String -> String -> [(Atom, ValueType)]
+genPapForArgs :: String -> [(Atom, ValueType)] -> MonStack [Statement]
 genPapForArgs name args  = do
    initArgs <- initArgs_
-   return $ prepareArgsFromStack ++ initStructTable ++ declareNewPap:initArgs ++  [arrayIndex "pap_" 0 ..= "pap_info", returnSt "pap_ref"]
+   return $ initStructTable ++ declareNewPap:initArgs ++  [arrayIndex "pap_" 0 ..= "pap_info", returnSt "pap_ref"]
         where
           argSize = c_sum (map (toSize . snd) args)          
           -- the pap consists of the arg size + the info pointer
@@ -359,7 +363,6 @@ genPapForArgs name args  = do
                              ptrAccess "pap_info" "type" ..= "4",
                              ptrAccess "pap_info" "extra.pap_info" ..= infoTableStruct]
           infoTableStruct = bracketInit "struct pap" [("info_ptr", "pap_info"), ("size", "1")]
-          prepareArgsFromStack = map declare_var_type papArgs ++ map pop_instr papArgs
           papArgs_ = fst . unzip $ papArgs
           papArgs = args
           initArgs_ = assignPapAtoms "pap_" name papArgs_
@@ -439,25 +442,26 @@ ref cont(hash_map *bindings)
 
 -- TODO: a case doesn't actually compile to this, this is just the case continuation
 -- TODO: A case actually compiles to a return case_name(bindings);
-generateCaseCont :: String -> Bindings -> Expression -> MonStack C_TopLevel
-generateCaseCont name bindings (Case (V var_name) es) = do
+generateCaseCont :: String -> Expression -> MonStack C_TopLevel
+generateCaseCont name (Case (V var_name) es) = do
     let statements = funcFormatter returnType name args <$> thunkBody name
     generateFunction name statements (args & traverse._2 %~ (,Boxed))
   where
     thunkBody name = case es of
         -- For this case we push a case frame and then a 'fake' update frame that restores su and returns the arg that the update frame was called with 
         [AltForce x e] -> error (s "AltForce $$ $$" [show x, show e]) -- TODO Need to handle this case.
-        alts -> (++)
-                <$>
-                pure [
+        alts -> do
+          bindings <- use stringBindings
+          let var_key = show . alX $ M.lookup var_name bindings
+          caseIfAlts <- mapM caseIf alts
+          return $ getVarKey var_key ++
+                   ifSt conCase (concat caseIfAlts) [thunkCase var_key name]
+    conCase = s "$$->type == 1" [info_table]    
+    getVarKey var_key = [
                   bindingMacro var_ref "void**" var_name var_key "bindings",
                   declInit "info_table*" info_table (deref (castPtr "info_table*" var_name))
-               ] <*>
-               (ifSt conCase <$> (fmap concat . mapM caseIf $ alts) <*>
-                pure [thunkCase name])
-    conCase = s "$$->type == 1" [info_table]    
-    var_key = show . al $ M.lookup var_name bindings
-    thunkCase name = [
+         ]
+    thunkCase var_key name = [
        assert (s "$$ == $$" [ptrAccess info_table "type", "5"]),
        returnSt (funCall "thunk_continuation" [var_ref, name, "bindings", var_key, var_ref])
      ]
@@ -471,9 +475,8 @@ generateCaseCont name bindings (Case (V var_name) es) = do
                let init_con_struct = declInit (s "$$*" [conName]) conInnerName conCasted
                    (_, valTypes) = unzip $ conFields conDefn
                    freeVarBindings = zip (zip freeVars valTypes) intStream
-                   bindings' = foldl updBindings bindings freeVarBindings
                    bindCaseStmts = zip (conFields conDefn) intStream >>= genBindConVarStmts
-                   updBindings mp ((name, _), i) = M.insert name i mp
+                   updBindings ((name, _), i) = stringBindings.at name ?= i
                    genBindConVarStmts ((field_name, value_type), num)
                        = case value_type of
                            Unboxed -> [newRefMacro tmp_var "int*" "sizeof(int)" tmp_var_val, deref tmp_var_val ..= con_field_val, putBinding tmp_var num]
@@ -483,8 +486,8 @@ generateCaseCont name bindings (Case (V var_name) es) = do
                          tmp_var = to_temp_var num
                          tmp_var_val = s "$$_val" [tmp_var]
                          con_field_val = ptrAccess conInnerName field_name
-                                         
-               case_alt_stmts <- eval bindings' exp
+               mapM_ updBindings freeVarBindings
+               case_alt_stmts <- eval exp
                
                return $ init_con_struct: bindCaseStmts ++ case_alt_stmts
 
@@ -509,31 +512,33 @@ generateCaseCont name bindings (Case (V var_name) es) = do
      return plus_int_slow(one_ref);
 
 -}    
-generateThunkCont bindings funName (THUNK e)
+generateThunkCont funName (THUNK e)
     = do
   let fun_stmts = funcFormatter "ref" funName [("ref", "thunk_ref")] <$> body
   generateFunction funName fun_stmts [("ref", ("thunk_ref", Boxed))]
     where
-      body = (declInit "hash_map*" "bindings" "THUNK_GET_BINDINGS(thunk_ref)":) <$> eval bindings e
+      body = (declInit "hash_map*" "bindings" "THUNK_GET_BINDINGS(thunk_ref)":) <$> eval e
 
 -- would be interesting to implement printf in the Real World State monad
-evalPrimop :: String -> Bindings -> Primop -> MonStack [String]             
-evalPrimop res bindings (Primop "print_int" [L x]) = return [
+evalPrimop :: String -> Primop -> MonStack [String]             
+evalPrimop res (Primop "print_int" [L x]) = return [
                                             st $ funCall "printf" ["%d\n", show x],
                                             decl "ref" res
                                            ]
-evalPrimop res bindings (Primop "exception" []) = return [
-                                                   st $ funCall "assert" ["false"]
-                                                   ]
-evalPrimop res bindings (Primop "print_int" [V x]) = do
+evalPrimop res (Primop "exception" []) = return [
+                                          st $ funCall "assert" ["false"]
+                                         ]
+evalPrimop res (Primop "print_int" [V x]) = do
+  bindings <- use stringBindings
   tmp <- freshName
   let tmp_ref = s "$$_ref" [tmp]
       [var_key] = bindings ^.. ix x
       assignPrintVar = bindingMacro tmp_ref "int*" tmp (show var_key) "bindings"
       printStatement = st $ funCall "printf" ["\"%d\\n\"", deref tmp]
   return [assignPrintVar, printStatement, decl "ref" res] 
-evalPrimop res bindings (Primop "+#" [L x, L y]) = return [declInit "int" res $ show (x + y)]
-evalPrimop res bindings (Primop "+#" [V x, V y]) = do
+evalPrimop res (Primop "+#" [L x, L y]) = return [declInit "int" res $ show (x + y)]
+evalPrimop res (Primop "+#" [V x, V y]) = do
+  bindings <- use stringBindings
   if length (bindings ^.. ix x) == 0
   then error . show $ bindings
   else return ()
@@ -551,11 +556,11 @@ evalPrimop res bindings (Primop "+#" [V x, V y]) = do
     
 
 
-eval :: Bindings -> Expression -> MonStack [String]
-eval bindings c@(Case deb _) = do
+eval :: Expression -> MonStack [String]
+eval c@(Case deb _) = do
   func_prefix <- freshName
   let name = s "$$_$$" [func_prefix, "cont"]
-  case_cont <- generateCaseCont name bindings c
+  case_cont <- generateCaseCont name c
   deferred %= (++[case_cont])
   return [returnSt (funCall name ["bindings"])]
 
@@ -565,7 +570,8 @@ eval bindings c@(Case deb _) = do
 If it's a function call thats not to a known function we need to figure out what type it is - thunk, func, pap and then push the args and generate a slow call.
 For a pap and fun, since we don't know at compile time which function has been called and what type the args are, we generate a bunch of case logic from the layout description of the function info table
 -}
-eval bindings (FuncCall fun args) = do
+eval (FuncCall fun args) = do
+  bindings <- use stringBindings
   let fastFun = fast_call_name fun
   knownAndSaturatedCond <- knownAndSaturated fastFun (length args)
   knownCond <- knownFunction fastFun
@@ -615,28 +621,29 @@ eval bindings (FuncCall fun args) = do
    put_binding(bindings, 4, thunk1_ref);
 
 -}
-eval bindings (Let var obj e) = do
+eval (Let var obj e) = do
                      updateKey <- freshInt
                      let bs = [putBinding thunk_ref_name updateKey]
-                     thunkObj <- evalObject bindings var thunk_ref_name obj
-                     rest <- eval (M.insert var updateKey bindings) e
+                     thunkObj <- evalObject var thunk_ref_name obj
+                     stringBindings.at var ?= updateKey
+                     rest <- eval e
                      return $ thunkObj ++ bs ++ rest
     where
       thunk_ref_name = s "$$_ref" [var]
 
 
-eval bindings (Atom (L x)) = return [returnSt $ show x]
-eval bindings (Atom (V x)) = return [returnSt $ s "$$_ref" [x]]
-eval bindings (Atom (P p)) = do
+eval (Atom (L x)) = return [returnSt $ show x]
+eval (Atom (V x)) = return [returnSt $ s "$$_ref" [x]]
+eval (Atom (P p)) = do
   tmp <- freshName
-  st <- evalPrimop tmp bindings p
+  st <- evalPrimop tmp p
   return $ st ++ [returnSt tmp]
 
 
-evalObject :: M.Map String Int -> String -> String -> Object -> MonStack [String]
-evalObject bindings obj_name obj_ref_name t@(THUNK e) = do
+evalObject :: String -> String -> Object -> MonStack [String]
+evalObject obj_name obj_ref_name t@(THUNK e) = do
   thunk_cont <- freshName
-  deferred_thunk <- generateThunkCont bindings thunk_cont t
+  deferred_thunk <- generateThunkCont thunk_cont t
   deferred %= (++[deferred_thunk])
   -- ugh, eval expects the object as a ref
   return [declInit "ref" obj_ref_name $ funCall "create_thunk" ["bindings", thunk_cont]]
@@ -648,7 +655,8 @@ evalObject bindings obj_name obj_ref_name t@(THUNK e) = do
    cons->value = thunk1_ref;
    cons->next = thunk2_ref;
 -}
-evalObject bindings obj_name obj_ref_name (CON (Con c atoms)) = do
+evalObject obj_name obj_ref_name (CON (Con c atoms)) = do
+  bindings <- use stringBindings
   [constrDefn] <- uses (conMap.ix c) (:[])
   let fields = fst . unzip . conFields $ constrDefn
   assignFields <- zipWithM assignField fields atoms
@@ -661,18 +669,16 @@ evalObject bindings obj_name obj_ref_name (CON (Con c atoms)) = do
       assignField f (L x) = return [ptrAccess val_name f ..= show x]
       assignField f (P p) = do
         tmp <- freshName
-        sts <- evalPrimop tmp bindings p
+        sts <- evalPrimop tmp p
         return $ sts ++ [ptrAccess val_name f ..= tmp]
       assignInfoPtr = ptrAccess val_name "info_ptr"  ..= (s "&$$" [c_info_table])
-evalObject _ _ _ BLACKHOLE = error "<loop>"
-evalObject _ _ _ (FUNC _) = error "I dont support lambdas yet."
+evalObject _ _ BLACKHOLE = error "<loop>"
+evalObject _ _ (FUNC _) = error "I dont support lambdas yet."
 -- TODO example is in list.c:60 (this might be wrong
-evalObject bindings obj_name obj_ref_name (PAP (Pap fun as)) = do
+evalObject obj_name obj_ref_name (PAP (Pap fun as)) = do
   funArgs <- use (funMap.ix fun.finfArgs)
-  let pushSt ((_, typ), argn) = push_instr (argn, typ)
-      pushes = map pushSt (reverse $ zip funArgs as)
-  papStats <- genPapForArgs fun (error "TODO what should the args be here?") -- funArgs
-  return $ pushes ++ papStats
+  let argValTypes = zip as (snd $ unzip funArgs)
+  genPapForArgs fun argValTypes
     
   -- return [st$ funCall "unroll_pap" fun, decl "ref" "null", returnSt $ finfo ]
 {-

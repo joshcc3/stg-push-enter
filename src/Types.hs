@@ -43,7 +43,8 @@ data ConstructorDefn = ConDefn {
 
 type MonStack = State Env
 
-data Env = Env { _funMap :: FunMap, _curFun ::  Maybe CurFun, _freshNameSource :: FreshNameSource, _conMap :: ConMap, _deferred :: [C_TopLevel], _funProtos :: [C_TopLevel] } deriving (Eq, Ord, Show)
+-- All names must be globally unique
+data Env = Env { _funMap :: FunMap, _curFun ::  Maybe CurFun, _freshNameSource :: FreshNameSource, _conMap :: ConMap, _deferred :: [C_TopLevel], _funProtos :: [C_TopLevel], _stringBindings :: Map String Int } deriving (Eq, Ord, Show)
 makeLenses ''Env
 
 
