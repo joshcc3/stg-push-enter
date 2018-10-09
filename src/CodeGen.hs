@@ -20,11 +20,8 @@ debug = undefined
 
 {-
   Buglist:
-   - implicit ma_f_slow generation
+   - we may not push and pop paps in the correct order - fair warning
    - code generates a 'return pap_ref' when building a pap
-   - doesn't generate an assignment for paps
-   - when building a pap, the size isn't generated properly gives + sizeof(void*)?
-   - when evaluating the result of a let, you dont need to get from the bindings (mayb put in a new local scope?)
 
    - the thunk cont didn't push any args onto the stack
    - FuncCall is not hitting the saturated case although it show
@@ -190,13 +187,14 @@ pushArgsFromLayoutInfo :: Bindings -> String -> [Atom] -> [Statement]
 pushArgsFromLayoutInfo bindings infoTable args = foldMap genPushes . reverse $ zip [0..] args
     where
       genPushes (index, V x)
-          = ifSt cond [getBinding updateKey (refname x),
+          = ifSt cond [decl "ref" (refname x),
+                       getBinding updateKey (refname x),
                        push_instr (V (refname x), Boxed)]
                       [[bindingMacro (refname x) "int*" x (show updateKey) "bindings",
                         push_instr (V (deref x), Unboxed)]]
           where
             updateKey = maybe (error "#1") id $ M.lookup x bindings
-            refname = debug -- s "$$_ref" . (:[])
+            refname x = s "$$_ref" [x]
             (.) = structAccess
             cond = arrayIndex (infoTable."layout"."entries") index."pointer"
 
@@ -353,7 +351,7 @@ generateSlowCall fastName name args = do
           where
             cond = funCall "arg_satisfaction_check" [c_sum . map (toSize . snd) $ as]
             prepareArgsFromStack = map declare_var_type as ++ map pop_instr as
-            body = (prepareArgsFromStack++) <$> genPapForArgs fastName as
+            body = (prepareArgsFromStack++) <$> genPapForArgs "pap_" fastName as
   elseStmts <- mapM genIfCase . tail . inits $ args
   let body = ifSt argSatisfactionCondition (generateFastCallFromArgsOnStack name args) (elseStmts ++ [[assert "false"]])
   return $ funcFormatter "ref" (slow_call_name name) [("ref", "null")] body
@@ -367,21 +365,23 @@ generateSlowCall fastName name args = do
      unwrap (V x) = x
 
 
-genPapForArgs :: String -> [(Atom, ValueType)] -> MonStack [Statement]
-genPapForArgs name args  = do
+genPapForArgs :: String -> String -> [(Atom, ValueType)] -> MonStack [Statement]
+genPapForArgs pap_name name args  = do
    initArgs <- initArgs_
-   return $ initStructTable ++ declareNewPap:initArgs ++  [arrayIndex "pap_" 0 ..= "pap_info", returnSt "pap_ref"]
+   return $ initStructTable ++ declareNewPap:initArgs ++  [arrayIndex pap_name 0 ..= pap_info_name]
         where
+          pap_ref_name = s "$$_ref" [pap_name]
+          pap_info_name = s "$$_info" [pap_name]
           argSize = c_sum (map (toSize . snd) args)          
           -- the pap consists of the arg size + the info pointer
-          declareNewPap = newRefMacro "pap_ref" "void**" (s "$$ + sizeof(void*)" [argSize]) "pap_"
-          initStructTable = [declInit "struct info_table*" "pap_info" (deref $ castPtr "struct info_table*" (funCall "new" ["sizeof(info_table)"])),
-                             ptrAccess "pap_info" "type" ..= "4",
-                             ptrAccess "pap_info" "extra.pap_info" ..= infoTableStruct]
-          infoTableStruct = bracketInit "struct pap" [("info_ptr", "pap_info"), ("size", "1")]
+          declareNewPap = newRefMacro pap_ref_name "void**" (s "$$ + sizeof(void*)" [argSize]) pap_name
+          initStructTable = [declInit "struct info_table*" pap_info_name (deref $ castPtr "struct info_table*" (funCall "new" ["sizeof(info_table)"])),
+                             ptrAccess pap_info_name "type" ..= "4",
+                             ptrAccess pap_info_name "extra.pap_info" ..= infoTableStruct]
+          infoTableStruct = bracketInit "struct pap" [("info_ptr", pap_info_name), ("size", "1")]
           papArgs_ = fst . unzip $ papArgs
           papArgs = args
-          initArgs_ = assignPapAtoms "pap_" name papArgs_
+          initArgs_ = assignPapAtoms pap_name name papArgs_
 
 {-
 data List a = Cons { value :: a, next :: (List a) } | Nil
@@ -613,7 +613,7 @@ eval (FuncCall fun args) = do
         funArgPushes = pushArgsFromLayoutInfo bindings infoTable args
         funBody = funArgPushes ++ [decl "ref" tmp, returnSt $ funCall (funSlowEntry infoTable) [tmp]]
         papArgPushes = pushArgsFromLayoutInfo bindings papFunInfoTable args
-        papBody = papArgPushes ++ [funCall "unroll_pap" [fun], decl "ref" tmp, returnSt $ funCall papSlowEntry [tmp]]
+        papBody = papArgPushes ++ [st $ funCall "unroll_pap" [fun], decl "ref" tmp, returnSt $ funCall papSlowEntry [tmp]]
         blackholeCase = ifSt blackholeCheck [assert "false"] [] where blackholeCheck = s "$$.type == 6" [infoTable]
         funcCase = ifSt funcCheck funBody [papCase, thunkCase] where funcCheck = s "$$.type == 0" [infoTable]
         papCase = ifSt papCheck papBody [] where papCheck = s "$$.type == 4" [infoTable]
@@ -694,7 +694,7 @@ evalObject _ _ (FUNC _) = error "I dont support lambdas yet."
 evalObject obj_name obj_ref_name (PAP (Pap fun as)) = do
   funArgs <- use (funMap.ix fun.finfArgs)
   let argValTypes = zip as (snd $ unzip funArgs)
-  genPapForArgs fun argValTypes
+  genPapForArgs obj_name fun argValTypes
     
   -- return [st$ funCall "unroll_pap" fun, decl "ref" "null", returnSt $ finfo ]
 {-
