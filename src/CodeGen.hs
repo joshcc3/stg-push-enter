@@ -452,7 +452,7 @@ generateCaseCont name (Case (V var_name) es) = do
         [AltForce x e] -> error (s "AltForce $$ $$" [show x, show e]) -- TODO Need to handle this case.
         alts -> do
           bindings <- use stringBindings
-          let var_key = show . alX $ M.lookup var_name bindings
+          let var_key = show . al $ M.lookup var_name bindings
           caseIfAlts <- mapM caseIf alts
           return $ getVarKey var_key ++
                    ifSt conCase (concat caseIfAlts) [thunkCase var_key name]
