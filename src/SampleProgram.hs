@@ -44,10 +44,10 @@ test1 = [("main_function", FUNC fun)]
 plus_int_test = Program [intConDecl] [("plus_int", FUNC plus_int), ("main_", FUNC main_fun)]
     where
       main_fun = Fun [] e
-          where e = Let "x" (CON (Con "I" [L 1])) $
-                    Let "y" (CON (Con "I" [L 2])) $
-                    Let "z" (THUNK (FuncCall "plus_int" [V "x", V "y"])) $
-                    Case (V "z") [AltCase "I" ["a"] $ Atom $ P $ Primop "print_int" [V "a"]]
+          where e = Let "pl_x" (CON (Con "I" [L 2101])) $
+                    Let "pl_y" (CON (Con "I" [L 2132])) $
+                    Let "pl_z" (THUNK (FuncCall "plus_int" [V "pl_x", V "pl_y"])) $
+                    Case (V "pl_z") [AltCase "I" ["pl_a"] $ Atom $ P $ Primop "print_int" [V "pl_a"]]
 
 {-
   plus_int x1 y1 = case x1 of

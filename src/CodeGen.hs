@@ -253,9 +253,13 @@ imports = C_Import [
 evalFunDef :: [FunDef] -> MonStack [C_TopLevel]
 evalFunDef prog = do
   x <- mapM generateTopLevelDefn prog
+  defereds <- whileM ((not . null) <$> use deferred) (do
+                                                       d <- use deferred
+                                                       deferred .= []
+                                                       mapM id d
+                                                     )
   fun_prototypes <- use funProtos
-  defereds <- use deferred >>= mapM id
-  return $ imports:fun_prototypes ++ defereds ++ concat x
+  return $ imports:fun_prototypes ++ concat defereds ++ concat x
     where
       generateTopLevelDefn (name, FUNC (Fun args e))
           = do
@@ -475,16 +479,16 @@ generateCaseCont name (Case (V var_name) es) = do
                let init_con_struct = declInit (s "$$*" [conName]) conInnerName conCasted
                    (_, valTypes) = unzip $ conFields conDefn
                    freeVarBindings = zip (zip freeVars valTypes) intStream
-                   bindCaseStmts = zip (conFields conDefn) intStream >>= genBindConVarStmts
+                   bindCaseStmts = zip (conFields conDefn) freeVarBindings >>= genBindConVarStmts
                    updBindings ((name, _), i) = stringBindings.at name ?= i
-                   genBindConVarStmts ((field_name, value_type), num)
+                   genBindConVarStmts ((field_name, value_type), ((case_var_name,_), num))
                        = case value_type of
-                           Unboxed -> [newRefMacro tmp_var "int*" "sizeof(int)" tmp_var_val, deref tmp_var_val ..= con_field_val, putBinding tmp_var num]
-                           Boxed -> [declInit "ref" tmp_var con_field_val, putBinding tmp_var num]
+                           Unboxed -> [newRefMacro tmp_var_ref "int*" "sizeof(int)" tmp_var, deref tmp_var ..= con_field_val, putBinding tmp_var_ref num]
+                           Boxed -> [declInit "ref" tmp_var_ref con_field_val, putBinding tmp_var_ref num]
                             -- need to actually assign the new variables from conInnerName, then need to generate statements to bind the new names to the new ints
                        where
-                         tmp_var = to_temp_var num
-                         tmp_var_val = s "$$_val" [tmp_var]
+                         tmp_var_ref = s "$$_ref" [tmp_var]
+                         tmp_var = case_var_name
                          con_field_val = ptrAccess conInnerName field_name
                mapM_ updBindings freeVarBindings
                case_alt_stmts <- eval exp
@@ -526,7 +530,8 @@ evalPrimop res (Primop "print_int" [L x]) = return [
                                             decl "ref" res
                                            ]
 evalPrimop res (Primop "exception" []) = return [
-                                          st $ funCall "assert" ["false"]
+                                          st $ funCall "assert" ["false"],
+                                          decl "ref" res
                                          ]
 evalPrimop res (Primop "print_int" [V x]) = do
   bindings <- use stringBindings
@@ -663,7 +668,7 @@ evalObject obj_name obj_ref_name (CON (Con c atoms)) = do
       val_name = obj_name
       c_info_table = s "$$_info_table" [c]
       ref_name = obj_ref_name
-      assignField f (V x) = return [ptrAccess val_name f ..= x]
+      assignField f (V x) = return [ptrAccess val_name f ..= s "$$_ref" [x]]
       assignField f (L x) = return [ptrAccess val_name f ..= show x]
       assignField f (P p) = do
         tmp <- freshName
