@@ -254,7 +254,7 @@ evalFunDef :: [FunDef] -> MonStack [C_TopLevel]
 evalFunDef prog = do
   x <- mapM generateTopLevelDefn prog
   fun_prototypes <- use funProtos
-  defereds <- use deferred
+  defereds <- use deferred >>= mapM id
   return $ imports:fun_prototypes ++ defereds ++ concat x
     where
       generateTopLevelDefn (name, FUNC (Fun args e))
@@ -560,8 +560,7 @@ eval :: Expression -> MonStack [String]
 eval c@(Case deb _) = do
   func_prefix <- freshName
   let name = s "$$_$$" [func_prefix, "cont"]
-  case_cont <- generateCaseCont name c
-  deferred %= (++[case_cont])
+  deferred %= (++[generateCaseCont name c])
   return [returnSt (funCall name ["bindings"])]
 
 
@@ -643,8 +642,7 @@ eval (Atom (P p)) = do
 evalObject :: String -> String -> Object -> MonStack [String]
 evalObject obj_name obj_ref_name t@(THUNK e) = do
   thunk_cont <- freshName
-  deferred_thunk <- generateThunkCont thunk_cont t
-  deferred %= (++[deferred_thunk])
+  deferred %= (++[generateThunkCont thunk_cont t])
   -- ugh, eval expects the object as a ref
   return [declInit "ref" obj_ref_name $ funCall "create_thunk" ["bindings", thunk_cont]]
 {-
