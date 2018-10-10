@@ -49,7 +49,7 @@ test1 = [("main_function", FUNC fun)]
          case z of
            I# a -> print a
 -}
-plus_int_test = Program [intConDecl] [("plus_int", FUNC plus_int), ("main_", FUNC main_fun)]
+plus_int_test = Program [intConDecl, unitConDecl] [("plus_int", FUNC plus_int), ("main_", FUNC main_fun)]
     where
       main_fun = Fun [] e
           where e = Let "pl_x" (CON (Con "I" [L 2101])) $
@@ -254,7 +254,7 @@ list_test = let one = CON (I# 1) in
 This constructs an infinite list of increasing numbers `list` and sums the 2nd and 3rd elements
 -}
 
-list_test = Program [intConDecl, listConDecl]
+list_test = Program [intConDecl, listConDecl, unitConDecl]
                     [("plus_int", FUNC plus_int), ("head", FUNC head_fn), ("tail", FUNC tail_fn), ("map", FUNC map_fn), ("main_", FUNC main_)]
     where
       main_ = Fun [] main_exp

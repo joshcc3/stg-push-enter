@@ -262,6 +262,7 @@ imports = C_Import [
           ]
 
 
+
 evalFunDef :: [FunDef] -> MonStack [C_TopLevel]
 evalFunDef prog = do
   x <- mapM generateTopLevelDefn prog
@@ -277,23 +278,27 @@ evalFunDef prog = do
           = do
         let slowEntryPointDecl = C_Fun slow_entry_name
             info_struct_name = s "$$_info_table" [name]
+        funcHeapObjectRef <- C_Var funcHeapObjectName . (:[]) <$> decl "ref" funcHeapObjectName
         infoTableVar <- C_Var info_struct_name . (:[]) <$> decl "info_table" info_struct_name                    
         infoTable <- generateFunction Nothing info_table_name info_table_initializer_stmts []
         fastEntry <- generateFunction (Just info_struct_name) fast_entry_name fast_entry_point (map toCType args)
         slowEntry <- generateFunction (Just info_struct_name) slow_entry_name slow_entry_point []
         if name == main_entry_point
         then return [fastEntry]
-        else return $ [infoTableVar, fastEntry, slowEntry, infoTable]
+        else return $ [infoTableVar, funcHeapObjectRef, fastEntry, slowEntry, infoTable]
           where
+            funcHeapObjectName = s "$$_ref" [name]
             (initializeLayoutEntries, offsets) = unzip $ map init_arg_entry $ zip [0..] $ zip ("0":offsets) args
             info_table_function = Fun [] 
             (info_table_name, info_table_initializer_stmts) = (init_func_name, funcFormatter "void" init_func_name [] <$> body)
                 where
                   init_func_name = s "init_function_$$" [name]
                   body = do
-                    allocateLayoutObject <- declInit "arg_entry*" "layout_entries" $ castPtr "arg_entry" $ funCall "new" $ [s "sizeof(arg_entry)*$$" [show $ length args]]
-                    return $ allocateLayoutObject:initializeLayoutEntries ++ [funInfoTableName name ..= info_table_struct]
+                    let initializeHeapObjRef = st $ funCall "new_ref" ["sizeof(void*)", reference funcHeapObjectName]
+                        referenceInfoTableFromHeapObj = deref ((castPtr "info_table*") (funCall "get_ref" [funcHeapObjectName])) ..= reference (funInfoTableName name)
 
+                    allocateLayoutObject <- declInit "arg_entry*" "layout_entries" $ castPtr "arg_entry" $ funCall "new" $ [s "sizeof(arg_entry)*$$" [show $ length args]]
+                    return $ allocateLayoutObject:initializeLayoutEntries ++ [funInfoTableName name ..= info_table_struct] ++ [initializeHeapObjRef, referenceInfoTableFromHeapObj]
                   layout = bracketInit "struct layout" [("num", "2"), ("entries", "layout_entries")]
                   info_table_struct = bracketInit "info_table" $
                             [("type", "0"),
