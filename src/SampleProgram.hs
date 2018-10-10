@@ -113,7 +113,7 @@ map_fn = Fun args body
       args = [("ma_f", Boxed), ("ma_l", Boxed)]
       body = Case (V "ma_l") [
               AltCase "Cons" ["ma_v", "ma_n"] $
-                        Let "ma_new_v" (THUNK (FuncCall "ma_f" [V "ma_n"])) $
+                        Let "ma_new_v" (THUNK (FuncCall "ma_f" [V "ma_v"])) $
                             Let "ma_new_n" (THUNK (FuncCall "map" [V "ma_f", V "ma_n"]))$
                                 Let "ma_new_res" (CON (cons (V "ma_new_v") (V "ma_new_n"))) $
                                   Atom (V "ma_new_res"),

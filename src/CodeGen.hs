@@ -20,6 +20,7 @@ debug = undefined
 
 {-
   Buglist:
+   - pushArgsFromLayout is incorrect: it starts from index 0 when instead it should take `len args` from a list of [maxNumArgsOfFunc - 1 .. 0]
    - we may not push and pop paps in the correct order - fair warning
    - code generates a 'return pap_ref' when building a pap
 
