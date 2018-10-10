@@ -5,6 +5,21 @@ Implementation of a compiler
 < for an [stg](https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/GeneratedCode)-like language
 using the push-enter approach based on [this paper](http://simonmar.github.io/bib/papers/evalapplyjfp06.pdf).
 
+# Features
+ - Lazy Evaluation
+ - Currying
+ - Higher order functions
+ - Unboxed values
+ - Simple ADTs
+ - Stack Traces
+ - Lambda Functions (TODO)
+ - Garbage Collection (TODO)
+ - STM (TODO)
+ - FFI (TODO)
+ - System F type checking (TODO)
+ - Tail-call Optimization (TODO)
+ 
+
 # Language Spec
 See the paper (page 4, 5) for a more detailed description of the constructs.
 ```
@@ -38,7 +53,7 @@ prog := f1 = obj1; f2 = obj2; f3 = obj3 ...
 
 I've changed the grammar slightly and added primops to an 'atom'. This is to allow them to be used in constructors/function calls, etc. Unboxed types are not allowed to be lifted values (values that can evaluate to bottom - thunks mainly) so you can't instantiate them in a let binding.
 
-#Objectives
+# Objectives
  - Manually 'compile' stg programs into C - Done
  - Write a code generator for stg - Done
  - Write a parallel generational garbage collector for the runtime based on ()
@@ -48,16 +63,9 @@ I've changed the grammar slightly and added primops to an 'atom'. This is to all
 It's currently a bit haphazard but, you prepare your program in the edsl by creating a value of type `Program` (this is basically a carbon copy of the stg structure). Then you run `compile` on the value also passing in the c output file name. This generates a `.c` file in `c_out/out` and a `.sh` file in `c_out/`. The `.sh` file compiles the generated C code against my `rts` library and produces a standalone binary in `c_out/`.
 
 
-# Why do we need continuations?
-They're kind of like return addresses with packed info. Since I compile to C, they can be used to implement tail call optimization although I haven't figured out how yet. They are also needed because the same sections of code are visited from different points.  (like after a case or after a thunk). 
 
-
-
-# C Functions:
-When a case is being evaluated and the only options are case constructors:
-The arguments can only ever evaluate to thunks or the case constructor (not func/pap)
-
-# Memory Representation of Heap Objects
+# Details
+##  Memory Representation of Heap Objects
 Most memory representation definitions are inside static.h. All heap objects consist of an info table pointer followed by a payload, the descriptions of which are given in the paper.
 Constructor: (<info table pointer>, <arg1> ... ) where the args can be either boxed or unboxed values. The layout is specified in the info table.
 Thunk: (<info table pointer>, <hash map pointer>) the hash map points to the free variables inside the body of the thunk
@@ -94,9 +102,12 @@ A constructor that takes an unboxed value can never take a ref so if you're doin
 // TODO need to implement the slow entry point for functions
 
 
+## C Functions:
+When a case is being evaluated and the only options are case constructors:
+The arguments can only ever evaluate to thunks or the case constructor (not func/pap)
 
-# Code flow
-## Examples
+## Code flow
+### Examples
 Examples of the flow for `head :: [a] -> a`
 ```
 ref head_case_cont(ref bindings)
@@ -154,7 +165,7 @@ ref head_slow(ref null)
     pop the update continuation
     pop the case continuation
 
-## Notes
+### Notes
  - The case continuation updates a particular binding it knows are not among the cases free variables so that the actual continuation can pluck the referenced object out at that binding.
 
  - Single argument functions don't need to perform an argument satisfaction check - the function call rules would never apply for that to be the case.
@@ -162,6 +173,11 @@ ref head_slow(ref null)
  - Another optimization that we follow from the paper is to limit the number of su saves. As the paper describes, the only time we care about saving su is when not saving it would mean that the scrutinee of the case or update frame would get its argument satisfaction check wrong (i.e. the scrutinee evaluates to a partial function that mistakes the number of arguments available because we haven't saved the closes stack frame).
  Thus we only care about this when the scrutinee evaluates to a function.
  Since it's rare for the scrutinee of a case expression to evaluate to a function we never save su for stack frames. In the odd case (like for `seq`) we push an update frame that updates su on top of the case frame.
+
+### Why do we need continuations?
+They're kind of like return addresses with packed info. Since I compile to C, they can be used to implement tail call optimization although I haven't figured out how yet. They are also needed because the same sections of code are visited from different points.  (like after a case or after a thunk). 
+
+
 
 # Dev environment
 Clone the project.
