@@ -16,25 +16,17 @@ import Data.List
 
 debug = undefined
 
--- TODO: Keep track of live variables in the function scope in the env: set every time you decl/declinit a variable and unset every time you exit a function scope.
 
+-- TODO : Tail call optimization
+-- TODO : Growing the stack - walk the su frames and update them (Instead its easier to store su and stack_pointer as relative offsets from the stack top)
+-- TODO : Create a parser, also have a pass that ensures all names are globally unique
 -- TODO: Is there a nice way of implementing a lazy stateful infinite stream that doesn't highjack the state (freshIntStream could be infinite)
 
 {-
   Buglist:
    - pushArgsFromLayout is incorrect: it starts from index 0 when instead it should take `len args` from a list of [maxNumArgsOfFunc - 1 .. 0]
    - we may not push and pop paps in the correct order - fair warning
-   - code generates a 'return pap_ref' when building a pap
 
-   - the thunk cont didn't push any args onto the stack
-   - FuncCall is not hitting the saturated case although it show
-
-
-   - The main function is not generating a call to the inits, 
-
-   - I dont seem to handle higher order functions - just add logic to generateCaseCont to always handle all types of heap objects (except fun of course - although this may be poss)
-   - returning primops needs to be done.
-   - If an expression is evaluated and is the last statement it should return - need to prove this
 
 -}
 
@@ -494,14 +486,14 @@ generateCaseCont name (Case (V var_name) es) = do
         -- For this case we push a case frame and then a 'fake' update frame that restores su and returns the arg that the update frame was called with 
         [AltForce x e] -> do
           bindings <- use stringBindings
-          let var_key = show . al $ M.lookup var_name bindings
+          let var_key = show . alX $ M.lookup var_name bindings
               isAThunk = s "$$->type == 5" [info_table]
           rest <- eval e
           varKeyStmts <- getVarKey var_key
           return $ varKeyStmts ++ ifSt isAThunk (thunkCase var_key name) [rest]
         alts -> do
           bindings <- use stringBindings
-          let var_key = show . al $ M.lookup var_name bindings
+          let var_key = show . maybe (error var_name) id $ M.lookup var_name bindings
           caseIfAlts <- mapM caseIf alts
           varKeyStmts <- getVarKey var_key
           return $ varKeyStmts ++ ifSt conCase (concat caseIfAlts) [thunkCase var_key name]
@@ -723,7 +715,10 @@ evalObject obj_name obj_ref_name t@(THUNK e) = do
 -}
 evalObject obj_name obj_ref_name (CON (Con c atoms)) = do
   bindings <- use stringBindings
-  [constrDefn] <- uses (conMap.ix c) (:[])
+  
+  ld <- uses (conMap.ix c) (:[])
+  [constrDefn] <- if null ld then error (s "$$" [c])
+                  else return ld
   let fields = fst . unzip . conFields $ constrDefn
   assignFields <- zipWithM assignField fields atoms
   newRef <- newRefMacro ref_name (s "$$*" [c]) (s "sizeof($$)"[c]) val_name                  
