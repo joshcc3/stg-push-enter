@@ -12,13 +12,14 @@ using the push-enter approach based on [this paper](http://simonmar.github.io/bi
  - Unboxed values
  - Simple ADTs
  - Stack Traces
- - Lambda Functions (TODO)
+ - Lambda Functions
  - Garbage Collection (TODO)
+ - Typeclasses (TODO)
  - STM (TODO)
  - FFI (TODO)
  - System F type checking (TODO)
  - Tail-call Optimization (TODO)
- 
+  
 
 # Language Spec
 See the paper (page 4, 5) for a more detailed description of the constructs.
@@ -166,6 +167,7 @@ ref head_slow(ref null)
     pop the case continuation
 
 ### Notes
+ - I do lots of stupid things like retrieve arguments from the bindings map which are already in scope - this is mainly because it's difficult to distinguish the cases. Would be worth adding a component to `Env` which tracks the live variables which you can lookup and which you have to refer to the global map for.
  - The case continuation updates a particular binding it knows are not among the cases free variables so that the actual continuation can pluck the referenced object out at that binding.
 
  - Single argument functions don't need to perform an argument satisfaction check - the function call rules would never apply for that to be the case.

@@ -1,5 +1,7 @@
 module CConstructs where
 
+import Control.Lens
+import qualified Data.Map as M
 import Utils
 import Types    
 
@@ -10,7 +12,11 @@ st x = s "$$;" [x]
 to_temp_var i = s "var_$$" [show i]
 
 newMacro typ nm = s "NEW($$, $$)" [typ, nm]
-initBindings = [decl "hash_map *" "bindings", st $ st $ funCall "init_bindings" [reference "bindings"]]
+
+
+initBindings = do
+  res <- decl "hash_map *" "bindings"
+  return [res, st $ st $ funCall "init_bindings" [reference "bindings"]]
 putBinding :: String -> Int -> String
 putBinding thunk_ref_name updateKey = st $ funCall "put_binding" ["bindings", show updateKey, thunk_ref_name]
 
@@ -35,15 +41,30 @@ ifSt cond ifBody elses = [condSt, "{"] ++ tab ifBody ++ ["}"] ++ (
       toElseIf a = s "else $$" [head a] : tab (tail a)
       condSt = s "if($$)" [cond]
 
-decl typ name = s "$$ $$;" [typ, name]
-declInit typ name val = s "$$ $$ = $$;" [typ, name, val]
+decl :: String -> String -> MonStack String
+decl typ name = do
+  liveVars %= M.insert name typ
+  return $ s "$$ $$;" [typ, name]
+         
+declInit :: String -> String -> String -> MonStack String
+declInit typ name val = do
+    liveVars %= M.insert name typ
+    return $ s "$$ $$ = $$;" [typ, name, val]
 
 funcFormatter returnType name args body = [line1, "{"] ++ tab body ++ ["}"]
     where
       line1 = s "$$ $$($$)" [returnType, name, commaSep . map (\(a, b) -> s "$$ $$" [a, b]) $ args]
 
-newRefMacro refn typ size valn = s "NEW_REF($$, $$, $$, $$)" [refn, typ, size, valn]
-bindingMacro ref typ val updk bs = s "GET_BINDING($$, $$, $$, $$, $$)" [ref, typ, val, updk, bs]
+newRefMacro :: String -> String -> String -> String -> MonStack String
+newRefMacro refn typ size valn = do
+    liveVars %= M.insert refn "ref" . M.insert valn typ
+    return $ s "NEW_REF($$, $$, $$, $$)" [refn, typ, size, valn]
+
+
+bindingMacro :: String -> String -> String -> String -> String -> MonStack String
+bindingMacro ref typ val updk bs = do
+   liveVars %= M.insert ref "ref" . M.insert val typ
+   return $ s "GET_BINDING($$, $$, $$, $$, $$)" [ref, typ, val, updk, bs]
 
 getBinding :: Int -> String -> String
 getBinding updateKey refName = st $ funCall "get_binding" ["bindings", show updateKey, reference refName]
@@ -70,9 +91,10 @@ charSeperate c xs = s "$$ $$" [init xs >>= \x -> s "$$$$ " [x, [c]], last xs]
 
 
 
-extractArgsToFunArgs (V x) = x
-extractArgsToFunArgs (L x) = show x
-fast_call_name f = f -- s "$$_fast" [f]
+extractArgsToFunArgs (V x, Nothing) = x
+extractArgsToFunArgs (L x, Nothing) = show x
+extractArgsToFunArgs (P _, Just a) = a
+fast_call_name f = f
 slow_call_name f = s "$$_slow" [f]
 
 bracketInit typ as = cast typ $ s "{$$}" [commaSep (map assign as)]

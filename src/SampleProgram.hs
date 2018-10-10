@@ -27,6 +27,10 @@ listConDecl = ConDecl "List" [listCon, nilCon]
       listCon = ConDefn "Cons" 0 [("C_element", Boxed), ("C_next", Boxed)]
       nilCon = ConDefn "Nil" 1 []
 
+unitConDecl = ConDecl "Unit" [unitCon]
+    where
+      unitCon = ConDefn "Unit" 0 []
+
 
 test1 = [("main_function", FUNC fun)]
     where
@@ -122,6 +126,41 @@ map_fn = Fun args body
               ]
 
 {-
+print_i_list :: List Int
+print_i_list l = case l of
+                 Cons v n -> case v of
+                               I# x -> let rest = THUNK (print_i_list n) in
+                                       let inner = THUNK (seq (print_int x) rest)
+                                       seq inner ()
+
+seq :: a -> b -> b
+seq a b = case a of
+            x -> b
+-}
+
+print_i_list_fn :: Function
+print_i_list_fn = Fun [("pr_i_l", Boxed)] $ Case (V "pr_i_l") [
+                     AltCase "Cons" ["pr_i_v", "pr_i_n"] $
+                        Case (V "pr_i_v") $ [
+                           AltCase "I" ["pr_i_x"] $
+                              Let "pr_i_rest" (THUNK (FuncCall "print_i_list" [V "pr_i_n"])) $
+                                  Let "pr_i_inner" (THUNK (FuncCall "seq" [P $ Primop "print_int" [V "pr_i_x"], V "pr_i_rest"])) $
+                                      Let "unit" (CON (Con "Unit" [])) $ 
+                                          FuncCall "seq" [V "pr_i_inner", V "unit"]
+                             
+                                 ],
+                     AltCase "Nil" [] $
+                        Let "unit" (CON $ Con "Unit" []) $
+                            Atom $ V "unit"
+                  ]
+
+
+seq_fn :: Function
+seq_fn = Fun [("se_a", Boxed), ("se_b", Boxed)] $ Case (V "se_a") [AltForce "se_x" $ Atom (V "se_b")]
+         
+
+
+{-
 list_test = let one = CON (I# 1) in
             let inc = PAP (plus_int 1) in
             let inced = THUNK (map inc list) in
@@ -157,4 +196,22 @@ list_test = Program [intConDecl, listConDecl]
       tail1 = THUNK (FuncCall "tail" [V "inced"])
       element2 = THUNK (FuncCall "head" [V "tail1"])
 
-
+list_test2 = Program [intConDecl, listConDecl, unitConDecl]
+                    [("plus_int", FUNC plus_int),
+                     ("head", FUNC head_fn),
+                     ("tail", FUNC tail_fn),
+                     ("map", FUNC map_fn),
+                     ("print_i_list", FUNC print_i_list_fn),
+                     ("seq", FUNC seq_fn),
+                     ("main_", FUNC main_)]
+    where
+      main_ = Fun [] main_exp
+      main_exp = Let "one" one $
+              Let "inc" inc $
+              Let "inced" inced $
+              Let "list" list $
+              FuncCall "print_i_list" [V "list"]
+      one = CON (Con "I" [L 1])
+      inc = PAP (Pap "plus_int" [V "one"])
+      inced = THUNK (FuncCall "map" [V "inc", V "list"])
+      list = CON (Con "Cons" [V "one", V "inced"])

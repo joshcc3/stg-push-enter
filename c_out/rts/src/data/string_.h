@@ -5,10 +5,10 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-struct string_ {
+typedef struct string_ {
   char *char_arr;
   int length;
-};
+} string_;
 
 
 err_t init_string_(const char *, int, struct string_ **);
