@@ -162,14 +162,16 @@ generatePapSize fun argLen = do
 {-
      *(ref*)(pap + 1) = one_ref;
 -}
-assignPapAtoms pap fun atoms = do
+assignPapAtoms giveRefsSuffix pap fun atoms = do
   layout <- use (funMap.ix fun.finfLayout)
   return $ zipWith toAssignment layout atoms
       where
         toAssignment (LayoutEntry _ isPtr offs) a
             = if not isPtr
               then deref (castPtr "int" location) ..= atomToVal a
-              else deref (castPtr "ref" location) ..= s "$$" [atomToVal a]
+              else deref (castPtr "ref" location) ..= (if giveRefsSuffix
+                                                       then s "$$_ref" [atomToVal a]
+                                                       else atomToVal a)
             where
               atomToVal (L i) = show i
               atomToVal (V v) = v
@@ -350,7 +352,7 @@ generateSlowCall fastName name args = do
           where
             cond = funCall "arg_satisfaction_check" [c_sum . map (toSize . snd) $ as]
             prepareArgsFromStack = map declare_var_type as ++ map pop_instr as
-            body = (prepareArgsFromStack++) <$> genPapForArgs "pap_" fastName as
+            body = (prepareArgsFromStack++) <$> genPapForArgs False "pap_" fastName as
   elseStmts <- mapM genIfCase . tail . inits $ args
   let body = ifSt argSatisfactionCondition (generateFastCallFromArgsOnStack name args) (elseStmts ++ [[assert "false"]])
   return $ funcFormatter "ref" (slow_call_name name) [("ref", "null")] body
@@ -364,8 +366,8 @@ generateSlowCall fastName name args = do
      unwrap (V x) = x
 
 
-genPapForArgs :: String -> String -> [(Atom, ValueType)] -> MonStack [Statement]
-genPapForArgs pap_name name args  = do
+genPapForArgs :: Bool -> String -> String -> [(Atom, ValueType)] -> MonStack [Statement]
+genPapForArgs giveRefsSuffix pap_name name args  = do
    initArgs <- initArgs_
    [Just fun_info_name] <- uses (funMap.ix name.finfTableName) (:[])
    let initStructTable = [declInit "struct info_table*" pap_info_name (castPtr "struct info_table" (funCall "new" ["sizeof(info_table)"])),
@@ -382,7 +384,7 @@ genPapForArgs pap_name name args  = do
           declareNewPap = newRefMacro pap_ref_name "void**" (s "$$ + sizeof(void*)" [argSize]) pap_name
           papArgs_ = fst . unzip $ papArgs
           papArgs = args
-          initArgs_ = assignPapAtoms pap_name name papArgs_
+          initArgs_ = assignPapAtoms giveRefsSuffix pap_name name papArgs_
 
 {-
 data List a = Cons { value :: a, next :: (List a) } | Nil
@@ -691,11 +693,11 @@ evalObject obj_name obj_ref_name (CON (Con c atoms)) = do
       assignInfoPtr = ptrAccess val_name "info_ptr"  ..= (s "&$$" [c_info_table])
 evalObject _ _ BLACKHOLE = error "<loop>"
 evalObject _ _ (FUNC _) = error "I dont support lambdas yet."
--- TODO example is in list.c:60 (this might be wrong
+-- TODO example is in list.c:60 (this might be wrong)
 evalObject obj_name obj_ref_name (PAP (Pap fun as)) = do
   funArgs <- use (funMap.ix fun.finfArgs)
   let argValTypes = zip as (snd $ unzip funArgs)
-  genPapForArgs obj_name fun argValTypes
+  genPapForArgs True obj_name fun argValTypes
     
   -- return [st$ funCall "unroll_pap" fun, decl "ref" "null", returnSt $ finfo ]
 {-
