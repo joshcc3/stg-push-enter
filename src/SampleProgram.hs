@@ -177,6 +177,7 @@ uncurry_fn = Fun [("un_f", Boxed), ("un_p", Boxed)] $
                Case (V "un_p") $ [
                          AltCase "Pa" ["un_a", "un_b"] $ FuncCall "un_f" [V "un_a", V "un_b"]
                          ]
+
 {-
   index :: [a] -> Int# -> a
   index l x = case x ==# 0 of
@@ -187,7 +188,7 @@ uncurry_fn = Fun [("un_f", Boxed), ("un_p", Boxed)] $
 -}
 index_fn :: Function
 index_fn = Fun [("in_l", Boxed), ("in_x", Unboxed)] $
-           Case (P $ Primop "==#" [V "in_x", L 0]) [
+           Case (P $ Primop "==" [V "in_x", L 0]) [
                      AltCase "True" [] $ FuncCall "head" [V "in_l"],
                      AltCase "False" [] $ Let "in_n" (THUNK $ FuncCall "tail" [V "in_l"]) $
                                               FuncCall "index" [V "in_l", V "in_n"]
@@ -237,8 +238,8 @@ fibo_test2 = Program [intConDecl, listConDecl, unitConDecl, pairConDecl, boolCon
                      ("map", FUNC map_fn),
                      ("zip", FUNC zip_fn),
                      ("uncurry", FUNC uncurry_fn),
-                     ("print_i_list", FUNC print_i_list_fn),
                      ("seq", FUNC seq_fn),
+                     ("index", FUNC index_fn),
                      ("main_", FUNC main_)]
     where
       main_ = Fun [] main_exp
@@ -249,8 +250,11 @@ fibo_test2 = Program [intConDecl, listConDecl, unitConDecl, pairConDecl, boolCon
                  Let "plus_uncurried" plus_uncurried $
                  Let "mapped" mapped $
                  Let "fibsT" fibsT $
-                 Let "fibs" fibs $ FuncCall "index" [V "fibs", L 20]
+                 Let "fibs" fibs $
+                 Let "elem" elem $
+                     Case (V "elem") [AltCase "I" ["x"] $ Atom $ P $ Primop "print_int" [V "x"]]
                          where
+                           elem = THUNK (FuncCall "index" [V "fibs", L 20])
                            one = CON (Con "I" [L 1])
                            zero = CON (Con "I" [L 0])
                            zipped = THUNK $ FuncCall "zip" [V "fibs", V "fibTail"]

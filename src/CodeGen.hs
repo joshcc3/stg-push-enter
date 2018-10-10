@@ -188,6 +188,7 @@ pushArgsFromLayoutInfo :: Bindings -> String -> [Atom] -> MonStack [Statement]
 pushArgsFromLayoutInfo bindings infoTable args
     = fmap concat . traverse genPushes . reverse $ zip [0..] args
     where
+      genPushes (index, L x) = return [push_instr (L x, Unboxed)]
       genPushes (index, V x)
           = do
         declare_xref <- decl "ref" (refname x)
@@ -499,7 +500,7 @@ generateCaseCont name (Case (V var_name) es) = do
           return $ varKeyStmts ++ ifSt isAThunk (thunkCase var_key name) [rest]
         alts -> do
           bindings <- use stringBindings
-          let var_key = show . maybe (error var_name) id $ M.lookup var_name bindings
+          let var_key = show . maybe (error $ s "GenCaseCont $$" [var_name]) id $ M.lookup var_name bindings
           caseIfAlts <- mapM caseIf alts
           varKeyStmts <- getVarKey var_key
           return $ varKeyStmts ++ ifSt conCase (concat caseIfAlts) [thunkCase var_key name]
@@ -615,15 +616,24 @@ evalPrimop res (Primop op [V x, L y]) = do
   resDecl <- decl "int" res
   return $ resDecl : newScope [
         initX,
-        res ..= s "$$ $$ $$" [deref x,
-                              maybe (error op) id $ M.lookup op cOps,
-                              show y]
+        case op of
+          "==" -> res ..= funCall "int_equals" [x, show y]
+          op_ -> res ..= s "$$ $$ $$" [deref x,
+                                       maybe (error op) id $ M.lookup op_ cOps,
+                                       show y]
    ]
     
 
 
 eval :: Expression -> MonStack [String]
-eval c@(Case deb _) = do
+eval c@(Case (P p) as) = do
+  updateKey <- freshInt
+  let tmp = to_temp_var updateKey
+  sts <- evalPrimop tmp p
+  stringBindings.at tmp ?= updateKey
+  sts' <- eval (Case (V tmp) as)
+  return $ sts ++ putBinding tmp updateKey:sts'
+eval c@(Case _ _) = do
   func_prefix <- freshName
   let name = s "$$_$$" [func_prefix, "cont"]
   deferred %= (++[generateCaseCont name c])
@@ -661,8 +671,9 @@ eval (FuncCall fun args) = do
   else do
     tmp <- freshName
     Just thunkContName <- use curFun
-    let [funKey] = bindings ^.. ix fun
+    let asd = bindings ^.. ix fun
         fun_ref = s "$$_ref" [fun]
+        funKey = if null asd then error (s "FuncCall case: $$" [fun]) else head asd
     initFun <- bindingMacro fun_ref "void**" fun (show funKey) "bindings"
     initFunTable <- declInit "info_table" infoTable (deref . deref $ castPtr "info_table*" fun)
     funArgPushes <- pushArgsFromLayoutInfo bindings infoTable args
