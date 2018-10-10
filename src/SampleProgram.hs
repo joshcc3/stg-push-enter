@@ -22,6 +22,10 @@ intConDecl = ConDecl "Int" [intConstructor]
     where
       intConstructor = ConDefn "I" 0 [("I_value", Unboxed)]      
 
+pairConDecl = ConDecl "Pair" [pairCon]
+    where
+      pairCon = ConDefn "Pa" 0 [("P_fst", Boxed), ("P_snd", Boxed)]
+
 listConDecl = ConDecl "List" [listCon, nilCon]
     where
       listCon = ConDefn "Cons" 0 [("C_element", Boxed), ("C_next", Boxed)]
@@ -31,6 +35,11 @@ unitConDecl = ConDecl "Unit" [unitCon]
     where
       unitCon = ConDefn "Unit" 0 []
 
+
+boolConDecl = ConDecl "Bool" [trueCon, falseCon]
+    where
+      trueCon = ConDefn "True" 0 []
+      falseCon = ConDefn "False" 1 []
 
 test1 = [("main_function", FUNC fun)]
     where
@@ -45,7 +54,7 @@ test1 = [("main_function", FUNC fun)]
          case z of
            I# a -> print a
 -}
-plus_int_test = Program [intConDecl] [("plus_int", FUNC plus_int), ("main_", FUNC main_fun)]
+plus_int_test = Program [intConDecl, unitConDecl] [("plus_int", FUNC plus_int), ("main_", FUNC main_fun)]
     where
       main_fun = Fun [] e
           where e = Let "pl_x" (CON (Con "I" [L 2101])) $
@@ -158,7 +167,142 @@ print_i_list_fn = Fun [("pr_i_l", Boxed)] $ Case (V "pr_i_l") [
 seq_fn :: Function
 seq_fn = Fun [("se_a", Boxed), ("se_b", Boxed)] $ Case (V "se_a") [AltForce "se_x" $ Atom (V "se_b")]
          
+{-
+  uncurry :: (a -> b -> c) -> (a, b) -> c
+  uncurry f p = case p of
+                  (a, b) -> f a b
+-}
+uncurry_fn :: Function
+uncurry_fn = Fun [("un_f", Boxed), ("un_p", Boxed)] $
+               Case (V "un_p") $ [
+                         AltCase "Pa" ["un_a", "un_b"] $ FuncCall "un_f" [V "un_a", V "un_b"]
+                         ]
 
+{-
+  index :: [a] -> Int# -> a
+  index l x = case x ==# 0 of
+                True -> head l
+                False -> let n = tail l in 
+                         index l n
+                       
+-}
+index_fn :: Function
+index_fn = Fun [("in_l", Boxed), ("in_x", Unboxed)] $
+           Case (P $ Primop "==#" [V "in_x", L 0]) [
+                     AltCase "1" [] $ FuncCall "head" [V "in_l"],
+                     AltCase "0" [] $ Let "in_n" (THUNK $ FuncCall "tail" [V "in_l"]) $
+                                              FuncCall "index" [V "in_n", P $ Primop "-#" [V "in_x", L 1]]
+                     ]
+
+{-
+zip :: [a] -> [b] -> [(a, b)]
+zip as bs = case as of
+              Nil -> Nil
+              Cons a an -> case bs of
+                             Nil -> Nil
+                             Cons b bn -> let p = CON (a, b) in
+                                          let rest = THUNK (zip an bn) in
+                                          let res = CON (Cons p rest) in
+                                          res
+-}
+zip_fn :: Function
+zip_fn = Fun [("zi_as", Boxed), ("zi_bs", Boxed)] $ Case (V "zi_as") [
+             AltCase "Nil"[] $ Let "zi_nil" (CON $ Con "Nil" []) $ Atom (V "zi_nil"),
+             AltCase "Cons" ["zi_a", "zi_an"] $ Case (V "zi_bs") [
+                          AltCase "Nil" [] $ Let "zi_nil" (CON $ Con "Nil" []) $ Atom (V "zi_nil"),
+                          AltCase "Cons" ["zi_b", "zi_bn"] $
+                                  Let "zi_p" (CON pairedVal) $
+                                      Let "zi_rest" (THUNK recursiveCall) $
+                                          Let "zi_res" (CON $ Con "Cons" [V "zi_p", V "zi_rest"]) $
+                                              Atom (V "zi_res")
+                         ]
+         ]
+    where
+      pairedVal = Con "Pa" [V "zi_a", V "zi_b"]
+      recursiveCall = FuncCall "zip" [V "zi_an", V "zi_bn"]
+                                           
+         
+{-
+fibo_test = let zipped = THUNK (zip fibs fibTail) in
+            let fibTail = THUNK (tail fibs) in
+            let mapped = THUNK (map plus_uncurried zipped) in
+            let zero = CON (I 0) in
+            let one = CON (I 1) in
+            let fibsT = CON (one : mapped) in
+            let fibs = CON (zero : fibsT) in index fibs 20#
+-}
+fibo_test2 = Program [intConDecl, listConDecl, unitConDecl, pairConDecl, boolConDecl]
+                    [("plus_int", FUNC plus_int),
+                     ("head", FUNC head_fn),
+                     ("tail", FUNC tail_fn),
+                     ("map", FUNC map_fn),
+                     ("zip", FUNC zip_fn),
+                     ("uncurry", FUNC uncurry_fn),
+                     ("seq", FUNC seq_fn),
+                     ("index", FUNC index_fn),
+                     ("main_", FUNC main_)]
+    where
+      main_ = Fun [] main_exp
+      main_exp = Let "one" one $
+                 Let "zero" zero $
+                 Let "zipped" zipped $
+                 Let "fibTail" fibTail $
+                 Let "plus_uncurried" plus_uncurried $
+                 Let "mapped" mapped $
+                 Let "fibsT" fibsT $
+                 Let "fibs" fibs $
+                 Let "elem" elem $
+                     Case (V "elem") [AltCase "I" ["x"] $ Atom $ P $ Primop "print_int" [V "x"]]
+                         where
+                           elem = THUNK (FuncCall "index" [V "fibs", L 20])
+                           one = CON (Con "I" [L 1])
+                           zero = CON (Con "I" [L 0])
+                           zipped = THUNK $ FuncCall "zip" [V "fibs", V "fibTail"]
+                           fibTail = THUNK $ FuncCall "tail" [V "fibs"]
+                           fibsT = CON $ Con "Cons" [V "one", V "mapped"]
+                           fibs = CON $ Con "Cons" [V "zero", V "fibsT"]
+                           plus_uncurried = PAP $ Pap "uncurry" [V "plus_int"]
+                           mapped = THUNK $ FuncCall "map" [V "plus_uncurried", V "zipped"]
+
+
+{-
+fibo_test = let zipped = THUNK (zip fibs fibTail) in
+            let fibTail = THUNK (tail fibs) in
+            let mapped = THUNK (map plus_uncurried zipped) in
+            let zero = CON (I 0) in
+            let one = CON (I 1) in
+            let fibsT = CON (one : mapped) in
+            let fibs = CON (zero : fibsT) in print_i_list fibs
+-}
+fibo_test = Program [intConDecl, listConDecl, unitConDecl, pairConDecl]
+                    [("plus_int", FUNC plus_int),
+                     ("head", FUNC head_fn),
+                     ("tail", FUNC tail_fn),
+                     ("map", FUNC map_fn),
+                     ("zip", FUNC zip_fn),
+                     ("uncurry", FUNC uncurry_fn),
+                     ("print_i_list", FUNC print_i_list_fn),
+                     ("seq", FUNC seq_fn),
+                     ("main_", FUNC main_)]
+    where
+      main_ = Fun [] main_exp
+      main_exp = Let "one" one $
+                 Let "zero" zero $
+                 Let "zipped" zipped $
+                 Let "fibTail" fibTail $
+                 Let "plus_uncurried" plus_uncurried $
+                 Let "mapped" mapped $
+                 Let "fibsT" fibsT $
+                 Let "fibs" fibs $ FuncCall "print_i_list" [V "fibs"]
+                         where
+                           one = CON (Con "I" [L 1])
+                           zero = CON (Con "I" [L 0])
+                           zipped = THUNK $ FuncCall "zip" [V "fibs", V "fibTail"]
+                           fibTail = THUNK $ FuncCall "tail" [V "fibs"]
+                           fibsT = CON $ Con "Cons" [V "one", V "mapped"]
+                           fibs = CON $ Con "Cons" [V "zero", V "fibsT"]
+                           plus_uncurried = PAP $ Pap "uncurry" [V "plus_int"]
+                           mapped = THUNK $ FuncCall "map" [V "plus_uncurried", V "zipped"]
 
 {-
 list_test = let one = CON (I# 1) in
@@ -174,7 +318,7 @@ list_test = let one = CON (I# 1) in
 This constructs an infinite list of increasing numbers `list` and sums the 2nd and 3rd elements
 -}
 
-list_test = Program [intConDecl, listConDecl]
+list_test = Program [intConDecl, listConDecl, unitConDecl]
                     [("plus_int", FUNC plus_int), ("head", FUNC head_fn), ("tail", FUNC tail_fn), ("map", FUNC map_fn), ("main_", FUNC main_)]
     where
       main_ = Fun [] main_exp
@@ -196,6 +340,9 @@ list_test = Program [intConDecl, listConDecl]
       tail1 = THUNK (FuncCall "tail" [V "inced"])
       element2 = THUNK (FuncCall "head" [V "tail1"])
 
+
+
+
 list_test2 = Program [intConDecl, listConDecl, unitConDecl]
                     [("plus_int", FUNC plus_int),
                      ("head", FUNC head_fn),
@@ -215,3 +362,9 @@ list_test2 = Program [intConDecl, listConDecl, unitConDecl]
       inc = PAP (Pap "plus_int" [V "one"])
       inced = THUNK (FuncCall "map" [V "inc", V "list"])
       list = CON (Con "Cons" [V "one", V "inced"])
+
+testSuite = [(plus_int_test, "plus_int_test"),
+             (list_test, "list_test"),
+             (list_test2, "list_test2"),
+             (fibo_test, "fibo_test"),
+             (fibo_test2, "fibo_test2")]            

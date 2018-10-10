@@ -10,6 +10,7 @@
 #include "stg/bindings.h"
 #include "containers/hash_map.h"
 #include "typeclasses.h"
+#include "stack.h"
 
 #include <assert.h>
 
@@ -22,14 +23,9 @@ bool arg_satisfaction_check(int size)
     return (su_register - stack_pointer) >= size;
 }
 
-char* allocate_stack(int stack_size) { return (char*)new(stack_size); }
-
 int main()
 {
-  stack_pointer = allocate_stack(INITIAL_STACK_SIZE);
-  stack_pointer += INITIAL_STACK_SIZE;
-
-  su_register = stack_pointer;
+  init_stack();
 
   init_pointer_table(64);
   init_pointer_table(16);
