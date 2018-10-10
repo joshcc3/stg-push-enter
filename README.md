@@ -39,8 +39,14 @@ prog := f1 = obj1; f2 = obj2; f3 = obj3 ...
 I've changed the grammar slightly and added primops to an 'atom'. This is to allow them to be used in constructors/function calls, etc. Unboxed types are not allowed to be lifted values (values that can evaluate to bottom - thunks mainly) so you can't instantiate them in a let binding.
 
 #Objectives
- - Manually 'compile' stg programs into C
+ - Manually 'compile' stg programs into C - Done
+ - Write a code generator for stg - Done
  - Write a parallel generational garbage collector for the runtime based on ()
+ - Implement STM for STG
+
+# Compilation
+It's currently a bit haphazard but, you prepare your program in the edsl by creating a value of type `Program` (this is basically a carbon copy of the stg structure). Then you run `compile` on the value also passing in the c output file name. This generates a `.c` file in `c_out/out` and a `.sh` file in `c_out/`. The `.sh` file compiles the generated C code against my `rts` library and produces a standalone binary in `c_out/`.
+
 
 # Why do we need continuations?
 They're kind of like return addresses with packed info. Since I compile to C, they can be used to implement tail call optimization although I haven't figured out how yet. They are also needed because the same sections of code are visited from different points.  (like after a case or after a thunk). 
