@@ -121,3 +121,16 @@ includeUser x = s "#include $$" [show x]
 
 newScope :: [Statement] -> [Statement]
 newScope st = "{":tab st ++ ["}"]
+
+cOps :: M.Map String String
+cOps = M.fromList  [("+#", "+"), ("-#", "-"), ("==#", "=="), (">#", ">"), ("<#", "<")]
+
+binPrimops ::  M.Map String (Int -> Int -> Int)
+binPrimops = M.fromList [("+#", (+)), ("-#", (-)), ("==#", eq), (">#", gt), ("<#", lt)]
+    where
+      eq x y | x == y = 1
+             | otherwise = 0
+      gt x y | x > y = 1
+             | otherwise = 0
+      lt x y | x < y = 1
+             | otherwise = 0

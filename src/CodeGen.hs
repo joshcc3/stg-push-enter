@@ -584,8 +584,8 @@ evalPrimop res (Primop "print_int" [V x]) = do
   resDecl <- decl "ref" res
   unitResultStmts <- evalObject res_val res (CON $ Con "Unit" [])
   return $ [assignPrintVar, printStatement] ++ unitResultStmts
-evalPrimop res (Primop "+#" [L x, L y]) = (:[]) <$> declInit "int" res (show $ x + y)
-evalPrimop res (Primop "+#" [V x, V y]) = do
+evalPrimop res (Primop op [L x, L y]) = (:[]) <$> declInit "int" res (show $ maybe (error op) (\f -> f x y) $ M.lookup op binPrimops)
+evalPrimop res (Primop op [V x, V y]) = do
   bindings <- use stringBindings
   if length (bindings ^.. ix x) == 0
   then error . show $ bindings
@@ -600,7 +600,24 @@ evalPrimop res (Primop "+#" [V x, V y]) = do
   return $ resDecl : newScope [
         initX,
         initY,
-        res ..= s "$$ + $$" [deref x, deref y]
+        res ..= s "$$ $$ $$" [deref x,
+                              maybe (error op) id $ M.lookup op cOps,
+                              deref y]
+   ]
+evalPrimop res (Primop op [V x, L y]) = do
+  bindings <- use stringBindings
+  if length (bindings ^.. ix x) == 0
+  then error . show $ bindings
+  else return ()
+  let [xkey] = bindings ^.. ix x
+      x_ref = s "$$_ref" [x]
+  initX <- bindingMacro x_ref "int*" x (show xkey) "bindings"
+  resDecl <- decl "int" res
+  return $ resDecl : newScope [
+        initX,
+        res ..= s "$$ $$ $$" [deref x,
+                              maybe (error op) id $ M.lookup op cOps,
+                              show y]
    ]
     
 

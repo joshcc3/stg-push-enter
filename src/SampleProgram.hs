@@ -36,6 +36,11 @@ unitConDecl = ConDecl "Unit" [unitCon]
       unitCon = ConDefn "Unit" 0 []
 
 
+boolConDecl = ConDecl "Bool" [trueCon, falseCon]
+    where
+      trueCon = ConDefn "True" 0 []
+      falseCon = ConDefn "False" 1 []
+
 test1 = [("main_function", FUNC fun)]
     where
       fun = Fun [("x", Boxed)] (Atom $ V "x")
@@ -172,6 +177,21 @@ uncurry_fn = Fun [("un_f", Boxed), ("un_p", Boxed)] $
                Case (V "un_p") $ [
                          AltCase "Pa" ["un_a", "un_b"] $ FuncCall "un_f" [V "un_a", V "un_b"]
                          ]
+{-
+  index :: [a] -> Int# -> a
+  index l x = case x ==# 0 of
+                True -> head l
+                False -> let n = tail l in 
+                         index l n
+                       
+-}
+index_fn :: Function
+index_fn = Fun [("in_l", Boxed), ("in_x", Unboxed)] $
+           Case (P $ Primop "==#" [V "in_x", L 0]) [
+                     AltCase "True" [] $ FuncCall "head" [V "in_l"],
+                     AltCase "False" [] $ Let "in_n" (THUNK $ FuncCall "tail" [V "in_l"]) $
+                                              FuncCall "index" [V "in_l", V "in_n"]
+                     ]
 
 {-
 zip :: [a] -> [b] -> [(a, b)]
@@ -201,6 +221,46 @@ zip_fn = Fun [("zi_as", Boxed), ("zi_bs", Boxed)] $ Case (V "zi_as") [
       recursiveCall = FuncCall "zip" [V "zi_an", V "zi_bn"]
                                            
          
+{-
+fibo_test = let zipped = THUNK (zip fibs fibTail) in
+            let fibTail = THUNK (tail fibs) in
+            let mapped = THUNK (map plus_uncurried zipped) in
+            let zero = CON (I 0) in
+            let one = CON (I 1) in
+            let fibsT = CON (one : mapped) in
+            let fibs = CON (zero : fibsT) in index fibs 20#
+-}
+fibo_test2 = Program [intConDecl, listConDecl, unitConDecl, pairConDecl, boolConDecl]
+                    [("plus_int", FUNC plus_int),
+                     ("head", FUNC head_fn),
+                     ("tail", FUNC tail_fn),
+                     ("map", FUNC map_fn),
+                     ("zip", FUNC zip_fn),
+                     ("uncurry", FUNC uncurry_fn),
+                     ("print_i_list", FUNC print_i_list_fn),
+                     ("seq", FUNC seq_fn),
+                     ("main_", FUNC main_)]
+    where
+      main_ = Fun [] main_exp
+      main_exp = Let "one" one $
+                 Let "zero" zero $
+                 Let "zipped" zipped $
+                 Let "fibTail" fibTail $
+                 Let "plus_uncurried" plus_uncurried $
+                 Let "mapped" mapped $
+                 Let "fibsT" fibsT $
+                 Let "fibs" fibs $ FuncCall "index" [V "fibs", L 20]
+                         where
+                           one = CON (Con "I" [L 1])
+                           zero = CON (Con "I" [L 0])
+                           zipped = THUNK $ FuncCall "zip" [V "fibs", V "fibTail"]
+                           fibTail = THUNK $ FuncCall "tail" [V "fibs"]
+                           fibsT = CON $ Con "Cons" [V "one", V "mapped"]
+                           fibs = CON $ Con "Cons" [V "zero", V "fibsT"]
+                           plus_uncurried = PAP $ Pap "uncurry" [V "plus_int"]
+                           mapped = THUNK $ FuncCall "map" [V "plus_uncurried", V "zipped"]
+
+
 {-
 fibo_test = let zipped = THUNK (zip fibs fibTail) in
             let fibTail = THUNK (tail fibs) in
@@ -302,4 +362,5 @@ list_test2 = Program [intConDecl, listConDecl, unitConDecl]
 testSuite = [(plus_int_test, "plus_int_test"),
              (list_test, "list_test"),
              (list_test2, "list_test2"),
-             (fibo_test, "fibo_test")]
+             (fibo_test, "fibo_test"),
+             (fibo_test2, "fibo_test2")]            
