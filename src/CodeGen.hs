@@ -51,7 +51,7 @@ runProgram_ (Program conDecls defs) = do
   mainFunc <- mainFunction (concat cs ++ fs)
   return $ concat cs ++ fs ++ [mainFunc]
     where
-      mainFunction topLevels = generateFunction "main_function" stmts []
+      mainFunction topLevels = generateFunction Nothing "main_function" stmts []
           where
             stmts = return $ funcFormatter "ref" "main_function" [] body
             allInits = topLevels ^.. traverse._C_Fun._1.filtered (\x -> x /= "init_function_main_" && startsWith "init_" x)
@@ -110,8 +110,8 @@ Need to generate a makefile as well.
 -}
 
 -- Probably a source of bugs - we discard the type information here (just bad design really)
-generateFunction :: String -> MonStack [Statement] -> [(Type, Arg)] -> MonStack C_TopLevel
-generateFunction name fun_stmts args = do
+generateFunction :: Maybe String -> String -> MonStack [Statement] -> [(Type, Arg)] -> MonStack C_TopLevel
+generateFunction tableName name fun_stmts args = do
   funMap.at name ?= funDescr
   curFun .= Just name
   stmts <- fun_stmts
@@ -119,7 +119,7 @@ generateFunction name fun_stmts args = do
   funProtos %= (C_Var name [st (takeWhile (/= '{') (stmts !! 0))]:)
   return (C_Fun name stmts)
       where
-        funDescr = FInf name (length args) (map snd args) layoutEnts
+        funDescr = FInf tableName name (length args) (map snd args) layoutEnts
         (layoutEnts, offsets) = unzip $ zipWith toLayoutEntry ("0":offsets) args
             where
               toLayoutEntry off (_, (_, t))
@@ -169,7 +169,7 @@ assignPapAtoms pap fun atoms = do
         toAssignment (LayoutEntry _ isPtr offs) a
             = if not isPtr
               then deref (castPtr "int" location) ..= atomToVal a
-              else deref (castPtr "ref" location) ..= atomToVal a
+              else deref (castPtr "ref" location) ..= s "$$" [atomToVal a]
             where
               atomToVal (L i) = show i
               atomToVal (V v) = v
@@ -276,9 +276,9 @@ evalFunDef prog = do
         let slowEntryPointDecl = C_Fun slow_entry_name
             info_struct_name = s "$$_info_table" [name]
             infoTableVar = C_Var info_struct_name [decl "info_table" info_struct_name]
-        infoTable <- generateFunction info_table_name info_table_initializer_stmts []
-        fastEntry <- generateFunction fast_entry_name fast_entry_point (map toCType args)
-        slowEntry <- generateFunction slow_entry_name slow_entry_point []
+        infoTable <- generateFunction Nothing info_table_name info_table_initializer_stmts []
+        fastEntry <- generateFunction (Just info_struct_name) fast_entry_name fast_entry_point (map toCType args)
+        slowEntry <- generateFunction (Just info_struct_name) slow_entry_name slow_entry_point []
         if name == main_entry_point
         then return [fastEntry]
         else return $ [infoTableVar, fastEntry, slowEntry, infoTable]
@@ -302,7 +302,6 @@ evalFunDef prog = do
 
             (slow_entry_name, slow_entry_point) = (slow_call_name name, generateSlowCall fast_entry_name name . map (\x -> (V . fst $ x, snd x)) $ args)
 --            fastEntryPointDecl = C_Fun fast_entry_name fast_entry_point []
-            fastEntryPointDescr = FInf fast_entry_name (length args) args
             fast_entry_name = if name == main_entry_point
                               then name
                               else fast_call_name name
@@ -368,6 +367,12 @@ generateSlowCall fastName name args = do
 genPapForArgs :: String -> String -> [(Atom, ValueType)] -> MonStack [Statement]
 genPapForArgs pap_name name args  = do
    initArgs <- initArgs_
+   [Just fun_info_name] <- uses (funMap.ix name.finfTableName) (:[])
+   let initStructTable = [declInit "struct info_table*" pap_info_name (castPtr "struct info_table" (funCall "new" ["sizeof(info_table)"])),
+                             ptrAccess pap_info_name "type" ..= "4",
+                             ptrAccess pap_info_name "extra.pap_info" ..= infoTableStruct]
+       infoTableStruct = bracketInit "struct pap" [("info_ptr", reference fun_info_name), ("size", "1")]
+                    
    return $ initStructTable ++ declareNewPap:initArgs ++  [arrayIndex pap_name 0 ..= pap_info_name]
         where
           pap_ref_name = s "$$_ref" [pap_name]
@@ -375,10 +380,6 @@ genPapForArgs pap_name name args  = do
           argSize = c_sum (map (toSize . snd) args)          
           -- the pap consists of the arg size + the info pointer
           declareNewPap = newRefMacro pap_ref_name "void**" (s "$$ + sizeof(void*)" [argSize]) pap_name
-          initStructTable = [declInit "struct info_table*" pap_info_name (deref $ castPtr "struct info_table*" (funCall "new" ["sizeof(info_table)"])),
-                             ptrAccess pap_info_name "type" ..= "4",
-                             ptrAccess pap_info_name "extra.pap_info" ..= infoTableStruct]
-          infoTableStruct = bracketInit "struct pap" [("info_ptr", pap_info_name), ("size", "1")]
           papArgs_ = fst . unzip $ papArgs
           papArgs = args
           initArgs_ = assignPapAtoms pap_name name papArgs_
@@ -409,7 +410,7 @@ void init_list()
 evalConDecl :: ConDecl -> MonStack [C_TopLevel]
 evalConDecl (ConDecl typeName cons) = do
   conMap %= flip (foldl conMapUpd) cons
-  funcDecl <- generateFunction name (funcFormatter "void" name args <$> body) args
+  funcDecl <- generateFunction Nothing name (funcFormatter "void" name args <$> body) args
   return (funcDecl:structDecls)
     where
       info_table_name c = s "$$_info_table" [c]
@@ -461,7 +462,7 @@ ref cont(hash_map *bindings)
 generateCaseCont :: String -> Expression -> MonStack C_TopLevel
 generateCaseCont name (Case (V var_name) es) = do
     let statements = funcFormatter returnType name args <$> thunkBody name
-    generateFunction name statements (args & traverse._2 %~ (,Boxed))
+    generateFunction Nothing name statements (args & traverse._2 %~ (,Boxed))
   where
     thunkBody name = case es of
         -- For this case we push a case frame and then a 'fake' update frame that restores su and returns the arg that the update frame was called with 
@@ -531,7 +532,7 @@ generateCaseCont name (Case (V var_name) es) = do
 generateThunkCont funName (THUNK e)
     = do
   let fun_stmts = funcFormatter "ref" funName [("ref", "thunk_ref")] <$> body
-  generateFunction funName fun_stmts [("ref", ("thunk_ref", Boxed))]
+  generateFunction Nothing funName fun_stmts [("ref", ("thunk_ref", Boxed))]
     where
       body = (declInit "hash_map*" "bindings" "THUNK_GET_BINDINGS(thunk_ref)":) <$> eval e
 

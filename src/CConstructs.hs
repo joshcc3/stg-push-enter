@@ -72,7 +72,7 @@ charSeperate c xs = s "$$ $$" [init xs >>= \x -> s "$$$$ " [x, [c]], last xs]
 
 extractArgsToFunArgs (V x) = x
 extractArgsToFunArgs (L x) = show x
-fast_call_name f = s "$$_fast" [f]
+fast_call_name f = f -- s "$$_fast" [f]
 slow_call_name f = s "$$_slow" [f]
 
 bracketInit typ as = cast typ $ s "{$$}" [commaSep (map assign as)]

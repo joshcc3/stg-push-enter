@@ -25,6 +25,7 @@ type Layout = [LayoutEntry]
 
 type CurFun = String
 data FunInfoTable = FInf {
+      _finfTableName :: Maybe String,
       _finfName :: String,
       _finfArity :: Int,
       _finfArgs :: [(String, ValueType)],
