@@ -298,3 +298,8 @@ list_test2 = Program [intConDecl, listConDecl, unitConDecl]
       inc = PAP (Pap "plus_int" [V "one"])
       inced = THUNK (FuncCall "map" [V "inc", V "list"])
       list = CON (Con "Cons" [V "one", V "inced"])
+
+testSuite = [(plus_int_test, "plus_int_test"),
+             (list_test, "list_test"),
+             (list_test2, "list_test2"),
+             (fibo_test, "fibo_test")]

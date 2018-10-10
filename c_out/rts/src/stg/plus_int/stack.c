@@ -8,7 +8,7 @@
 
 #define STACK_OVERFLOW_CHECK if(stack_pointer < stack_bottom) \
     {\
-      if(CUR_STACK_SIZE >= INITIAL_STACK_SIZE * 1024 * 5) \
+      if(CUR_STACK_SIZE >= INITIAL_STACK_SIZE * 1024L * 5L) \
       {								\
 	char message[128];						\
 	sprintf(message, "Stack Overflow Exception: Stack pointer - %p, Stack_bottom - %p", stack_pointer, stack_bottom); \
@@ -34,7 +34,7 @@
 char* allocate_stack(int stack_size) { return (char*)new(stack_size); }
 
 char* stack_bottom;
-int CUR_STACK_SIZE = INITIAL_STACK_SIZE;
+long CUR_STACK_SIZE = INITIAL_STACK_SIZE;
 
 void init_stack()
 {

@@ -13,6 +13,7 @@ import Control.Monad.State
 import Control.Lens
 import Control.Applicative
 import Data.List
+import Data.Monoid
 
 debug = undefined
 
@@ -725,14 +726,23 @@ evalObject obj_name obj_ref_name (CON (Con c atoms)) = do
   [constrDefn] <- if null ld then error (s "$$" [c])
                   else return ld
   let fields = fst . unzip . conFields $ constrDefn
+  newRef <- newRefMacro ref_name (s "$$*" [c]) (s "sizeof($$)"[c]) val_name
   assignFields <- zipWithM assignField fields atoms
-  newRef <- newRefMacro ref_name (s "$$*" [c]) (s "sizeof($$)"[c]) val_name                  
   return $ newRef:assignInfoPtr:concat assignFields
     where
       val_name = obj_name
       c_info_table = s "$$_info_table" [c]
       ref_name = obj_ref_name
-      assignField f (V x) = return [ptrAccess val_name f ..= s "$$_ref" [x]]
+      assignField f (V x) = do
+        let x_ref = s "$$_ref" [x]
+        x_key_ <- uses (stringBindings.ix x) (:[])
+        x_ref_key_ <- uses (stringBindings.ix x_ref) (:[])
+        let x_key = head $ x_ref_key_ ++ x_key_
+        lv <- use liveVars
+        extraStats <- if M.notMember x_ref lv
+                      then (:[]) <$> bindingMacro x_ref "void**" x (show x_key) "bindings"
+                      else return []
+        return $ extraStats ++ [ptrAccess val_name f ..= x_ref]
       assignField f (L x) = return [ptrAccess val_name f ..= show x]
       assignField f (P p) = do
         tmp <- freshName
