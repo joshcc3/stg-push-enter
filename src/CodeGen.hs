@@ -14,6 +14,7 @@ import Control.Lens
 import Control.Applicative
 import Data.List
 import Data.Monoid
+import Bookeeping
 
 debug = undefined
 
@@ -49,10 +50,19 @@ runProgram_ (Program conDecls defs) = do
     where
       mainFunction topLevels = generateFunction Nothing "main_function" stmts []
           where
-            stmts = return $ funcFormatter "ref" "main_function" [] body
+            stmts = do
+                returnName <- freshName
+                declReturn <- decl "ref" returnName
+                return $ funcFormatter "ref" "main_function" [] (body returnName declReturn)
             allInits = topLevels ^.. traverse._C_Fun._1.filtered (\x -> x /= "init_function_main_" && startsWith "init_" x)
-            body = map (st . flip funCall []) allInits ++ [st $ funCall "main_" [bracketInit "ref" []]]
-        
+            body returnName declReturn = map (st . flip funCall []) allInits ++
+                [declReturn, returnName ..= funCall "main_" [bracketInit "ref" []]] ++
+                whileLoop cond whileBody ++
+                [returnSt returnName]
+              where
+                cond = "stack_pointer < stack_top"
+                whileBody = [returnName ..= (funCall "case_continuation" [funCall "update_continuation" [returnName]])]
+
 runProgram = fst . flip runState initialEnv . runProgram_
 
 toStatements :: [C_TopLevel] -> [Statement]
@@ -130,27 +140,7 @@ generateFunction tableName name fun_stmts args = do
                                  let pos = s "$$ + $$" [off, size] in
                                  (LayoutEntry size False pos, pos)
 
-freshInt :: MonStack Int
-freshInt = do
-  x <- use freshNameSource
-  freshNameSource += 1
-  return x
 
-freshName :: MonStack String
-freshName = do
-  x <- freshInt
-  return (to_temp_var x)
-
-freshIntStream :: Int -> MonStack [Int]
-freshIntStream z = do
-  st <- get
-  result <- stream
-  put st
-  freshNameSource += z
-  return (take z result)
-      where
-        stream = (:) <$> freshInt <*> stream
-  
 
 generatePapSize :: String -> Int -> MonStack String
 generatePapSize fun argLen = do
@@ -257,6 +247,7 @@ imports = C_Import [
            includeSys "stdio.h",
            includeSys "assert.h",                      
            includeUser "stg/plus_int/static.h",
+           includeUser "stg/plus_int/stack.h",
            includeUser "stg/bindings.h",
            includeUser "containers/mmanager.h",
            includeUser "stg/heap.h",
@@ -385,8 +376,8 @@ generateSlowCall fastName name args = do
                                         decls <- mapM declare_var_type args
                                         return $ decls
                                                  ++ map pop_instr args
-                                                 ++ [returnSt (funCall (fast_call_name name) [commaSep . map (unwrap . fst) $ args])]
-     unwrap (V x) = x
+                                                 ++ tailCall (fast_call_name name) (map unwrap args)
+     unwrap (V x, z) = (x, z)
 
 
 genPapForArgs :: Bool -> String -> String -> [(Atom, ValueType)] -> MonStack [Statement]
@@ -502,26 +493,29 @@ generateCaseCont name (Case (V var_name) es) = do
         -- For this case we push a case frame and then a 'fake' update frame that restores su and returns the arg that the update frame was called with 
         [AltForce x e] -> do
           bindings <- use stringBindings
-          let var_key = show . alX $ M.lookup var_name bindings
+          var_key <- freshName
+          let var_key_num = show . alX $ M.lookup var_name bindings
               isAThunk = s "$$->type == 5" [info_table]
+          varKeyNumAssign <- declInit "int" var_key var_key_num
           rest <- eval e
-          varKeyStmts <- getVarKey var_key
-          return $ varKeyStmts ++ ifSt isAThunk (thunkCase var_key name) [rest]
+          varKeyStmts <- getVarKey var_key_num
+          return $ varKeyStmts
+                     ++ varKeyNumAssign:ifSt isAThunk (thunkCase var_key name) [rest]
         alts -> do
           bindings <- use stringBindings
-          let var_key = show . maybe (error $ s "GenCaseCont $$" [var_name]) id $ M.lookup var_name bindings
+          var_key <- freshName                      
+          let var_key_num = show . maybe (error $ s "GenCaseCont $$" [var_name]) id $ M.lookup var_name bindings
+          varKeyNumAssign <- declInit "int" var_key var_key_num
           caseIfAlts <- mapM caseIf alts
-          varKeyStmts <- getVarKey var_key
-          return $ varKeyStmts ++ ifSt conCase (concat caseIfAlts) [thunkCase var_key name]
+          varKeyStmts <- getVarKey var_key_num
+          return $ varKeyStmts ++ varKeyNumAssign:ifSt conCase (concat caseIfAlts) [thunkCase var_key name]
     conCase = s "$$->type == 1" [info_table]    
     getVarKey var_key = do
       declareInfoTable <- declInit "info_table*" info_table (deref (castPtr "info_table*" var_name))      
       bindingStmt <- bindingMacro var_ref "void**" var_name var_key "bindings"
       return [bindingStmt, declareInfoTable]
-    thunkCase var_key name = [
-       assert (s "$$ == $$" [ptrAccess info_table "type", "5"]),
-       returnSt (funCall "thunk_continuation" [var_ref, name, "bindings", var_key, var_ref])
-     ]
+    thunkCase var_key name = assert (s "$$ == $$" [ptrAccess info_table "type", "5"]):
+                             tailCall "thunk_continuation" [(var_ref, Boxed), (name, Boxed), ("bindings", Boxed), (var_key, Unboxed), (var_ref, Boxed)]
     caseIf (AltCase conName freeVars exp) = do
             [conDefn] <- uses (conMap.ix conName) (:[])
             let expectedConNum = conTag conDefn
@@ -655,7 +649,7 @@ eval c@(Case _ _) = do
   func_prefix <- freshName
   let name = s "$$_$$" [func_prefix, "cont"]
   deferred %= (++[generateCaseCont name c])
-  return [returnSt (funCall name ["bindings"])]
+  return $ tailCall name [("bindings", Boxed)]
 
 
 -- (void**)get_binding()
@@ -673,23 +667,27 @@ eval (FuncCall fun args) = do
   let argTypes = if null _debug then error $ s "$$, $$: $$" [fun, fastFun, show fMap] else head _debug
   if knownAndSaturatedCond
   then do
-    let toArgInit (a@(V x), (_, Unboxed)) = return ([], (a, Nothing))
+    let toArgInit (a@(V x), (_, Unboxed)) = return ([], (a, Nothing, Unboxed))
         toArgInit (a@(V x), (_, Boxed)) = do
                                         x_decl <- decl "ref" x
-                                        return ([x_decl, getBinding (al $ M.lookup x bindings) x], (a, Nothing))
-        toArgInit (a@(L _), _) = return ([], (a, Nothing)) -- pass them directly
-        toArgInit (a@(P p), _) = do
-          freshName >>= \n -> evalPrimop n p >>= \sts -> return (sts, (a, Just n))
+                                        return ([x_decl, getBinding (al $ M.lookup x bindings) x], (a, Nothing, Boxed))
+        toArgInit (a@(L _), (_, boxed)) = return ([], (a, Nothing, boxed)) -- pass them directly
+        toArgInit (a@(P p), (_, boxed)) = do
+          freshName >>= \n -> evalPrimop n p >>= \sts -> return (sts, (a, Just n, boxed))
     bs <- mapM toArgInit (zip args argTypes)
     let (initArgsFromBindings, argsWithResultVars) = unzip bs
+        extractArgsToTailCallArgs (V x, Nothing, t) = (x, t)
+        extractArgsToTailCallArgs (L x, Nothing, t) = (show x, t)
+        extractArgsToTailCallArgs (P _, Just a, t) = (a, t)
     -- I new scope over here because at this point I don't have a clear idea of what's in scope - I should really be keeping a map of whats in scope at this point.
-    return $ newScope $ concat initArgsFromBindings ++ [returnSt $ funCall fastFun (map extractArgsToFunArgs argsWithResultVars)]
+    return $ newScope $ concat initArgsFromBindings
+                      ++ tailCall fastFun (map extractArgsToTailCallArgs argsWithResultVars)
   else if knownCond
        then do
          tmp <- freshName
          pushStmts <- pushFunArgs fastFun (reverse args)
          tmp_decl <- decl "ref" tmp
-         return $ pushStmts ++ [tmp_decl, returnSt $ funCall (slow_call_name fun) [tmp]]
+         return $ pushStmts ++ tmp_decl:tailCall (slow_call_name fun) [(tmp, Boxed)]
   else do
     tmp <- freshName
     Just thunkContName <- use curFun
@@ -697,28 +695,36 @@ eval (FuncCall fun args) = do
         fun_ref = s "$$_ref" [fun]
         funKey = if null asd then error (s "FuncCall case: $$" [fun]) else head asd
     initFun <- bindingMacro fun_ref "void**" fun (show funKey) "bindings"
+    funKeyVar <- freshName
+    funKeyNumAssign <- declInit "int" funKeyVar (show funKey)
     initFunTable <- declInit "info_table" infoTable (deref . deref $ castPtr "info_table*" fun)
     funArgPushes <- pushArgsFromLayoutInfo bindings infoTable args
-    tmpDecl <- decl "ref" tmp                    
-    let funBody = funArgPushes ++ [tmpDecl, returnSt $ funCall (funSlowEntry infoTable) [tmp]]
+    tmpDecl <- decl "ref" tmp
+    funTmp <- freshName
+    funJmpAddrStore <- declInit "void*" funTmp (castPtr "void" funSlowEntryLoc)
+    let funUnknownCallStmts = unknownTailCall funTmp funSlowEntryLoc [(tmp, Boxed)]
+        funBody = funArgPushes ++ tmpDecl:funJmpAddrStore:funUnknownCallStmts
     papArgPushes <- pushArgsFromLayoutInfo bindings papFunInfoTable args
-    let papBody = papArgPushes ++ [st $ funCall "unroll_pap" [fun], tmpDecl, returnSt $ funCall papSlowEntry [tmp]]
+
+    papTmp <- freshName
+    papJmpAddrStore <- declInit "void*" papTmp (castPtr "void" papSlowEntry)
+
+    let papUnknownCallStmts = unknownTailCall papTmp papSlowEntry [(tmp, Boxed)]
+        papBody = papArgPushes ++ [st $ funCall "unroll_pap" [fun], tmpDecl] ++ papJmpAddrStore:papUnknownCallStmts
         blackholeCase = ifSt blackholeCheck [assert "false"] [] where blackholeCheck = s "$$.type == 6" [infoTable]
         funcCase = ifSt funcCheck funBody [papCase, thunkCase] where funcCheck = s "$$.type == 0" [infoTable]
         papCase = ifSt papCheck papBody [] where papCheck = s "$$.type == 4" [infoTable]
-        thunkCase = [
-           assert (s "$$.type == $$" [infoTable, "5"]),
-           returnSt (funCall "thunk_continuation" [fun_ref, thunkContName, "bindings", show funKey, fun_ref])
-         ]
+        thunkCase = assert (s "$$.type == $$" [infoTable, "5"]):
+                    tailCall "thunk_continuation" [(fun_ref, Boxed), (thunkContName, Boxed), ("bindings", Boxed), (funKeyVar, Unboxed), (fun_ref, Boxed)]
             
-    return $ initFun:initFunTable:funcCase
+    return $ initFun:funKeyNumAssign:initFunTable:funcCase
     where
       infoTable = s "$$_info" [fun]
+      funSlowEntryLoc = funSlowEntry infoTable
       funSlowEntry funTable = structAccess (structAccess (structAccess funTable "extra") "function") "slow_entry_point"
       papFunInfoTable =  deref $ structAccess (structAccess (structAccess infoTable "extra") "pap_info") "info_ptr"
       papSlowEntry = funSlowEntry papFunInfoTable
-      
-                                                       
+
 
 {-
    let x' = THUNK (f x) in e

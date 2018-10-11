@@ -1,9 +1,10 @@
 module CConstructs where
 
+import Control.Monad
 import Control.Lens
 import qualified Data.Map as M
 import Utils
-import Types    
+import Types
 
 main_entry_point = "main_"
 
@@ -73,6 +74,52 @@ ptrAccess v f = s "($$)->$$" [v, f]
 cast t n = s "($$)$$" [t, n]
 castPtr t n = s "($$*)$$" [t, n]
 returnSt st = s "return $$;" [st]
+
+asmCode :: [String] -> [String] -> [String] -> [String] -> [String] -> [String]
+asmCode qualifiers assemblyInstrs output input clobbersRegs
+    = s "__asm__ $$ (" [charSeperate ' ' qualifiers]:
+      tab (assemblyInstrs ++
+           [s ": $$" [commaSep output],
+            s ": $$" [commaSep input],
+            s ": $$" [commaSep clobbersRegs]])
+      ++ [");"]
+
+asmArgPushes i (x, Unboxed) = [s "\"xorq %%$$, %%$$\\n\\t\"" [reg 'r' i, reg 'r' i],
+                            s "\"movl %$$, %%$$;\\n\\t\"" [show i, reg 'e' i]]
+asmArgPushes i (x, Boxed) = [s "\"movq %$$, %%$$;\\n\\t\"" [show i, reg 'r' i]]
+
+reg 'e' i | i < 4 = map ('e':) mainRegs !! i -- r8, r9, r11, then stack
+        | otherwise = map (++"d") suppRegs !! (i - 4)
+reg 'r' i | i < 4 = map ('r':) mainRegs !! i -- r8, r9, r11, then stack
+        | otherwise = suppRegs !! (i - 4)
+mainRegs = ["di", "si", "dx", "cx"]
+suppRegs = ["r8", "r9"]
+
+dquote x = s "\"$$\"" [x]
+asmPopFrame = dquote "movq %%rbp, %%rsp;\\n\\t"
+asmPopRBP =  dquote "popq %%rbp;\\n\\t"
+asmJmp x = dquote $ s "jmp *$$;\\n\\t" [x]
+
+toAsmInputOperand (x, _) = s "\"r\"($$)" [x]
+toClobberedReg x _ = s "\"$$\"" [reg 'r' x]
+
+
+unknownTailCall tmp f args' = if length args > 6 then error $ s "$$ takes $$, I only know how to deal with <= 6" [f, show args] else
+    asmCode ["volatile"] body [] (map toAsmInputOperand args) (zipWith toClobberedReg [0..] args)
+  where
+    body = concat (zipWith asmArgPushes [0..] args) ++ [asmPopFrame, asmPopRBP, asmJmp argIndex]
+    argIndex = s "%$$" [show $ length args - 1]
+    args = args' ++ [(tmp, Boxed)]
+
+
+-- rdx, rcx, rbx
+tailCall f args = if length args > 6 then error $ s "$$ takes $$, I only know how to deal with <= 6" [f, show args] else
+        asmCode ["volatile"] body [] (map toAsmInputOperand args) (zipWith toClobberedReg [0..] args)
+        ++ [s "goto *(void*)$$;" [f]]
+    where
+     body = concat (zipWith asmArgPushes [0..] args) ++ [asmPopFrame, asmPopRBP]
+
+
 assert st = s "assert($$);" [st]
 structAccess var field = s "($$).$$" [var, field]
 deref x = s "*($$)" [x]
@@ -91,9 +138,6 @@ charSeperate c xs = s "$$ $$" [init xs >>= \x -> s "$$$$ " [x, [c]], last xs]
 
 
 
-extractArgsToFunArgs (V x, Nothing) = x
-extractArgsToFunArgs (L x, Nothing) = show x
-extractArgsToFunArgs (P _, Just a) = a
 fast_call_name f = f
 slow_call_name f = s "$$_slow" [f]
 
@@ -104,6 +148,7 @@ bracketInit typ as = cast typ $ s "{$$}" [commaSep (map assign as)]
 toSize Boxed = "sizeof(ref)"
 toSize Unboxed = "sizeof(int)"
 
+whileLoop c b = s "while($$) {" [c]:tab b ++ ["}"]
 
 c_sum = charSeperate '+'
 

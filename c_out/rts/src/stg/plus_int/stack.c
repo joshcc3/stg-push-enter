@@ -10,36 +10,38 @@
     {\
       if(CUR_STACK_SIZE >= INITIAL_STACK_SIZE * 1024L * 5L) \
       {								\
-	char message[128];						\
-	sprintf(message, "Stack Overflow Exception: Stack pointer - %p, Stack_bottom - %p", stack_pointer, stack_bottom); \
-	perror(message);						\
-	assert(false);							\
+    char message[128];						\
+    sprintf(message, "Stack Overflow Exception: Stack pointer - %p, Stack_bottom - %p", stack_pointer, stack_bottom); \
+    perror(message);						\
+    assert(false);							\
       }									\
       else								\
-	{								\
-	  perror("Haven't added stack growth yet because we need to learn to walk first"); \
-	  assert(false);						\
-	}								\
+    {								\
+      perror("Haven't added stack growth yet because we need to learn to walk first"); \
+      assert(false);						\
+    }								\
     }									\
-	  // Growing the stack is a bit troublesome because you need to walk all update continuations and update the saved value of su.
-	  /*int old_stack_size = CUR_STACK_SIZE;			\
-	  CUR_STACK_SIZE *= 2;						\
-	  char *new_stack_bottom = allocate_stack(CUR_STACK_SIZE);	\
-	  memcpy(CUR_STACK_SIZE >> 1 + new_stack_bottom, stack_bottom, CUR_STACK_SIZE >> 1);\
-	  stack_pointer 
-	  stack_bottom = new_stack_bottom;
+      // Growing the stack is a bit troublesome because you need to walk all update continuations and update the saved value of su.
+      /*int old_stack_size = CUR_STACK_SIZE;			\
+      CUR_STACK_SIZE *= 2;						\
+      char *new_stack_bottom = allocate_stack(CUR_STACK_SIZE);	\
+      memcpy(CUR_STACK_SIZE >> 1 + new_stack_bottom, stack_bottom, CUR_STACK_SIZE >> 1);\
+      stack_pointer
+      stack_bottom = new_stack_bottom;
           */
 
 
 char* allocate_stack(int stack_size) { return (char*)new(stack_size); }
 
 char* stack_bottom;
+char* stack_top;
 long CUR_STACK_SIZE = INITIAL_STACK_SIZE;
 
 void init_stack()
 {
   stack_bottom = allocate_stack(INITIAL_STACK_SIZE);
   stack_pointer = stack_bottom + INITIAL_STACK_SIZE;
+  stack_top = stack_bottom + CUR_STACK_SIZE;
 
   su_register = stack_pointer;
 }
@@ -56,9 +58,20 @@ struct ref update_continuation(struct ref value)
 struct ref case_continuation(struct ref result)
 {
   struct case_frame *frame = (struct case_frame *)stack_pointer;
-  put_binding(frame->free_vars, frame->update_key, result);
+  void *free_vars = (void*)frame->free_vars;
+  put_binding(free_vars, frame->update_key, result);
   stack_pointer += sizeof(struct case_frame);
-  return frame->alternatives_evaluator(frame->free_vars);
+  void *jmpaddr = (void*)frame->alternatives_evaluator;
+  __asm__ volatile (
+		    "movq %0, %%rdi;\n\t"
+		    "movq %1, %%rsi;\n\t"
+		    "movq %%rbp, %%rsp;\n\t"
+		    "popq %%rbp;\n\t"
+		    "jmp *%1;\n\t"
+		    :
+		    : "r"(free_vars),  "r"(jmpaddr)
+		    : "rdi",  "rsi"
+		    );
 }
 
 void push_update_frame(struct ref update_ref) {
@@ -125,6 +138,6 @@ void pop_ptr(struct ref *res)
 
 void pop_int(int *res)
 {
-	*res = *(int*)stack_pointer;
-	stack_pointer += (sizeof(int));
+    *res = *(int*)stack_pointer;
+    stack_pointer += (sizeof(int));
 }

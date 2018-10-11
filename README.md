@@ -11,14 +11,15 @@ using the push-enter approach based on [this paper](http://simonmar.github.io/bi
  - Higher order functions
  - Unboxed values
  - Simple ADTs
- - Stack Traces
  - Lambda Functions
+ - Tail-call Optimization
+ - Stack splitting (TODO)
  - Garbage Collection (TODO)
  - Typeclasses (TODO)
  - STM (TODO)
  - FFI (TODO)
  - System F type checking (TODO)
- - Tail-call Optimization (TODO)
+ - Stack Traces (TODO)
   
 
 # Language Spec
@@ -179,6 +180,65 @@ ref head_slow(ref null)
 ### Why do we need continuations?
 They're kind of like return addresses with packed info. Since I compile to C, they can be used to implement tail call optimization although I haven't figured out how yet. They are also needed because the same sections of code are visited from different points.  (like after a case or after a thunk). 
 
+## Tail Call Optimization
+In the current code (2018-10-11) all tail calls generate a new C stack frame which segfaults the program. All tail calls can be safely optimized to jumps.
+A simple way (hacky?) way to implement tail call opt:
+You
+```
+int f(int x)
+{
+  return g(x++);
+}
+
+// use the sysv_abi to ensure compatibility with windows, amd
+int f_opt(int x) __attribute__ ((noinline, noclone, sysv_abi));
+int f_opt(int x)
+{
+  x++;
+  asm volatile (
+		     "movq %%rbp, %%rsp;\n\t"
+		     "popq %%rbp;\n\t"
+		     "movl %0, %%edi;\n\t"
+		     :
+		     :"r" (x));
+		     :"edi"
+  goto *(void*)f;
+
+}
+
+// 261945 - and then it segfaults (4MB of stack space)
+root@9c9ccbe47a52:/code/c_out/rts/src/experiments# ./a.out 
+0
+100000
+200000
+Segmentation fault 
+
+// For f_opt, printing every 10^5th iteration I get:
+.
+.
+.
+1808400000
+1808500000
+1808600000
+^C
+```
+
+When implementing tail call optimization - remember to tell gcc that you're clobbering some registers. Also you cant refer to variables after you pop the stack.
+When we have to jump to an anonymous functions entry then we have to perform the jump inside assembly rather than outside like I normally do - this is because you can't refer to variables on the stack to find the location after you've popped the stack frame.
+All tail calls have now been replaced with jmps. The program ends when there are no more continuations on the stack.
+
+Finally added tail call optimization everywhere:
+.
+.
+.
+599182
+599183
+599184
+599185
+599186
+Haven't added stack growth yet because we need to learn to walk first: Success
+a.out: rts/src/stg/plus_int/stack.c:104: push_case_frame: Assertion `0' failed.
+Aborted
 
 
 # Dev environment
