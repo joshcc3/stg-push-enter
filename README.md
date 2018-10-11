@@ -179,7 +179,9 @@ ref head_slow(ref null)
 ### Why do we need continuations?
 They're kind of like return addresses with packed info. Since I compile to C, they can be used to implement tail call optimization although I haven't figured out how yet. They are also needed because the same sections of code are visited from different points.  (like after a case or after a thunk). 
 
-
+## Tail Call Optimization
+In the current code (2018-10-11) there are multiple sections which could do with tail call optimization of the C code.
+All stack continuation calls are 
 
 # Dev environment
 Clone the project.
