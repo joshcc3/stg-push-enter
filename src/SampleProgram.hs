@@ -188,9 +188,9 @@ uncurry_fn = Fun [("un_f", Boxed), ("un_p", Boxed)] $
 -}
 index_fn :: Function
 index_fn = Fun [("in_l", Boxed), ("in_x", Unboxed)] $
-           Case (P $ Primop "==" [V "in_x", L 0]) [
-                     AltCase "True" [] $ FuncCall "head" [V "in_l"],
-                     AltCase "False" [] $ Let "in_n" (THUNK $ FuncCall "tail" [V "in_l"]) $
+           Case (P $ Primop "==#" [V "in_x", L 0]) [
+                     AltCase "1" [] $ FuncCall "head" [V "in_l"],
+                     AltCase "0" [] $ Let "in_n" (THUNK $ FuncCall "tail" [V "in_l"]) $
                                               FuncCall "index" [V "in_l", V "in_n"]
                      ]
 

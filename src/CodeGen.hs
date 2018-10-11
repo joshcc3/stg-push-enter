@@ -110,7 +110,7 @@ generateFunction :: Maybe String -> String -> MonStack [Statement] -> [(Type, Ar
 generateFunction tableName name fun_stmts args = do
   funMap.at name ?= funDescr
   savedScope <- use liveVars
-  liveVars .= M.empty
+  liveVars .= M.fromList (map (\p -> (fst . snd $ p, fst p)) args)
   curFun .= Just name
   stmts <- fun_stmts
   curFun .= Nothing
@@ -537,9 +537,9 @@ generateCaseCont name (Case (V var_name) es) = do
                mapM_ updBindings freeVarBindings
                case_alt_stmts <- eval exp
                
-               return $ init_con_struct: bindCaseStmts ++ case_alt_stmts
+               return $ init_con_struct: bindCaseStmts ++ case_alt_stmts ++ [st $ funCall "assert" ["false"]]
 
-            return $ ifSt cond ifBody [[st $ funCall "assert" ["false"]]]
+            return $ ifSt cond ifBody []
         where
           conCasted = castPtr conName var_name
           actualConNum = structAccess (structAccess (ptrAccess info_table "extra") "constructor") "con_num"
@@ -627,12 +627,21 @@ evalPrimop res (Primop op [V x, L y]) = do
 
 eval :: Expression -> MonStack [String]
 eval c@(Case (P p) as) = do
-  updateKey <- freshInt
-  let tmp = to_temp_var updateKey
+  tmp <- freshName
   sts <- evalPrimop tmp p
-  stringBindings.at tmp ?= updateKey
-  sts' <- eval (Case (V tmp) as)
-  return $ sts ++ putBinding tmp updateKey:sts'
+  ((sts++) . concat) <$> mapM (genPrimCaseAlt tmp) as
+      where
+        {-
+          We assume that primop case expressions can only evaluate to unlifted
+          (in our case only ints).
+         -}
+        genPrimCaseAlt t (AltCase x [] e) = ifSt tEqualsX <$> bodyEvaled <*> pure []
+            where
+              tEqualsX = s "$$ == $$" [t, x]
+              bodyEvaled = eval e
+        genPrimCaseAlt t (AltForce x e) = (:) <$> assignTmpToX <*> eval e
+            where assignTmpToX = declInit "int" x t
+
 eval c@(Case _ _) = do
   func_prefix <- freshName
   let name = s "$$_$$" [func_prefix, "cont"]
