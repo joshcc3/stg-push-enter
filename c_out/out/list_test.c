@@ -115,7 +115,7 @@ ref var_0_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(x1_ref), "r"(var_0_cont), "r"(bindings), "r"(var_18),  "r"(x1_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -158,7 +158,7 @@ ref var_1_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(he_l_ref), "r"(var_1_cont), "r"(bindings), "r"(var_22),  "r"(he_l_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -201,7 +201,7 @@ ref var_2_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ta_l_ref), "r"(var_2_cont), "r"(bindings), "r"(var_28),  "r"(ta_l_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -254,7 +254,7 @@ ref var_3_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ma_l_ref), "r"(var_3_cont), "r"(bindings), "r"(var_34),  "r"(ma_l_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -342,7 +342,7 @@ ref var_17_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(case_expr_ref), "r"(var_17_cont), "r"(bindings), "r"(var_45),  "r"(case_expr_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -387,7 +387,7 @@ ref var_21_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(y1_ref), "r"(var_21_cont), "r"(bindings), "r"(var_50),  "r"(y1_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -461,7 +461,7 @@ ref var_39(ref thunk_ref)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ma_f_ref), "r"(var_39), "r"(bindings), "r"(var_56),  "r"(ma_f_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -508,7 +508,7 @@ ref plus_int_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(x1),  "r"(y1)
-			:"rdi"
+			:"rdi",  "rsi"
 		);
 		goto *(void*)plus_int;
 	}
@@ -692,7 +692,7 @@ ref map_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ma_f),  "r"(ma_l)
-			:"rdi"
+			:"rdi",  "rsi"
 		);
 		goto *(void*)map;
 	}

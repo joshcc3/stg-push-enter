@@ -165,7 +165,7 @@ ref var_0_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(x1_ref), "r"(var_0_cont), "r"(bindings), "r"(var_25),  "r"(x1_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -208,7 +208,7 @@ ref var_1_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(he_l_ref), "r"(var_1_cont), "r"(bindings), "r"(var_29),  "r"(he_l_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -251,7 +251,7 @@ ref var_2_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ta_l_ref), "r"(var_2_cont), "r"(bindings), "r"(var_35),  "r"(ta_l_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -304,7 +304,7 @@ ref var_3_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ma_l_ref), "r"(var_3_cont), "r"(bindings), "r"(var_41),  "r"(ma_l_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -356,7 +356,7 @@ ref var_4_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(zi_as_ref), "r"(var_4_cont), "r"(bindings), "r"(var_52),  "r"(zi_as_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -463,7 +463,7 @@ ref var_5_cont(hash_map* bindings)
 					"popq %%rbp;\n\t"
 					:
 					:"r"(un_f_ref), "r"(var_5_cont), "r"(bindings), "r"(var_64),  "r"(un_f_ref)
-					:"rdi"
+					:"rdi", "rsi", "rdx", "rcx",  "r8"
 				);
 				goto *(void*)thunk_continuation;
 			}
@@ -483,7 +483,7 @@ ref var_5_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(un_p_ref), "r"(var_5_cont), "r"(bindings), "r"(var_59),  "r"(un_p_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -507,7 +507,7 @@ ref var_6_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(se_a_ref), "r"(var_6_cont), "r"(bindings), "r"(var_65),  "r"(se_a_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -601,7 +601,7 @@ ref var_24_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(elem_ref), "r"(var_24_cont), "r"(bindings), "r"(var_66),  "r"(elem_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -646,7 +646,7 @@ ref var_28_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(y1_ref), "r"(var_28_cont), "r"(bindings), "r"(var_71),  "r"(y1_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -720,7 +720,7 @@ ref var_46(ref thunk_ref)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ma_f_ref), "r"(var_46), "r"(bindings), "r"(var_77),  "r"(ma_f_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -788,7 +788,7 @@ ref var_58_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(zi_bs_ref), "r"(var_58_cont), "r"(bindings), "r"(var_78),  "r"(zi_bs_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -835,7 +835,7 @@ ref plus_int_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(x1),  "r"(y1)
-			:"rdi"
+			:"rdi",  "rsi"
 		);
 		goto *(void*)plus_int;
 	}
@@ -1019,7 +1019,7 @@ ref map_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ma_f),  "r"(ma_l)
-			:"rdi"
+			:"rdi",  "rsi"
 		);
 		goto *(void*)map;
 	}
@@ -1093,7 +1093,7 @@ ref zip_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(zi_as),  "r"(zi_bs)
-			:"rdi"
+			:"rdi",  "rsi"
 		);
 		goto *(void*)zip;
 	}
@@ -1167,7 +1167,7 @@ ref uncurry_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(un_f),  "r"(un_p)
-			:"rdi"
+			:"rdi",  "rsi"
 		);
 		goto *(void*)uncurry;
 	}
@@ -1241,7 +1241,7 @@ ref seq_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(se_a),  "r"(se_b)
-			:"rdi"
+			:"rdi",  "rsi"
 		);
 		goto *(void*)seq;
 	}
@@ -1338,7 +1338,7 @@ ref index_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(in_l),  "r"(in_x)
-			:"rdi"
+			:"rdi",  "rsi"
 		);
 		goto *(void*)index;
 	}

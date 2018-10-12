@@ -152,7 +152,7 @@ ref var_0_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(x1_ref), "r"(var_0_cont), "r"(bindings), "r"(var_19),  "r"(x1_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -195,7 +195,7 @@ ref var_1_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(he_l_ref), "r"(var_1_cont), "r"(bindings), "r"(var_23),  "r"(he_l_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -238,7 +238,7 @@ ref var_2_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ta_l_ref), "r"(var_2_cont), "r"(bindings), "r"(var_29),  "r"(ta_l_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -291,7 +291,7 @@ ref var_3_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ma_l_ref), "r"(var_3_cont), "r"(bindings), "r"(var_35),  "r"(ma_l_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -343,7 +343,7 @@ ref var_4_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(zi_as_ref), "r"(var_4_cont), "r"(bindings), "r"(var_46),  "r"(zi_as_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -450,7 +450,7 @@ ref var_5_cont(hash_map* bindings)
 					"popq %%rbp;\n\t"
 					:
 					:"r"(un_f_ref), "r"(var_5_cont), "r"(bindings), "r"(var_58),  "r"(un_f_ref)
-					:"rdi"
+					:"rdi", "rsi", "rdx", "rcx",  "r8"
 				);
 				goto *(void*)thunk_continuation;
 			}
@@ -470,7 +470,7 @@ ref var_5_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(un_p_ref), "r"(var_5_cont), "r"(bindings), "r"(var_53),  "r"(un_p_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -522,7 +522,7 @@ ref var_6_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(pr_i_l_ref), "r"(var_6_cont), "r"(bindings), "r"(var_59),  "r"(pr_i_l_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -546,7 +546,7 @@ ref var_7_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(se_a_ref), "r"(var_7_cont), "r"(bindings), "r"(var_66),  "r"(se_a_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -628,7 +628,7 @@ ref var_22_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(y1_ref), "r"(var_22_cont), "r"(bindings), "r"(var_67),  "r"(y1_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -702,7 +702,7 @@ ref var_40(ref thunk_ref)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ma_f_ref), "r"(var_40), "r"(bindings), "r"(var_73),  "r"(ma_f_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -770,7 +770,7 @@ ref var_52_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(zi_bs_ref), "r"(var_52_cont), "r"(bindings), "r"(var_74),  "r"(zi_bs_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -818,7 +818,7 @@ ref var_63_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(pr_i_v_ref), "r"(var_63_cont), "r"(bindings), "r"(var_84),  "r"(pr_i_v_ref)
-			:"rdi"
+			:"rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -887,7 +887,7 @@ ref plus_int_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(x1),  "r"(y1)
-			:"rdi"
+			:"rdi",  "rsi"
 		);
 		goto *(void*)plus_int;
 	}
@@ -1071,7 +1071,7 @@ ref map_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ma_f),  "r"(ma_l)
-			:"rdi"
+			:"rdi",  "rsi"
 		);
 		goto *(void*)map;
 	}
@@ -1145,7 +1145,7 @@ ref zip_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(zi_as),  "r"(zi_bs)
-			:"rdi"
+			:"rdi",  "rsi"
 		);
 		goto *(void*)zip;
 	}
@@ -1219,7 +1219,7 @@ ref uncurry_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(un_f),  "r"(un_p)
-			:"rdi"
+			:"rdi",  "rsi"
 		);
 		goto *(void*)uncurry;
 	}
@@ -1348,7 +1348,7 @@ ref seq_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(se_a),  "r"(se_b)
-			:"rdi"
+			:"rdi",  "rsi"
 		);
 		goto *(void*)seq;
 	}
