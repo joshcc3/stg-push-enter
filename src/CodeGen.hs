@@ -50,10 +50,19 @@ runProgram_ (Program conDecls defs) = do
     where
       mainFunction topLevels = generateFunction Nothing "main_function" stmts []
           where
-            stmts = return $ funcFormatter "ref" "main_function" [] body
+            stmts = do
+                returnName <- freshName
+                declReturn <- decl "ref" returnName
+                return $ funcFormatter "ref" "main_function" [] (body returnName declReturn)
             allInits = topLevels ^.. traverse._C_Fun._1.filtered (\x -> x /= "init_function_main_" && startsWith "init_" x)
-            body = map (st . flip funCall []) allInits ++ [st $ funCall "main_" [bracketInit "ref" []]]
-        
+            body returnName declReturn = map (st . flip funCall []) allInits ++
+                [declReturn, returnName ..= funCall "main_" [bracketInit "ref" []]] ++
+                whileLoop cond whileBody ++
+                [returnSt returnName]
+              where
+                cond = "stack_pointer < stack_top"
+                whileBody = [returnName ..= (funCall "case_continuation" [funCall "updateContinuation" [returnName]])]
+
 runProgram = fst . flip runState initialEnv . runProgram_
 
 toStatements :: [C_TopLevel] -> [Statement]

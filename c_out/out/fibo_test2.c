@@ -1531,5 +1531,10 @@ ref main_function()
 	init_function_uncurry();
 	init_function_seq();
 	init_function_index();
-	main_((ref){});
+	ref var_92;
+	var_92 = main_((ref){});
+	while(stack_pointer < stack_top) {
+		var_92 = case_continuation(updateContinuation(var_92));
+	}
+	return var_92;
 }

@@ -287,5 +287,10 @@ ref main_function()
 	init_constructors_Int();
 	init_constructors_Unit();
 	init_function_plus_int();
-	main_((ref){});
+	ref var_20;
+	var_20 = main_((ref){});
+	while(stack_pointer < stack_top) {
+		var_20 = case_continuation(updateContinuation(var_20));
+	}
+	return var_20;
 }

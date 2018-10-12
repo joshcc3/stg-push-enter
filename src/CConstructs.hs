@@ -148,6 +148,7 @@ bracketInit typ as = cast typ $ s "{$$}" [commaSep (map assign as)]
 toSize Boxed = "sizeof(ref)"
 toSize Unboxed = "sizeof(int)"
 
+whileLoop c b = s "while($$) {" [c]:tab b ++ ["}"]
 
 c_sum = charSeperate '+'
 

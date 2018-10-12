@@ -1044,13 +1044,10 @@ ref main_function()
 	init_function_map();
 	init_function_print_i_list();
 	init_function_seq();
-
-	ref result = main_((ref){});
-
-	while(stack_pointer < stack_top)
-	{
-		result = case_continuation(update_continuation(result));
+	ref var_65;
+	var_65 = main_((ref){});
+	while(stack_pointer < stack_top) {
+		var_65 = case_continuation(updateContinuation(var_65));
 	}
-
-	return result;
+	return var_65;
 }

@@ -839,5 +839,10 @@ ref main_function()
 	init_function_head();
 	init_function_tail();
 	init_function_map();
-	main_((ref){});
+	ref var_59;
+	var_59 = main_((ref){});
+	while(stack_pointer < stack_top) {
+		var_59 = case_continuation(updateContinuation(var_59));
+	}
+	return var_59;
 }
