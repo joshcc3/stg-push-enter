@@ -34,12 +34,14 @@
 char* allocate_stack(int stack_size) { return (char*)new(stack_size); }
 
 char* stack_bottom;
+char* stack_top;
 long CUR_STACK_SIZE = INITIAL_STACK_SIZE;
 
 void init_stack()
 {
   stack_bottom = allocate_stack(INITIAL_STACK_SIZE);
   stack_pointer = stack_bottom + INITIAL_STACK_SIZE;
+  stack_top = stack_bottom + CUR_STACK_SIZE;
 
   su_register = stack_pointer;
 }

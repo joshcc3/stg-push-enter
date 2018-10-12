@@ -9,7 +9,8 @@ void init_stack();
 // for easier pointer arithmetic necessary for pushing and popping stack frames
 char *stack_pointer;
 char *su_register; // used for tracking the current update frames
-
+long CUR_STACK_SIZE;
+char *stack_top;
 // functions as well as continuations take a pointer to the info table of the structure, the stack pointer should be globally available
 
 #define INITIAL_STACK_SIZE 32*1024*1024
