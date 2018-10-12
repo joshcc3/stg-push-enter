@@ -78,9 +78,9 @@ returnSt st = s "return $$;" [st]
 tailCall f args = if length args > 6 then error "Err" else
     "__asm__ volatile (":
     (tab $
+     zipWith argPushes [0..] args ++
      "\"movq %%rbp, %%rsp;\\n\\t\"":
      "\"popq %%rbp;\\n\\t\"":
-     zipWith argPushes [0..] args ++
      [":", asmInputOperands]) ++ [");"] ++
     [s "goto *(void*)$$;" [f]]
         where
