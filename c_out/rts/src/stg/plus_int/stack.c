@@ -55,8 +55,8 @@ struct ref update_continuation(struct ref value)
 
 struct ref case_continuation(struct ref result)
 {
-  void *free_vars = (void*)frame->free_vars;
   struct case_frame *frame = (struct case_frame *)stack_pointer;
+  void *free_vars = (void*)frame->free_vars;
   put_binding(free_vars, frame->update_key, result);
   stack_pointer += sizeof(struct case_frame);
   void *jmpaddr = (void*)frame->alternatives_evaluator;
@@ -65,7 +65,7 @@ struct ref case_continuation(struct ref result)
             "movq %%rbp, %%rsp;\n\t"
             "popq %%rbp;\n\t"
             :
-            : "r"(free_vars)
+            : "r"(result)
             : "rdi"
     );
     goto *(void*)jmpaddr;
