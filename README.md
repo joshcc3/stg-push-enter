@@ -180,8 +180,48 @@ ref head_slow(ref null)
 They're kind of like return addresses with packed info. Since I compile to C, they can be used to implement tail call optimization although I haven't figured out how yet. They are also needed because the same sections of code are visited from different points.  (like after a case or after a thunk). 
 
 ## Tail Call Optimization
-In the current code (2018-10-11) there are multiple sections which could do with tail call optimization of the C code.
-All stack continuation calls are 
+In the current code (2018-10-11) all tail calls generate a new C stack frame which segfaults the program. All tail calls can be safely optimized to jumps.
+A simple way (hacky?) way to implement tail call opt:
+You
+```
+int f(int x)
+{
+  return g(x++);
+}
+
+// use the sysv_abi to ensure compatibility with windows, amd
+int f_opt(int x) __attribute__ ((noinline, noclone, sysv_abi));
+int f_opt(int x)
+{
+  x++;
+  asm volatile (
+		     "movq %%rbp, %%rsp;\n\t"
+		     "popq %%rbp;\n\t"
+		     "movl %0, %%edi;\n\t"
+		     :
+		     :"r" (x));
+
+  goto *(void*)f;
+
+}
+
+// 261945 - and then it segfaults (4MB of stack space)
+root@9c9ccbe47a52:/code/c_out/rts/src/experiments# ./a.out 
+0
+100000
+200000
+Segmentation fault 
+
+// For f_opt, printing every 10^5th iteration I get:
+.
+.
+.
+1808400000
+1808500000
+1808600000
+^C
+```
+
 
 # Dev environment
 Clone the project.
