@@ -24,20 +24,29 @@ int f(int x, int y, int z, int a, int b)
   if(x % 100000 == 0) printf("%d\n", x);  
   return f(++x, y, z, a, b);
 }
+
+int g(int z) {
+  return 1;
+}
+
 // use the sysv_abi to ensure compatibility with windows, amd
 int f_opt(int x) __attribute__ ((noinline, noclone, sysv_abi));
 int f_opt(int x)
 {
-  x++;
-  if(x % 100000 == 0) printf("%d\n", x);
+
+
+  long p = 0;
+  
+
   __asm__ volatile (
+		    "movq %0, %%rdi;\n\t"
 		    "movq %%rbp, %%rsp;\n\t"
 		    "popq %%rbp;\n\t"
-		    "movl %0, %%edi;\n\t"
 		    :
-		    :"r"(x)
+		    : "r"(p)
+		    : "rdi"
 		    );
-  goto *(void*)f_opt;
+  goto *(void*)g;
 
 /*  __asm__ volatile (
 		     "movq %%rbp, %%rsp;\n\t"

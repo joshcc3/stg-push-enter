@@ -60,15 +60,16 @@ struct ref case_continuation(struct ref result)
   put_binding(free_vars, frame->update_key, result);
   stack_pointer += sizeof(struct case_frame);
   void *jmpaddr = (void*)frame->alternatives_evaluator;
-    __asm__ volatile (
-            "movq %0, %%rdi;\n\t"
-            "movq %%rbp, %%rsp;\n\t"
-            "popq %%rbp;\n\t"
-            :
-            : "r"(result)
-            : "rdi"
-    );
-    goto *(void*)jmpaddr;
+  __asm__ volatile (
+		    "movq %0, %%rdi;\n\t"
+		    "movq %1, %%rsi;\n\t"
+		    "movq %%rbp, %%rsp;\n\t"
+		    "popq %%rbp;\n\t"
+		    "jmp *%1;\n\t"
+		    :
+		    : "r"(free_vars),  "r"(jmpaddr)
+		    : "rdi",  "rsi"
+		    );
 }
 
 void push_update_frame(struct ref update_ref) {
