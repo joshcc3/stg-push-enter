@@ -359,7 +359,16 @@ ref var_9(ref thunk_ref)
 		get_binding(bindings, 7,  &(inc));
 		ref list;
 		get_binding(bindings, 10,  &(list));
-		return map(inc,  list);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(inc),  "r"(list)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)map;
 	}
 }
 ref var_14_cont(hash_map* bindings)
@@ -493,7 +502,16 @@ ref var_34(ref thunk_ref)
 		get_binding(bindings, 0,  &(ma_f));
 		ref ma_n;
 		get_binding(bindings, 30,  &(ma_n));
-		return map(ma_f,  ma_n);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(ma_f),  "r"(ma_n)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)map;
 	}
 }
 ref var_42_cont(hash_map* bindings)
@@ -521,7 +539,16 @@ ref var_42_cont(hash_map* bindings)
 				get_binding(bindings, 60,  &(pr_i_inner));
 				ref unit;
 				get_binding(bindings, 62,  &(unit));
-				return seq(pr_i_inner,  unit);
+				__asm__ volatile (
+					"movq %0, %%rdi;\n\t"
+					"movq %1, %%rsi;\n\t"
+					"movq %%rbp, %%rsp;\n\t"
+					"popq %%rbp;\n\t"
+					: 
+					: "r"(pr_i_inner),  "r"(unit)
+					: "rdi",  "rsi"
+				);
+				goto *(void*)seq;
 			}
 		}
 	}
@@ -550,7 +577,15 @@ ref var_59(ref thunk_ref)
 	{
 		ref pr_i_n;
 		get_binding(bindings, 41,  &(pr_i_n));
-		return print_i_list(pr_i_n);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(pr_i_n)
+			: "rdi"
+		);
+		goto *(void*)print_i_list;
 	}
 }
 ref var_61(ref thunk_ref)
@@ -563,7 +598,16 @@ ref var_61(ref thunk_ref)
 		(var_63_val)->info_ptr = &Unit_info_table;
 		ref pr_i_rest;
 		get_binding(bindings, 58,  &(pr_i_rest));
-		return seq(var_63,  pr_i_rest);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(var_63),  "r"(pr_i_rest)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)seq;
 	}
 }
 ref plus_int(ref x1,  ref y1)
@@ -978,7 +1022,15 @@ ref main_()
 	{
 		ref list;
 		get_binding(bindings, 10,  &(list));
-		return print_i_list(list);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(list)
+			: "rdi"
+		);
+		goto *(void*)print_i_list;
 	}
 }
 ref main_function()

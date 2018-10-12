@@ -528,7 +528,15 @@ ref var_9(ref thunk_ref)
 	{
 		ref in_l;
 		get_binding(bindings, 0,  &(in_l));
-		return tail(in_l);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(in_l)
+			: "rdi"
+		);
+		goto *(void*)tail;
 	}
 }
 ref var_14(ref thunk_ref)
@@ -539,7 +547,16 @@ ref var_14(ref thunk_ref)
 		get_binding(bindings, 21,  &(fibs));
 		ref fibTail;
 		get_binding(bindings, 15,  &(fibTail));
-		return zip(fibs,  fibTail);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(fibs),  "r"(fibTail)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)zip;
 	}
 }
 ref var_16(ref thunk_ref)
@@ -548,7 +565,15 @@ ref var_16(ref thunk_ref)
 	{
 		ref fibs;
 		get_binding(bindings, 21,  &(fibs));
-		return tail(fibs);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(fibs)
+			: "rdi"
+		);
+		goto *(void*)tail;
 	}
 }
 ref var_19(ref thunk_ref)
@@ -559,7 +584,16 @@ ref var_19(ref thunk_ref)
 		get_binding(bindings, 17,  &(plus_uncurried));
 		ref zipped;
 		get_binding(bindings, 13,  &(zipped));
-		return map(plus_uncurried,  zipped);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(plus_uncurried),  "r"(zipped)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)map;
 	}
 }
 ref var_23(ref thunk_ref)
@@ -568,7 +602,17 @@ ref var_23(ref thunk_ref)
 	{
 		ref fibs;
 		get_binding(bindings, 21,  &(fibs));
-		return index(fibs,  20);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"xorq %%rsi, %%rsi\n\t"
+			"movl %1, %%esi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(fibs),  "r"(20)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)index;
 	}
 }
 ref var_24_cont(hash_map* bindings)
@@ -741,7 +785,16 @@ ref var_48(ref thunk_ref)
 		get_binding(bindings, 0,  &(ma_f));
 		ref ma_n;
 		get_binding(bindings, 44,  &(ma_n));
-		return map(ma_f,  ma_n);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(ma_f),  "r"(ma_n)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)map;
 	}
 }
 ref var_58_cont(hash_map* bindings)
@@ -809,7 +862,16 @@ ref var_90(ref thunk_ref)
 		get_binding(bindings, 57,  &(zi_an));
 		ref zi_bn;
 		get_binding(bindings, 87,  &(zi_bn));
-		return zip(zi_an,  zi_bn);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(zi_an),  "r"(zi_bn)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)zip;
 	}
 }
 ref plus_int(ref x1,  ref y1)
@@ -1311,7 +1373,15 @@ ref index(ref in_l,  int in_x)
 		{
 			ref in_l;
 			get_binding(bindings, 0,  &(in_l));
-			return head(in_l);
+			__asm__ volatile (
+				"movq %0, %%rdi;\n\t"
+				"movq %%rbp, %%rsp;\n\t"
+				"popq %%rbp;\n\t"
+				: 
+				: "r"(in_l)
+				: "rdi"
+			);
+			goto *(void*)head;
 		}
 	}
 	if(var_7 == 0)
@@ -1326,7 +1396,17 @@ ref index(ref in_l,  int in_x)
 				GET_BINDING(in_x_ref, int*, in_x, 1, bindings)
 				var_10 = *(in_x) - 1;
 			}
-			return index(in_n,  var_10);
+			__asm__ volatile (
+				"movq %0, %%rdi;\n\t"
+				"xorq %%rsi, %%rsi\n\t"
+				"movl %1, %%esi;\n\t"
+				"movq %%rbp, %%rsp;\n\t"
+				"popq %%rbp;\n\t"
+				: 
+				: "r"(in_n),  "r"(var_10)
+				: "rdi",  "rsi"
+			);
+			goto *(void*)index;
 		}
 	}
 }

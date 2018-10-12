@@ -267,7 +267,16 @@ ref var_7(ref thunk_ref)
 		get_binding(bindings, 5,  &(inc));
 		ref list;
 		get_binding(bindings, 8,  &(list));
-		return map(inc,  list);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(inc),  "r"(list)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)map;
 	}
 }
 ref var_10(ref thunk_ref)
@@ -276,7 +285,15 @@ ref var_10(ref thunk_ref)
 	{
 		ref inced;
 		get_binding(bindings, 6,  &(inced));
-		return head(inced);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(inced)
+			: "rdi"
+		);
+		goto *(void*)head;
 	}
 }
 ref var_12(ref thunk_ref)
@@ -285,7 +302,15 @@ ref var_12(ref thunk_ref)
 	{
 		ref inced;
 		get_binding(bindings, 6,  &(inced));
-		return tail(inced);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(inced)
+			: "rdi"
+		);
+		goto *(void*)tail;
 	}
 }
 ref var_14(ref thunk_ref)
@@ -294,7 +319,15 @@ ref var_14(ref thunk_ref)
 	{
 		ref tail1;
 		get_binding(bindings, 11,  &(tail1));
-		return head(tail1);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(tail1)
+			: "rdi"
+		);
+		goto *(void*)head;
 	}
 }
 ref var_16(ref thunk_ref)
@@ -305,7 +338,16 @@ ref var_16(ref thunk_ref)
 		get_binding(bindings, 9,  &(element1));
 		ref element2;
 		get_binding(bindings, 13,  &(element2));
-		return plus_int(element1,  element2);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(element1),  "r"(element2)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)plus_int;
 	}
 }
 ref var_17_cont(hash_map* bindings)
@@ -478,7 +520,16 @@ ref var_41(ref thunk_ref)
 		get_binding(bindings, 0,  &(ma_f));
 		ref ma_n;
 		get_binding(bindings, 37,  &(ma_n));
-		return map(ma_f,  ma_n);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(ma_f),  "r"(ma_n)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)map;
 	}
 }
 ref plus_int(ref x1,  ref y1)

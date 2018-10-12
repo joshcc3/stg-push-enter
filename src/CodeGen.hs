@@ -657,17 +657,21 @@ eval (FuncCall fun args) = do
   let argTypes = if null _debug then error $ s "$$, $$: $$" [fun, fastFun, show fMap] else head _debug
   if knownAndSaturatedCond
   then do
-    let toArgInit (a@(V x), (_, Unboxed)) = return ([], (a, Nothing))
+    let toArgInit (a@(V x), (_, Unboxed)) = return ([], (a, Nothing, Unboxed))
         toArgInit (a@(V x), (_, Boxed)) = do
                                         x_decl <- decl "ref" x
-                                        return ([x_decl, getBinding (al $ M.lookup x bindings) x], (a, Nothing))
-        toArgInit (a@(L _), _) = return ([], (a, Nothing)) -- pass them directly
-        toArgInit (a@(P p), _) = do
-          freshName >>= \n -> evalPrimop n p >>= \sts -> return (sts, (a, Just n))
+                                        return ([x_decl, getBinding (al $ M.lookup x bindings) x], (a, Nothing, Boxed))
+        toArgInit (a@(L _), (_, boxed)) = return ([], (a, Nothing, boxed)) -- pass them directly
+        toArgInit (a@(P p), (_, boxed)) = do
+          freshName >>= \n -> evalPrimop n p >>= \sts -> return (sts, (a, Just n, boxed))
     bs <- mapM toArgInit (zip args argTypes)
     let (initArgsFromBindings, argsWithResultVars) = unzip bs
+        extractArgsToTailCallArgs (V x, Nothing, t) = (x, t)
+        extractArgsToTailCallArgs (L x, Nothing, t) = (show x, t)
+        extractArgsToTailCallArgs (P _, Just a, t) = (a, t)
     -- I new scope over here because at this point I don't have a clear idea of what's in scope - I should really be keeping a map of whats in scope at this point.
-    return $ newScope $ concat initArgsFromBindings ++ [returnSt $ funCall fastFun (map extractArgsToFunArgs argsWithResultVars)]
+    return $ newScope $ concat initArgsFromBindings
+                      ++ tailCall fastFun (map extractArgsToTailCallArgs argsWithResultVars)
   else if knownCond
        then do
          tmp <- freshName
@@ -710,8 +714,7 @@ eval (FuncCall fun args) = do
       funSlowEntry funTable = structAccess (structAccess (structAccess funTable "extra") "function") "slow_entry_point"
       papFunInfoTable =  deref $ structAccess (structAccess (structAccess infoTable "extra") "pap_info") "info_ptr"
       papSlowEntry = funSlowEntry papFunInfoTable
-      
-                                                       
+
 
 {-
    let x' = THUNK (f x) in e

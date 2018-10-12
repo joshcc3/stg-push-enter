@@ -569,7 +569,16 @@ ref var_11(ref thunk_ref)
 		get_binding(bindings, 18,  &(fibs));
 		ref fibTail;
 		get_binding(bindings, 12,  &(fibTail));
-		return zip(fibs,  fibTail);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(fibs),  "r"(fibTail)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)zip;
 	}
 }
 ref var_13(ref thunk_ref)
@@ -578,7 +587,15 @@ ref var_13(ref thunk_ref)
 	{
 		ref fibs;
 		get_binding(bindings, 18,  &(fibs));
-		return tail(fibs);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(fibs)
+			: "rdi"
+		);
+		goto *(void*)tail;
 	}
 }
 ref var_16(ref thunk_ref)
@@ -589,7 +606,16 @@ ref var_16(ref thunk_ref)
 		get_binding(bindings, 14,  &(plus_uncurried));
 		ref zipped;
 		get_binding(bindings, 10,  &(zipped));
-		return map(plus_uncurried,  zipped);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(plus_uncurried),  "r"(zipped)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)map;
 	}
 }
 ref var_22_cont(hash_map* bindings)
@@ -723,7 +749,16 @@ ref var_42(ref thunk_ref)
 		get_binding(bindings, 0,  &(ma_f));
 		ref ma_n;
 		get_binding(bindings, 38,  &(ma_n));
-		return map(ma_f,  ma_n);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(ma_f),  "r"(ma_n)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)map;
 	}
 }
 ref var_52_cont(hash_map* bindings)
@@ -808,7 +843,16 @@ ref var_65_cont(hash_map* bindings)
 				get_binding(bindings, 93,  &(pr_i_inner));
 				ref unit;
 				get_binding(bindings, 95,  &(unit));
-				return seq(pr_i_inner,  unit);
+				__asm__ volatile (
+					"movq %0, %%rdi;\n\t"
+					"movq %1, %%rsi;\n\t"
+					"movq %%rbp, %%rsp;\n\t"
+					"popq %%rbp;\n\t"
+					: 
+					: "r"(pr_i_inner),  "r"(unit)
+					: "rdi",  "rsi"
+				);
+				goto *(void*)seq;
 			}
 		}
 	}
@@ -839,7 +883,16 @@ ref var_86(ref thunk_ref)
 		get_binding(bindings, 51,  &(zi_an));
 		ref zi_bn;
 		get_binding(bindings, 83,  &(zi_bn));
-		return zip(zi_an,  zi_bn);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(zi_an),  "r"(zi_bn)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)zip;
 	}
 }
 ref var_92(ref thunk_ref)
@@ -848,7 +901,15 @@ ref var_92(ref thunk_ref)
 	{
 		ref pr_i_n;
 		get_binding(bindings, 64,  &(pr_i_n));
-		return print_i_list(pr_i_n);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(pr_i_n)
+			: "rdi"
+		);
+		goto *(void*)print_i_list;
 	}
 }
 ref var_94(ref thunk_ref)
@@ -861,7 +922,16 @@ ref var_94(ref thunk_ref)
 		(var_96_val)->info_ptr = &Unit_info_table;
 		ref pr_i_rest;
 		get_binding(bindings, 91,  &(pr_i_rest));
-		return seq(var_96,  pr_i_rest);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(var_96),  "r"(pr_i_rest)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)seq;
 	}
 }
 ref plus_int(ref x1,  ref y1)
@@ -1437,7 +1507,15 @@ ref main_()
 	{
 		ref fibs;
 		get_binding(bindings, 18,  &(fibs));
-		return print_i_list(fibs);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(fibs)
+			: "rdi"
+		);
+		goto *(void*)print_i_list;
 	}
 }
 ref main_function()

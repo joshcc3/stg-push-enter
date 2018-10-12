@@ -138,9 +138,6 @@ charSeperate c xs = s "$$ $$" [init xs >>= \x -> s "$$$$ " [x, [c]], last xs]
 
 
 
-extractArgsToFunArgs (V x, Nothing) = x
-extractArgsToFunArgs (L x, Nothing) = show x
-extractArgsToFunArgs (P _, Just a) = a
 fast_call_name f = f
 slow_call_name f = s "$$_slow" [f]
 

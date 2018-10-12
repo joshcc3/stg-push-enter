@@ -88,7 +88,16 @@ ref var_4(ref thunk_ref)
 		get_binding(bindings, 1,  &(pl_x));
 		ref pl_y;
 		get_binding(bindings, 2,  &(pl_y));
-		return plus_int(pl_x,  pl_y);
+		__asm__ volatile (
+			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
+			"movq %%rbp, %%rsp;\n\t"
+			"popq %%rbp;\n\t"
+			: 
+			: "r"(pl_x),  "r"(pl_y)
+			: "rdi",  "rsi"
+		);
+		goto *(void*)plus_int;
 	}
 }
 ref var_5_cont(hash_map* bindings)
