@@ -11,14 +11,15 @@ using the push-enter approach based on [this paper](http://simonmar.github.io/bi
  - Higher order functions
  - Unboxed values
  - Simple ADTs
- - Stack Traces
  - Lambda Functions
+ - Tail-call Optimization
+ - Stack splitting (TODO)
  - Garbage Collection (TODO)
  - Typeclasses (TODO)
  - STM (TODO)
  - FFI (TODO)
  - System F type checking (TODO)
- - Tail-call Optimization (TODO)
+ - Stack Traces (TODO)
   
 
 # Language Spec
@@ -222,8 +223,22 @@ Segmentation fault
 ^C
 ```
 
-When implementing tail call optimizatio - remember to tell gcc that you're clobbering some registers. Also you cant refer to variables after you pop the stack.
-When we have to jump to an anonymous functions entry then we have to perform the jump inside assembly rather than outside like I normally do.
+When implementing tail call optimization - remember to tell gcc that you're clobbering some registers. Also you cant refer to variables after you pop the stack.
+When we have to jump to an anonymous functions entry then we have to perform the jump inside assembly rather than outside like I normally do - this is because you can't refer to variables on the stack to find the location after you've popped the stack frame.
+All tail calls have now been replaced with jmps. The program ends when there are no more continuations on the stack.
+
+Finally added tail call optimization everywhere:
+.
+.
+.
+599182
+599183
+599184
+599185
+599186
+Haven't added stack growth yet because we need to learn to walk first: Success
+a.out: rts/src/stg/plus_int/stack.c:104: push_case_frame: Assertion `0' failed.
+Aborted
 
 
 # Dev environment
