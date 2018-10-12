@@ -14,6 +14,7 @@ import Control.Lens
 import Control.Applicative
 import Data.List
 import Data.Monoid
+import Bookeeping
 
 debug = undefined
 
@@ -130,27 +131,7 @@ generateFunction tableName name fun_stmts args = do
                                  let pos = s "$$ + $$" [off, size] in
                                  (LayoutEntry size False pos, pos)
 
-freshInt :: MonStack Int
-freshInt = do
-  x <- use freshNameSource
-  freshNameSource += 1
-  return x
 
-freshName :: MonStack String
-freshName = do
-  x <- freshInt
-  return (to_temp_var x)
-
-freshIntStream :: Int -> MonStack [Int]
-freshIntStream z = do
-  st <- get
-  result <- stream
-  put st
-  freshNameSource += z
-  return (take z result)
-      where
-        stream = (:) <$> freshInt <*> stream
-  
 
 generatePapSize :: String -> Int -> MonStack String
 generatePapSize fun argLen = do
@@ -704,10 +685,18 @@ eval (FuncCall fun args) = do
     funKeyNumAssign <- declInit "int" funKeyVar (show funKey)
     initFunTable <- declInit "info_table" infoTable (deref . deref $ castPtr "info_table*" fun)
     funArgPushes <- pushArgsFromLayoutInfo bindings infoTable args
-    tmpDecl <- decl "ref" tmp                    
-    let funBody = funArgPushes ++ tmpDecl:tailCall (funSlowEntry infoTable) [(tmp, Boxed)]
+    tmpDecl <- decl "ref" tmp
+    funTmp <- freshName
+    funJmpAddrStore <- declInit "void*" funTmp (castPtr "void" funSlowEntryLoc)
+    let funUnknownCallStmts = unknownTailCall funTmp funSlowEntryLoc [(tmp, Boxed)]
+        funBody = funArgPushes ++ tmpDecl:funJmpAddrStore:funUnknownCallStmts
     papArgPushes <- pushArgsFromLayoutInfo bindings papFunInfoTable args
-    let papBody = papArgPushes ++ [st $ funCall "unroll_pap" [fun], tmpDecl] ++ tailCall papSlowEntry [(tmp, Boxed)]
+
+    papTmp <- freshName
+    papJmpAddrStore <- declInit "void*" funTmp (castPtr "void" papSlowEntry)
+
+    let papUnknownCallStmts = unknownTailCall papTmp papSlowEntry [(tmp, Boxed)]
+        papBody = papArgPushes ++ [st $ funCall "unroll_pap" [fun], tmpDecl] ++ papJmpAddrStore:papUnknownCallStmts
         blackholeCase = ifSt blackholeCheck [assert "false"] [] where blackholeCheck = s "$$.type == 6" [infoTable]
         funcCase = ifSt funcCheck funBody [papCase, thunkCase] where funcCheck = s "$$.type == 0" [infoTable]
         papCase = ifSt papCheck papBody [] where papCheck = s "$$.type == 4" [infoTable]
@@ -717,6 +706,7 @@ eval (FuncCall fun args) = do
     return $ initFun:funKeyNumAssign:initFunTable:funcCase
     where
       infoTable = s "$$_info" [fun]
+      funSlowEntryLoc = funSlowEntry infoTable
       funSlowEntry funTable = structAccess (structAccess (structAccess funTable "extra") "function") "slow_entry_point"
       papFunInfoTable =  deref $ structAccess (structAccess (structAccess infoTable "extra") "pap_info") "info_ptr"
       papSlowEntry = funSlowEntry papFunInfoTable

@@ -94,9 +94,9 @@ ref var_0_cont(hash_map* bindings)
 				"movq %0, %%rdi;\n\t"
 				"movq %%rbp, %%rsp;\n\t"
 				"popq %%rbp;\n\t"
-				:
-				:"r"(bindings)
-				:"rdi"
+				: 
+				: "r"(bindings)
+				: "rdi"
 			);
 			goto *(void*)var_21_cont;
 		}
@@ -113,9 +113,9 @@ ref var_0_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(x1_ref), "r"(var_0_cont), "r"(bindings), "r"(var_18),  "r"(x1_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(x1_ref), "r"(var_0_cont), "r"(bindings), "r"(var_18),  "r"(x1_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -156,9 +156,9 @@ ref var_1_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(he_l_ref), "r"(var_1_cont), "r"(bindings), "r"(var_22),  "r"(he_l_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(he_l_ref), "r"(var_1_cont), "r"(bindings), "r"(var_22),  "r"(he_l_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -199,9 +199,9 @@ ref var_2_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(ta_l_ref), "r"(var_2_cont), "r"(bindings), "r"(var_28),  "r"(ta_l_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(ta_l_ref), "r"(var_2_cont), "r"(bindings), "r"(var_28),  "r"(ta_l_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -252,9 +252,9 @@ ref var_3_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(ma_l_ref), "r"(var_3_cont), "r"(bindings), "r"(var_34),  "r"(ma_l_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(ma_l_ref), "r"(var_3_cont), "r"(bindings), "r"(var_34),  "r"(ma_l_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -340,9 +340,9 @@ ref var_17_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(case_expr_ref), "r"(var_17_cont), "r"(bindings), "r"(var_45),  "r"(case_expr_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(case_expr_ref), "r"(var_17_cont), "r"(bindings), "r"(var_45),  "r"(case_expr_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -385,9 +385,9 @@ ref var_21_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(y1_ref), "r"(var_21_cont), "r"(bindings), "r"(var_50),  "r"(y1_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(y1_ref), "r"(var_21_cont), "r"(bindings), "r"(var_50),  "r"(y1_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -412,15 +412,17 @@ ref var_39(ref thunk_ref)
 			push_int(*(ma_v));
 		}
 		ref var_55;
-		__asm__ volatile (
+		void* var_57 = (void*)(((ma_f_info).extra).function).slow_entry_point;
+		__asm__ volatile   goto (
 			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(var_55)
-			:"rdi"
+			"jmp *%1;\n\t"
+			: 
+			: "r"(var_55),  "r"(var_57)
+			: "rdi",  "rsi"
 		);
-		goto *(void*)(((ma_f_info).extra).function).slow_entry_point;
 	}
 	else if(ma_f_info.type == 4)
 		{
@@ -437,15 +439,17 @@ ref var_39(ref thunk_ref)
 			}
 			unroll_pap(ma_f);
 			ref var_55;
-			__asm__ volatile (
+			void* var_57 = (void*)(((*((((ma_f_info).extra).pap_info).info_ptr)).extra).function).slow_entry_point;
+			__asm__ volatile   goto (
 				"movq %0, %%rdi;\n\t"
+				"movq %1, %%rsi;\n\t"
 				"movq %%rbp, %%rsp;\n\t"
 				"popq %%rbp;\n\t"
-				:
-				:"r"(var_55)
-				:"rdi"
+				"jmp *%1;\n\t"
+				: 
+				: "r"(var_55),  "r"(var_58)
+				: "rdi",  "rsi"
 			);
-			goto *(void*)(((*((((ma_f_info).extra).pap_info).info_ptr)).extra).function).slow_entry_point;
 		}
 	else
 	{
@@ -459,9 +463,9 @@ ref var_39(ref thunk_ref)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(ma_f_ref), "r"(var_39), "r"(bindings), "r"(var_56),  "r"(ma_f_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(ma_f_ref), "r"(var_39), "r"(bindings), "r"(var_56),  "r"(ma_f_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -487,9 +491,9 @@ ref plus_int(ref x1,  ref y1)
 		"movq %0, %%rdi;\n\t"
 		"movq %%rbp, %%rsp;\n\t"
 		"popq %%rbp;\n\t"
-		:
-		:"r"(bindings)
-		:"rdi"
+		: 
+		: "r"(bindings)
+		: "rdi"
 	);
 	goto *(void*)var_0_cont;
 }
@@ -506,9 +510,9 @@ ref plus_int_slow(ref null)
 			"movq %1, %%rsi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(x1),  "r"(y1)
-			:"rdi",  "rsi"
+			: 
+			: "r"(x1),  "r"(y1)
+			: "rdi",  "rsi"
 		);
 		goto *(void*)plus_int;
 	}
@@ -560,9 +564,9 @@ ref head(ref he_l)
 		"movq %0, %%rdi;\n\t"
 		"movq %%rbp, %%rsp;\n\t"
 		"popq %%rbp;\n\t"
-		:
-		:"r"(bindings)
-		:"rdi"
+		: 
+		: "r"(bindings)
+		: "rdi"
 	);
 	goto *(void*)var_1_cont;
 }
@@ -576,9 +580,9 @@ ref head_slow(ref null)
 			"movq %0, %%rdi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(he_l)
-			:"rdi"
+			: 
+			: "r"(he_l)
+			: "rdi"
 		);
 		goto *(void*)head;
 	}
@@ -615,9 +619,9 @@ ref tail(ref ta_l)
 		"movq %0, %%rdi;\n\t"
 		"movq %%rbp, %%rsp;\n\t"
 		"popq %%rbp;\n\t"
-		:
-		:"r"(bindings)
-		:"rdi"
+		: 
+		: "r"(bindings)
+		: "rdi"
 	);
 	goto *(void*)var_2_cont;
 }
@@ -631,9 +635,9 @@ ref tail_slow(ref null)
 			"movq %0, %%rdi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(ta_l)
-			:"rdi"
+			: 
+			: "r"(ta_l)
+			: "rdi"
 		);
 		goto *(void*)tail;
 	}
@@ -671,9 +675,9 @@ ref map(ref ma_f,  ref ma_l)
 		"movq %0, %%rdi;\n\t"
 		"movq %%rbp, %%rsp;\n\t"
 		"popq %%rbp;\n\t"
-		:
-		:"r"(bindings)
-		:"rdi"
+		: 
+		: "r"(bindings)
+		: "rdi"
 	);
 	goto *(void*)var_3_cont;
 }
@@ -690,9 +694,9 @@ ref map_slow(ref null)
 			"movq %1, %%rsi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(ma_f),  "r"(ma_l)
-			:"rdi",  "rsi"
+			: 
+			: "r"(ma_f),  "r"(ma_l)
+			: "rdi",  "rsi"
 		);
 		goto *(void*)map;
 	}
@@ -769,9 +773,9 @@ ref main_()
 		"movq %0, %%rdi;\n\t"
 		"movq %%rbp, %%rsp;\n\t"
 		"popq %%rbp;\n\t"
-		:
-		:"r"(bindings)
-		:"rdi"
+		: 
+		: "r"(bindings)
+		: "rdi"
 	);
 	goto *(void*)var_17_cont;
 }

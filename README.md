@@ -200,7 +200,7 @@ int f_opt(int x)
 		     "movl %0, %%edi;\n\t"
 		     :
 		     :"r" (x));
-
+		     :"edi"
   goto *(void*)f;
 
 }
@@ -221,6 +221,9 @@ Segmentation fault
 1808600000
 ^C
 ```
+
+When implementing tail call optimizatio - remember to tell gcc that you're clobbering some registers. Also you cant refer to variables after you pop the stack.
+When we have to jump to an anonymous functions entry then we have to perform the jump inside assembly rather than outside like I normally do.
 
 
 # Dev environment

@@ -4,7 +4,7 @@ import Control.Monad
 import Control.Lens
 import qualified Data.Map as M
 import Utils
-import Types    
+import Types
 
 main_entry_point = "main_"
 
@@ -75,28 +75,50 @@ cast t n = s "($$)$$" [t, n]
 castPtr t n = s "($$*)$$" [t, n]
 returnSt st = s "return $$;" [st]
 
--- rdx, rcx, rbx              
-tailCall f args = if length args > 6 then error "Err" else
-    "__asm__ volatile (":
-    (tab $
-     concat (zipWith argPushes [0..] args) ++
-     "\"movq %%rbp, %%rsp;\\n\\t\"":
-     "\"popq %%rbp;\\n\\t\"":
-     [":", asmInputOperands, clobbers]) ++ [");"] ++
-    [s "goto *(void*)$$;" [f]]
-        where
-          asmInputOperands = s ":$$" [commaSep $ map g args]
-              where g (x, _) = s "\"r\"($$)" [x]
-          clobbers = s ":$$" [commaSep $ zipWith g [0..] args] where g x _ = s "\"$$\"" [reg 'r' x]
-          argPushes i (x, Unboxed) = [s "\"xorq %%$$, %%$$\\n\\t\"" [reg 'r' i, reg 'r' i],
-                                      s "\"movl %$$, %%$$;\\n\\t\"" [show i, reg 'e' i]]
-          argPushes i (x, Boxed) = [s "\"movq %$$, %%$$;\\n\\t\"" [show i, reg 'r' i]]
-          reg 'e' i | i < 4 = map ('e':) mainRegs !! i -- r8, r9, r11, then stack
-                    | otherwise = map (++"d") suppRegs !! (i - 4)
-          reg 'r' i | i < 4 = map ('r':) mainRegs !! i -- r8, r9, r11, then stack
-                    | otherwise = suppRegs !! (i - 4)
-          mainRegs = ["di", "si", "dx", "cx"]
-          suppRegs = ["r8", "r9"]
+asmCode :: [String] -> [String] -> [String] -> [String] -> [String] -> [String]
+asmCode qualifiers assemblyInstrs output input clobbersRegs
+    = s "__asm__ $$ (" [charSeperate ' ' qualifiers]:
+      tab (assemblyInstrs ++
+           [s ": $$" [commaSep output],
+            s ": $$" [commaSep input],
+            s ": $$" [commaSep clobbersRegs]])
+      ++ [");"]
+
+asmArgPushes i (x, Unboxed) = [s "\"xorq %%$$, %%$$\\n\\t\"" [reg 'r' i, reg 'r' i],
+                            s "\"movl %$$, %%$$;\\n\\t\"" [show i, reg 'e' i]]
+asmArgPushes i (x, Boxed) = [s "\"movq %$$, %%$$;\\n\\t\"" [show i, reg 'r' i]]
+
+reg 'e' i | i < 4 = map ('e':) mainRegs !! i -- r8, r9, r11, then stack
+        | otherwise = map (++"d") suppRegs !! (i - 4)
+reg 'r' i | i < 4 = map ('r':) mainRegs !! i -- r8, r9, r11, then stack
+        | otherwise = suppRegs !! (i - 4)
+mainRegs = ["di", "si", "dx", "cx"]
+suppRegs = ["r8", "r9"]
+
+dquote x = s "\"$$\"" [x]
+asmPopFrame = dquote "movq %%rbp, %%rsp;\\n\\t"
+asmPopRBP =  dquote "popq %%rbp;\\n\\t"
+asmJmp x = dquote $ s "jmp *$$;\\n\\t" [x]
+
+toAsmInputOperand (x, _) = s "\"r\"($$)" [x]
+toClobberedReg x _ = s "\"$$\"" [reg 'r' x]
+
+
+unknownTailCall tmp f args' = if length args > 6 then error $ s "$$ takes $$, I only know how to deal with <= 6" [f, show args] else
+    asmCode ["volatile", "goto"] body [] (map toAsmInputOperand args) (zipWith toClobberedReg [0..] args)
+  where
+	body = concat (zipWith asmArgPushes [0..] args) ++ [asmPopFrame, asmPopRBP, asmJmp argIndex]
+	argIndex = s "%$$" [show $ length args - 1]
+	args = args' ++ [(tmp, Boxed)]
+
+
+-- rdx, rcx, rbx
+tailCall f args = if length args > 6 then error $ s "$$ takes $$, I only know how to deal with <= 6" [f, show args] else
+        asmCode ["volatile"] body [] (map toAsmInputOperand args) (zipWith toClobberedReg [0..] args)
+        ++ [s "goto *(void*)$$;" [f]]
+    where
+     body = concat (zipWith asmArgPushes [0..] args) ++ [asmPopFrame, asmPopRBP]
+
 
 assert st = s "assert($$);" [st]
 structAccess var field = s "($$).$$" [var, field]

@@ -54,9 +54,9 @@ ref var_0_cont(hash_map* bindings)
 				"movq %0, %%rdi;\n\t"
 				"movq %%rbp, %%rsp;\n\t"
 				"popq %%rbp;\n\t"
-				:
-				:"r"(bindings)
-				:"rdi"
+				: 
+				: "r"(bindings)
+				: "rdi"
 			);
 			goto *(void*)var_9_cont;
 		}
@@ -73,9 +73,9 @@ ref var_0_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(x1_ref), "r"(var_0_cont), "r"(bindings), "r"(var_6),  "r"(x1_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(x1_ref), "r"(var_0_cont), "r"(bindings), "r"(var_6),  "r"(x1_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -123,9 +123,9 @@ ref var_5_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(pl_z_ref), "r"(var_5_cont), "r"(bindings), "r"(var_10),  "r"(pl_z_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(pl_z_ref), "r"(var_5_cont), "r"(bindings), "r"(var_10),  "r"(pl_z_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -168,9 +168,9 @@ ref var_9_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(y1_ref), "r"(var_9_cont), "r"(bindings), "r"(var_15),  "r"(y1_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(y1_ref), "r"(var_9_cont), "r"(bindings), "r"(var_15),  "r"(y1_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -185,9 +185,9 @@ ref plus_int(ref x1,  ref y1)
 		"movq %0, %%rdi;\n\t"
 		"movq %%rbp, %%rsp;\n\t"
 		"popq %%rbp;\n\t"
-		:
-		:"r"(bindings)
-		:"rdi"
+		: 
+		: "r"(bindings)
+		: "rdi"
 	);
 	goto *(void*)var_0_cont;
 }
@@ -204,9 +204,9 @@ ref plus_int_slow(ref null)
 			"movq %1, %%rsi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(x1),  "r"(y1)
-			:"rdi",  "rsi"
+			: 
+			: "r"(x1),  "r"(y1)
+			: "rdi",  "rsi"
 		);
 		goto *(void*)plus_int;
 	}
@@ -267,9 +267,9 @@ ref main_()
 		"movq %0, %%rdi;\n\t"
 		"movq %%rbp, %%rsp;\n\t"
 		"popq %%rbp;\n\t"
-		:
-		:"r"(bindings)
-		:"rdi"
+		: 
+		: "r"(bindings)
+		: "rdi"
 	);
 	goto *(void*)var_5_cont;
 }

@@ -6,10 +6,10 @@
 #include "containers/mmanager.h"
 #include "stg/heap.h"
 #include "data/string_.h"
-ref var_90(ref thunk_ref);
-ref var_88(ref thunk_ref);
-ref var_82(ref thunk_ref);
-ref var_63_cont(hash_map* bindings);
+ref var_94(ref thunk_ref);
+ref var_92(ref thunk_ref);
+ref var_86(ref thunk_ref);
+ref var_65_cont(hash_map* bindings);
 ref var_52_cont(hash_map* bindings);
 ref var_42(ref thunk_ref);
 ref var_40(ref thunk_ref);
@@ -131,9 +131,9 @@ ref var_0_cont(hash_map* bindings)
 				"movq %0, %%rdi;\n\t"
 				"movq %%rbp, %%rsp;\n\t"
 				"popq %%rbp;\n\t"
-				:
-				:"r"(bindings)
-				:"rdi"
+				: 
+				: "r"(bindings)
+				: "rdi"
 			);
 			goto *(void*)var_22_cont;
 		}
@@ -150,9 +150,9 @@ ref var_0_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(x1_ref), "r"(var_0_cont), "r"(bindings), "r"(var_19),  "r"(x1_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(x1_ref), "r"(var_0_cont), "r"(bindings), "r"(var_19),  "r"(x1_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -193,9 +193,9 @@ ref var_1_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(he_l_ref), "r"(var_1_cont), "r"(bindings), "r"(var_23),  "r"(he_l_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(he_l_ref), "r"(var_1_cont), "r"(bindings), "r"(var_23),  "r"(he_l_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -236,9 +236,9 @@ ref var_2_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(ta_l_ref), "r"(var_2_cont), "r"(bindings), "r"(var_29),  "r"(ta_l_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(ta_l_ref), "r"(var_2_cont), "r"(bindings), "r"(var_29),  "r"(ta_l_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -289,9 +289,9 @@ ref var_3_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(ma_l_ref), "r"(var_3_cont), "r"(bindings), "r"(var_35),  "r"(ma_l_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(ma_l_ref), "r"(var_3_cont), "r"(bindings), "r"(var_35),  "r"(ma_l_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -322,9 +322,9 @@ ref var_4_cont(hash_map* bindings)
 				"movq %0, %%rdi;\n\t"
 				"movq %%rbp, %%rsp;\n\t"
 				"popq %%rbp;\n\t"
-				:
-				:"r"(bindings)
-				:"rdi"
+				: 
+				: "r"(bindings)
+				: "rdi"
 			);
 			goto *(void*)var_52_cont;
 		}
@@ -341,9 +341,9 @@ ref var_4_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(zi_as_ref), "r"(var_4_cont), "r"(bindings), "r"(var_46),  "r"(zi_as_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(zi_as_ref), "r"(var_4_cont), "r"(bindings), "r"(var_46),  "r"(zi_as_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -390,15 +390,17 @@ ref var_5_cont(hash_map* bindings)
 					push_int(*(un_a));
 				}
 				ref var_57;
-				__asm__ volatile (
+				void* var_59 = (void*)(((un_f_info).extra).function).slow_entry_point;
+				__asm__ volatile   goto (
 					"movq %0, %%rdi;\n\t"
+					"movq %1, %%rsi;\n\t"
 					"movq %%rbp, %%rsp;\n\t"
 					"popq %%rbp;\n\t"
-					:
-					:"r"(var_57)
-					:"rdi"
+					"jmp *%1;\n\t"
+					: 
+					: "r"(var_57),  "r"(var_59)
+					: "rdi",  "rsi"
 				);
-				goto *(void*)(((un_f_info).extra).function).slow_entry_point;
 			}
 			else if(un_f_info.type == 4)
 				{
@@ -426,15 +428,17 @@ ref var_5_cont(hash_map* bindings)
 					}
 					unroll_pap(un_f);
 					ref var_57;
-					__asm__ volatile (
+					void* var_59 = (void*)(((*((((un_f_info).extra).pap_info).info_ptr)).extra).function).slow_entry_point;
+					__asm__ volatile   goto (
 						"movq %0, %%rdi;\n\t"
+						"movq %1, %%rsi;\n\t"
 						"movq %%rbp, %%rsp;\n\t"
 						"popq %%rbp;\n\t"
-						:
-						:"r"(var_57)
-						:"rdi"
+						"jmp *%1;\n\t"
+						: 
+						: "r"(var_57),  "r"(var_60)
+						: "rdi",  "rsi"
 					);
-					goto *(void*)(((*((((un_f_info).extra).pap_info).info_ptr)).extra).function).slow_entry_point;
 				}
 			else
 			{
@@ -448,9 +452,9 @@ ref var_5_cont(hash_map* bindings)
 					"movq %4, %%r8;\n\t"
 					"movq %%rbp, %%rsp;\n\t"
 					"popq %%rbp;\n\t"
-					:
-					:"r"(un_f_ref), "r"(var_5_cont), "r"(bindings), "r"(var_58),  "r"(un_f_ref)
-					:"rdi", "rsi", "rdx", "rcx",  "r8"
+					: 
+					: "r"(un_f_ref), "r"(var_5_cont), "r"(bindings), "r"(var_58),  "r"(un_f_ref)
+					: "rdi", "rsi", "rdx", "rcx",  "r8"
 				);
 				goto *(void*)thunk_continuation;
 			}
@@ -468,9 +472,9 @@ ref var_5_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(un_p_ref), "r"(var_5_cont), "r"(bindings), "r"(var_53),  "r"(un_p_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(un_p_ref), "r"(var_5_cont), "r"(bindings), "r"(var_53),  "r"(un_p_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -479,32 +483,32 @@ ref var_6_cont(hash_map* bindings)
 {
 	GET_BINDING(pr_i_l_ref, void**, pr_i_l, 0, bindings)
 	info_table* pr_i_l_info = *((info_table**)pr_i_l);
-	int var_59 = 0;
+	int var_61 = 0;
 	if(pr_i_l_info->type == 1)
 	{
 		if((((pr_i_l_info)->extra).constructor).con_num == 0)
 		{
-			Cons* var_60 = (Cons*)pr_i_l;
-			ref pr_i_v_ref = (var_60)->C_element;
-			put_binding(bindings, 61,  pr_i_v_ref);
-			ref pr_i_n_ref = (var_60)->C_next;
-			put_binding(bindings, 62,  pr_i_n_ref);
+			Cons* var_62 = (Cons*)pr_i_l;
+			ref pr_i_v_ref = (var_62)->C_element;
+			put_binding(bindings, 63,  pr_i_v_ref);
+			ref pr_i_n_ref = (var_62)->C_next;
+			put_binding(bindings, 64,  pr_i_n_ref);
 			__asm__ volatile (
 				"movq %0, %%rdi;\n\t"
 				"movq %%rbp, %%rsp;\n\t"
 				"popq %%rbp;\n\t"
-				:
-				:"r"(bindings)
-				:"rdi"
+				: 
+				: "r"(bindings)
+				: "rdi"
 			);
-			goto *(void*)var_63_cont;
+			goto *(void*)var_65_cont;
 		}
 		if((((pr_i_l_info)->extra).constructor).con_num == 1)
 		{
-			Nil* var_64 = (Nil*)pr_i_l;
+			Nil* var_66 = (Nil*)pr_i_l;
 			NEW_REF(unit_ref, Unit*, sizeof(Unit), unit)
 			(unit)->info_ptr = &Unit_info_table;
-			put_binding(bindings, 65,  unit_ref);
+			put_binding(bindings, 67,  unit_ref);
 			return unit_ref;
 		}
 	}
@@ -520,9 +524,9 @@ ref var_6_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(pr_i_l_ref), "r"(var_6_cont), "r"(bindings), "r"(var_59),  "r"(pr_i_l_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(pr_i_l_ref), "r"(var_6_cont), "r"(bindings), "r"(var_61),  "r"(pr_i_l_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -531,7 +535,7 @@ ref var_7_cont(hash_map* bindings)
 {
 	GET_BINDING(se_a_ref, void**, se_a, 0, bindings)
 	info_table* se_a_info = *((info_table**)se_a);
-	int var_66 = 0;
+	int var_68 = 0;
 	if(se_a_info->type == 5)
 	{
 		assert((se_a_info)->type == 5);
@@ -544,9 +548,9 @@ ref var_7_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(se_a_ref), "r"(var_7_cont), "r"(bindings), "r"(var_66),  "r"(se_a_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(se_a_ref), "r"(var_7_cont), "r"(bindings), "r"(var_68),  "r"(se_a_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -592,25 +596,25 @@ ref var_22_cont(hash_map* bindings)
 {
 	GET_BINDING(y1_ref, void**, y1, 1, bindings)
 	info_table* y1_info = *((info_table**)y1);
-	int var_67 = 1;
+	int var_69 = 1;
 	if(y1_info->type == 1)
 	{
 		if((((y1_info)->extra).constructor).con_num == 0)
 		{
-			I* var_68 = (I*)y1;
+			I* var_70 = (I*)y1;
 			NEW_REF(b1_ref, int*, sizeof(int), b1)
-			*(b1) = (var_68)->I_value;
-			put_binding(bindings, 69,  b1_ref);
+			*(b1) = (var_70)->I_value;
+			put_binding(bindings, 71,  b1_ref);
 			NEW_REF(c1_ref, I*, sizeof(I), c1)
 			(c1)->info_ptr = &I_info_table;
-			int var_71;
+			int var_73;
 			{
 				GET_BINDING(a1_ref, int*, a1, 21, bindings)
-				GET_BINDING(b1_ref, int*, b1, 69, bindings)
-				var_71 = *(a1) + *(b1);
+				GET_BINDING(b1_ref, int*, b1, 71, bindings)
+				var_73 = *(a1) + *(b1);
 			}
-			(c1)->I_value = var_71;
-			put_binding(bindings, 70,  c1_ref);
+			(c1)->I_value = var_73;
+			put_binding(bindings, 72,  c1_ref);
 			return c1_ref;
 		}
 	}
@@ -626,9 +630,9 @@ ref var_22_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(y1_ref), "r"(var_22_cont), "r"(bindings), "r"(var_67),  "r"(y1_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(y1_ref), "r"(var_22_cont), "r"(bindings), "r"(var_69),  "r"(y1_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -637,7 +641,7 @@ ref var_40(ref thunk_ref)
 {
 	hash_map* bindings = THUNK_GET_BINDINGS(thunk_ref);
 	GET_BINDING(ma_f_ref, void**, ma_f, 0, bindings)
-	int var_73 = 0;
+	int var_75 = 0;
 	info_table ma_f_info = *(*((info_table**)ma_f));
 	if(ma_f_info.type == 0)
 	{
@@ -652,16 +656,18 @@ ref var_40(ref thunk_ref)
 			GET_BINDING(ma_v_ref, int*, ma_v, 37, bindings)
 			push_int(*(ma_v));
 		}
-		ref var_72;
-		__asm__ volatile (
+		ref var_74;
+		void* var_76 = (void*)(((ma_f_info).extra).function).slow_entry_point;
+		__asm__ volatile   goto (
 			"movq %0, %%rdi;\n\t"
+			"movq %1, %%rsi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(var_72)
-			:"rdi"
+			"jmp *%1;\n\t"
+			: 
+			: "r"(var_74),  "r"(var_76)
+			: "rdi",  "rsi"
 		);
-		goto *(void*)(((ma_f_info).extra).function).slow_entry_point;
 	}
 	else if(ma_f_info.type == 4)
 		{
@@ -677,16 +683,18 @@ ref var_40(ref thunk_ref)
 				push_int(*(ma_v));
 			}
 			unroll_pap(ma_f);
-			ref var_72;
-			__asm__ volatile (
+			ref var_74;
+			void* var_76 = (void*)(((*((((ma_f_info).extra).pap_info).info_ptr)).extra).function).slow_entry_point;
+			__asm__ volatile   goto (
 				"movq %0, %%rdi;\n\t"
+				"movq %1, %%rsi;\n\t"
 				"movq %%rbp, %%rsp;\n\t"
 				"popq %%rbp;\n\t"
-				:
-				:"r"(var_72)
-				:"rdi"
+				"jmp *%1;\n\t"
+				: 
+				: "r"(var_74),  "r"(var_77)
+				: "rdi",  "rsi"
 			);
-			goto *(void*)(((*((((ma_f_info).extra).pap_info).info_ptr)).extra).function).slow_entry_point;
 		}
 	else
 	{
@@ -700,9 +708,9 @@ ref var_40(ref thunk_ref)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(ma_f_ref), "r"(var_40), "r"(bindings), "r"(var_73),  "r"(ma_f_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(ma_f_ref), "r"(var_40), "r"(bindings), "r"(var_75),  "r"(ma_f_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -722,37 +730,37 @@ ref var_52_cont(hash_map* bindings)
 {
 	GET_BINDING(zi_bs_ref, void**, zi_bs, 1, bindings)
 	info_table* zi_bs_info = *((info_table**)zi_bs);
-	int var_74 = 1;
+	int var_78 = 1;
 	if(zi_bs_info->type == 1)
 	{
 		if((((zi_bs_info)->extra).constructor).con_num == 1)
 		{
-			Nil* var_75 = (Nil*)zi_bs;
+			Nil* var_79 = (Nil*)zi_bs;
 			NEW_REF(zi_nil_ref, Nil*, sizeof(Nil), zi_nil)
 			(zi_nil)->info_ptr = &Nil_info_table;
-			put_binding(bindings, 76,  zi_nil_ref);
+			put_binding(bindings, 80,  zi_nil_ref);
 			return zi_nil_ref;
 		}
 		if((((zi_bs_info)->extra).constructor).con_num == 0)
 		{
-			Cons* var_77 = (Cons*)zi_bs;
-			ref zi_b_ref = (var_77)->C_element;
-			put_binding(bindings, 78,  zi_b_ref);
-			ref zi_bn_ref = (var_77)->C_next;
-			put_binding(bindings, 79,  zi_bn_ref);
+			Cons* var_81 = (Cons*)zi_bs;
+			ref zi_b_ref = (var_81)->C_element;
+			put_binding(bindings, 82,  zi_b_ref);
+			ref zi_bn_ref = (var_81)->C_next;
+			put_binding(bindings, 83,  zi_bn_ref);
 			NEW_REF(zi_p_ref, Pa*, sizeof(Pa), zi_p)
 			(zi_p)->info_ptr = &Pa_info_table;
 			GET_BINDING(zi_a_ref, void**, zi_a, 50, bindings)
 			(zi_p)->P_fst = zi_a_ref;
 			(zi_p)->P_snd = zi_b_ref;
-			put_binding(bindings, 80,  zi_p_ref);
-			ref zi_rest_ref = create_thunk(bindings,  var_82);
-			put_binding(bindings, 81,  zi_rest_ref);
+			put_binding(bindings, 84,  zi_p_ref);
+			ref zi_rest_ref = create_thunk(bindings,  var_86);
+			put_binding(bindings, 85,  zi_rest_ref);
 			NEW_REF(zi_res_ref, Cons*, sizeof(Cons), zi_res)
 			(zi_res)->info_ptr = &Cons_info_table;
 			(zi_res)->C_element = zi_p_ref;
 			(zi_res)->C_next = zi_rest_ref;
-			put_binding(bindings, 83,  zi_res_ref);
+			put_binding(bindings, 87,  zi_res_ref);
 			return zi_res_ref;
 		}
 	}
@@ -768,38 +776,38 @@ ref var_52_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(zi_bs_ref), "r"(var_52_cont), "r"(bindings), "r"(var_74),  "r"(zi_bs_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(zi_bs_ref), "r"(var_52_cont), "r"(bindings), "r"(var_78),  "r"(zi_bs_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
 }
-ref var_63_cont(hash_map* bindings)
+ref var_65_cont(hash_map* bindings)
 {
-	GET_BINDING(pr_i_v_ref, void**, pr_i_v, 61, bindings)
+	GET_BINDING(pr_i_v_ref, void**, pr_i_v, 63, bindings)
 	info_table* pr_i_v_info = *((info_table**)pr_i_v);
-	int var_84 = 61;
+	int var_88 = 63;
 	if(pr_i_v_info->type == 1)
 	{
 		if((((pr_i_v_info)->extra).constructor).con_num == 0)
 		{
-			I* var_85 = (I*)pr_i_v;
+			I* var_89 = (I*)pr_i_v;
 			NEW_REF(pr_i_x_ref, int*, sizeof(int), pr_i_x)
-			*(pr_i_x) = (var_85)->I_value;
-			put_binding(bindings, 86,  pr_i_x_ref);
-			ref pr_i_rest_ref = create_thunk(bindings,  var_88);
-			put_binding(bindings, 87,  pr_i_rest_ref);
-			ref pr_i_inner_ref = create_thunk(bindings,  var_90);
-			put_binding(bindings, 89,  pr_i_inner_ref);
+			*(pr_i_x) = (var_89)->I_value;
+			put_binding(bindings, 90,  pr_i_x_ref);
+			ref pr_i_rest_ref = create_thunk(bindings,  var_92);
+			put_binding(bindings, 91,  pr_i_rest_ref);
+			ref pr_i_inner_ref = create_thunk(bindings,  var_94);
+			put_binding(bindings, 93,  pr_i_inner_ref);
 			NEW_REF(unit_ref, Unit*, sizeof(Unit), unit)
 			(unit)->info_ptr = &Unit_info_table;
-			put_binding(bindings, 91,  unit_ref);
+			put_binding(bindings, 95,  unit_ref);
 			{
 				ref pr_i_inner;
-				get_binding(bindings, 89,  &(pr_i_inner));
+				get_binding(bindings, 93,  &(pr_i_inner));
 				ref unit;
-				get_binding(bindings, 91,  &(unit));
+				get_binding(bindings, 95,  &(unit));
 				return seq(pr_i_inner,  unit);
 			}
 		}
@@ -816,44 +824,44 @@ ref var_63_cont(hash_map* bindings)
 			"movq %4, %%r8;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(pr_i_v_ref), "r"(var_63_cont), "r"(bindings), "r"(var_84),  "r"(pr_i_v_ref)
-			:"rdi", "rsi", "rdx", "rcx",  "r8"
+			: 
+			: "r"(pr_i_v_ref), "r"(var_65_cont), "r"(bindings), "r"(var_88),  "r"(pr_i_v_ref)
+			: "rdi", "rsi", "rdx", "rcx",  "r8"
 		);
 		goto *(void*)thunk_continuation;
 	}
 }
-ref var_82(ref thunk_ref)
+ref var_86(ref thunk_ref)
 {
 	hash_map* bindings = THUNK_GET_BINDINGS(thunk_ref);
 	{
 		ref zi_an;
 		get_binding(bindings, 51,  &(zi_an));
 		ref zi_bn;
-		get_binding(bindings, 79,  &(zi_bn));
+		get_binding(bindings, 83,  &(zi_bn));
 		return zip(zi_an,  zi_bn);
 	}
 }
-ref var_88(ref thunk_ref)
+ref var_92(ref thunk_ref)
 {
 	hash_map* bindings = THUNK_GET_BINDINGS(thunk_ref);
 	{
 		ref pr_i_n;
-		get_binding(bindings, 62,  &(pr_i_n));
+		get_binding(bindings, 64,  &(pr_i_n));
 		return print_i_list(pr_i_n);
 	}
 }
-ref var_90(ref thunk_ref)
+ref var_94(ref thunk_ref)
 {
 	hash_map* bindings = THUNK_GET_BINDINGS(thunk_ref);
 	{
-		GET_BINDING(var_93_ref, int*, var_93, 86, bindings)
-		printf("%d\n",  *(var_93));
-		NEW_REF(var_92, Unit*, sizeof(Unit), var_92_val)
-		(var_92_val)->info_ptr = &Unit_info_table;
+		GET_BINDING(var_97_ref, int*, var_97, 90, bindings)
+		printf("%d\n",  *(var_97));
+		NEW_REF(var_96, Unit*, sizeof(Unit), var_96_val)
+		(var_96_val)->info_ptr = &Unit_info_table;
 		ref pr_i_rest;
-		get_binding(bindings, 87,  &(pr_i_rest));
-		return seq(var_92,  pr_i_rest);
+		get_binding(bindings, 91,  &(pr_i_rest));
+		return seq(var_96,  pr_i_rest);
 	}
 }
 ref plus_int(ref x1,  ref y1)
@@ -866,9 +874,9 @@ ref plus_int(ref x1,  ref y1)
 		"movq %0, %%rdi;\n\t"
 		"movq %%rbp, %%rsp;\n\t"
 		"popq %%rbp;\n\t"
-		:
-		:"r"(bindings)
-		:"rdi"
+		: 
+		: "r"(bindings)
+		: "rdi"
 	);
 	goto *(void*)var_0_cont;
 }
@@ -885,9 +893,9 @@ ref plus_int_slow(ref null)
 			"movq %1, %%rsi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(x1),  "r"(y1)
-			:"rdi",  "rsi"
+			: 
+			: "r"(x1),  "r"(y1)
+			: "rdi",  "rsi"
 		);
 		goto *(void*)plus_int;
 	}
@@ -939,9 +947,9 @@ ref head(ref he_l)
 		"movq %0, %%rdi;\n\t"
 		"movq %%rbp, %%rsp;\n\t"
 		"popq %%rbp;\n\t"
-		:
-		:"r"(bindings)
-		:"rdi"
+		: 
+		: "r"(bindings)
+		: "rdi"
 	);
 	goto *(void*)var_1_cont;
 }
@@ -955,9 +963,9 @@ ref head_slow(ref null)
 			"movq %0, %%rdi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(he_l)
-			:"rdi"
+			: 
+			: "r"(he_l)
+			: "rdi"
 		);
 		goto *(void*)head;
 	}
@@ -994,9 +1002,9 @@ ref tail(ref ta_l)
 		"movq %0, %%rdi;\n\t"
 		"movq %%rbp, %%rsp;\n\t"
 		"popq %%rbp;\n\t"
-		:
-		:"r"(bindings)
-		:"rdi"
+		: 
+		: "r"(bindings)
+		: "rdi"
 	);
 	goto *(void*)var_2_cont;
 }
@@ -1010,9 +1018,9 @@ ref tail_slow(ref null)
 			"movq %0, %%rdi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(ta_l)
-			:"rdi"
+			: 
+			: "r"(ta_l)
+			: "rdi"
 		);
 		goto *(void*)tail;
 	}
@@ -1050,9 +1058,9 @@ ref map(ref ma_f,  ref ma_l)
 		"movq %0, %%rdi;\n\t"
 		"movq %%rbp, %%rsp;\n\t"
 		"popq %%rbp;\n\t"
-		:
-		:"r"(bindings)
-		:"rdi"
+		: 
+		: "r"(bindings)
+		: "rdi"
 	);
 	goto *(void*)var_3_cont;
 }
@@ -1069,9 +1077,9 @@ ref map_slow(ref null)
 			"movq %1, %%rsi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(ma_f),  "r"(ma_l)
-			:"rdi",  "rsi"
+			: 
+			: "r"(ma_f),  "r"(ma_l)
+			: "rdi",  "rsi"
 		);
 		goto *(void*)map;
 	}
@@ -1124,9 +1132,9 @@ ref zip(ref zi_as,  ref zi_bs)
 		"movq %0, %%rdi;\n\t"
 		"movq %%rbp, %%rsp;\n\t"
 		"popq %%rbp;\n\t"
-		:
-		:"r"(bindings)
-		:"rdi"
+		: 
+		: "r"(bindings)
+		: "rdi"
 	);
 	goto *(void*)var_4_cont;
 }
@@ -1143,9 +1151,9 @@ ref zip_slow(ref null)
 			"movq %1, %%rsi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(zi_as),  "r"(zi_bs)
-			:"rdi",  "rsi"
+			: 
+			: "r"(zi_as),  "r"(zi_bs)
+			: "rdi",  "rsi"
 		);
 		goto *(void*)zip;
 	}
@@ -1198,9 +1206,9 @@ ref uncurry(ref un_f,  ref un_p)
 		"movq %0, %%rdi;\n\t"
 		"movq %%rbp, %%rsp;\n\t"
 		"popq %%rbp;\n\t"
-		:
-		:"r"(bindings)
-		:"rdi"
+		: 
+		: "r"(bindings)
+		: "rdi"
 	);
 	goto *(void*)var_5_cont;
 }
@@ -1217,9 +1225,9 @@ ref uncurry_slow(ref null)
 			"movq %1, %%rsi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(un_f),  "r"(un_p)
-			:"rdi",  "rsi"
+			: 
+			: "r"(un_f),  "r"(un_p)
+			: "rdi",  "rsi"
 		);
 		goto *(void*)uncurry;
 	}
@@ -1271,9 +1279,9 @@ ref print_i_list(ref pr_i_l)
 		"movq %0, %%rdi;\n\t"
 		"movq %%rbp, %%rsp;\n\t"
 		"popq %%rbp;\n\t"
-		:
-		:"r"(bindings)
-		:"rdi"
+		: 
+		: "r"(bindings)
+		: "rdi"
 	);
 	goto *(void*)var_6_cont;
 }
@@ -1287,9 +1295,9 @@ ref print_i_list_slow(ref null)
 			"movq %0, %%rdi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(pr_i_l)
-			:"rdi"
+			: 
+			: "r"(pr_i_l)
+			: "rdi"
 		);
 		goto *(void*)print_i_list;
 	}
@@ -1327,9 +1335,9 @@ ref seq(ref se_a,  ref se_b)
 		"movq %0, %%rdi;\n\t"
 		"movq %%rbp, %%rsp;\n\t"
 		"popq %%rbp;\n\t"
-		:
-		:"r"(bindings)
-		:"rdi"
+		: 
+		: "r"(bindings)
+		: "rdi"
 	);
 	goto *(void*)var_7_cont;
 }
@@ -1346,9 +1354,9 @@ ref seq_slow(ref null)
 			"movq %1, %%rsi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
 			"popq %%rbp;\n\t"
-			:
-			:"r"(se_a),  "r"(se_b)
-			:"rdi",  "rsi"
+			: 
+			: "r"(se_a),  "r"(se_b)
+			: "rdi",  "rsi"
 		);
 		goto *(void*)seq;
 	}
