@@ -385,8 +385,8 @@ generateSlowCall fastName name args = do
                                         decls <- mapM declare_var_type args
                                         return $ decls
                                                  ++ map pop_instr args
-                                                 ++ [returnSt (funCall (fast_call_name name) [commaSep . map (unwrap . fst) $ args])]
-     unwrap (V x) = x
+                                                 ++ tailCall (fast_call_name name) (map unwrap args)
+     unwrap (V x, z) = (x, z)
 
 
 genPapForArgs :: Bool -> String -> String -> [(Atom, ValueType)] -> MonStack [Statement]
@@ -502,26 +502,29 @@ generateCaseCont name (Case (V var_name) es) = do
         -- For this case we push a case frame and then a 'fake' update frame that restores su and returns the arg that the update frame was called with 
         [AltForce x e] -> do
           bindings <- use stringBindings
-          let var_key = show . alX $ M.lookup var_name bindings
+          var_key <- freshName
+          let var_key_num = show . alX $ M.lookup var_name bindings
               isAThunk = s "$$->type == 5" [info_table]
+          varKeyNumAssign <- declInit "int" var_key var_key_num
           rest <- eval e
-          varKeyStmts <- getVarKey var_key
-          return $ varKeyStmts ++ ifSt isAThunk (thunkCase var_key name) [rest]
+          varKeyStmts <- getVarKey var_key_num
+          return $ varKeyStmts
+                     ++ varKeyNumAssign:ifSt isAThunk (thunkCase var_key name) [rest]
         alts -> do
           bindings <- use stringBindings
-          let var_key = show . maybe (error $ s "GenCaseCont $$" [var_name]) id $ M.lookup var_name bindings
+          var_key <- freshName                      
+          let var_key_num = show . maybe (error $ s "GenCaseCont $$" [var_name]) id $ M.lookup var_name bindings
+          varKeyNumAssign <- declInit "int" var_key var_key_num
           caseIfAlts <- mapM caseIf alts
-          varKeyStmts <- getVarKey var_key
-          return $ varKeyStmts ++ ifSt conCase (concat caseIfAlts) [thunkCase var_key name]
+          varKeyStmts <- getVarKey var_key_num
+          return $ varKeyStmts ++ varKeyNumAssign:ifSt conCase (concat caseIfAlts) [thunkCase var_key name]
     conCase = s "$$->type == 1" [info_table]    
     getVarKey var_key = do
       declareInfoTable <- declInit "info_table*" info_table (deref (castPtr "info_table*" var_name))      
       bindingStmt <- bindingMacro var_ref "void**" var_name var_key "bindings"
       return [bindingStmt, declareInfoTable]
-    thunkCase var_key name = [
-       assert (s "$$ == $$" [ptrAccess info_table "type", "5"]),
-       returnSt (funCall "thunk_continuation" [var_ref, name, "bindings", var_key, var_ref])
-     ]
+    thunkCase var_key name = assert (s "$$ == $$" [ptrAccess info_table "type", "5"]):
+                             tailCall "thunk_continuation" [(var_ref, Boxed), (name, Boxed), ("bindings", Boxed), (var_key, Unboxed), (var_ref, Boxed)]
     caseIf (AltCase conName freeVars exp) = do
             [conDefn] <- uses (conMap.ix conName) (:[])
             let expectedConNum = conTag conDefn
@@ -655,7 +658,7 @@ eval c@(Case _ _) = do
   func_prefix <- freshName
   let name = s "$$_$$" [func_prefix, "cont"]
   deferred %= (++[generateCaseCont name c])
-  return [returnSt (funCall name ["bindings"])]
+  return $ tailCall name [("bindings", Boxed)]
 
 
 -- (void**)get_binding()
@@ -689,7 +692,7 @@ eval (FuncCall fun args) = do
          tmp <- freshName
          pushStmts <- pushFunArgs fastFun (reverse args)
          tmp_decl <- decl "ref" tmp
-         return $ pushStmts ++ [tmp_decl, returnSt $ funCall (slow_call_name fun) [tmp]]
+         return $ pushStmts ++ tmp_decl:tailCall (slow_call_name fun) [(tmp, Boxed)]
   else do
     tmp <- freshName
     Just thunkContName <- use curFun
@@ -697,21 +700,21 @@ eval (FuncCall fun args) = do
         fun_ref = s "$$_ref" [fun]
         funKey = if null asd then error (s "FuncCall case: $$" [fun]) else head asd
     initFun <- bindingMacro fun_ref "void**" fun (show funKey) "bindings"
+    funKeyVar <- freshName
+    funKeyNumAssign <- declInit "int" funKeyVar (show funKey)
     initFunTable <- declInit "info_table" infoTable (deref . deref $ castPtr "info_table*" fun)
     funArgPushes <- pushArgsFromLayoutInfo bindings infoTable args
     tmpDecl <- decl "ref" tmp                    
-    let funBody = funArgPushes ++ [tmpDecl, returnSt $ funCall (funSlowEntry infoTable) [tmp]]
+    let funBody = funArgPushes ++ tmpDecl:tailCall (funSlowEntry infoTable) [(tmp, Boxed)]
     papArgPushes <- pushArgsFromLayoutInfo bindings papFunInfoTable args
-    let papBody = papArgPushes ++ [st $ funCall "unroll_pap" [fun], tmpDecl, returnSt $ funCall papSlowEntry [tmp]]
+    let papBody = papArgPushes ++ [st $ funCall "unroll_pap" [fun], tmpDecl] ++ tailCall papSlowEntry [(tmp, Boxed)]
         blackholeCase = ifSt blackholeCheck [assert "false"] [] where blackholeCheck = s "$$.type == 6" [infoTable]
         funcCase = ifSt funcCheck funBody [papCase, thunkCase] where funcCheck = s "$$.type == 0" [infoTable]
         papCase = ifSt papCheck papBody [] where papCheck = s "$$.type == 4" [infoTable]
-        thunkCase = [
-           assert (s "$$.type == $$" [infoTable, "5"]),
-           returnSt (funCall "thunk_continuation" [fun_ref, thunkContName, "bindings", show funKey, fun_ref])
-         ]
+        thunkCase = assert (s "$$.type == $$" [infoTable, "5"]):
+                    tailCall "thunk_continuation" [(fun_ref, Boxed), (thunkContName, Boxed), ("bindings", Boxed), (funKeyVar, Unboxed), (fun_ref, Boxed)]
             
-    return $ initFun:initFunTable:funcCase
+    return $ initFun:funKeyNumAssign:initFunTable:funcCase
     where
       infoTable = s "$$_info" [fun]
       funSlowEntry funTable = structAccess (structAccess (structAccess funTable "extra") "function") "slow_entry_point"

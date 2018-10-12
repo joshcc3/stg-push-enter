@@ -73,6 +73,28 @@ ptrAccess v f = s "($$)->$$" [v, f]
 cast t n = s "($$)$$" [t, n]
 castPtr t n = s "($$*)$$" [t, n]
 returnSt st = s "return $$;" [st]
+
+-- rdx, rcx, rbx              
+tailCall f args = if length args > 6 then error "Err" else
+    "__asm__ volatile (":
+    (tab $
+     "\"movq %%rbp, %%rsp;\\n\\t\"":
+     "\"popq %%rbp;\\n\\t\"":
+     zipWith argPushes [0..] args ++
+     [":", asmInputOperands]) ++ [");"] ++
+    [s "goto *(void*)$$;" [f]]
+        where
+          asmInputOperands = s ":$$" [commaSep $ map g args]
+              where g (x, _) = s "\"r\"($$)" [x]
+          argPushes i (x, Unboxed) = s "\"movl %$$, %%$$;\\n\\t\"" [show i, reg 'e' i]
+          argPushes i (x, Boxed) = s "\"movq %$$, %%$$;\\n\\t\"" [show i, reg 'r' i]
+          reg 'e' i | i < 4 = map ('e':) mainRegs !! i -- r8, r9, r11, then stack
+                    | otherwise = map (++"d") suppRegs !! (i - 4)
+          reg 'r' i | i < 4 = map ('r':) mainRegs !! i -- r8, r9, r11, then stack
+                    | otherwise = suppRegs !! (i - 4)
+          mainRegs = ["di", "si", "dx", "cx"]
+          suppRegs = ["r8", "r9"]
+
 assert st = s "assert($$);" [st]
 structAccess var field = s "($$).$$" [var, field]
 deref x = s "*($$)" [x]

@@ -7,6 +7,7 @@ sites
 *.obj
 *.elf
 *.hi
+*.s
 
 # Linker output
 *.ilk
