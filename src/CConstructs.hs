@@ -1,5 +1,6 @@
 module CConstructs where
 
+import Control.Monad
 import Control.Lens
 import qualified Data.Map as M
 import Utils
@@ -78,7 +79,7 @@ returnSt st = s "return $$;" [st]
 tailCall f args = if length args > 6 then error "Err" else
     "__asm__ volatile (":
     (tab $
-     zipWith argPushes [0..] args ++
+     concat (zipWith argPushes [0..] args) ++
      "\"movq %%rbp, %%rsp;\\n\\t\"":
      "\"popq %%rbp;\\n\\t\"":
      [":", asmInputOperands]) ++ [");"] ++
@@ -86,8 +87,9 @@ tailCall f args = if length args > 6 then error "Err" else
         where
           asmInputOperands = s ":$$" [commaSep $ map g args]
               where g (x, _) = s "\"r\"($$)" [x]
-          argPushes i (x, Unboxed) = s "\"movl %$$, %%$$;\\n\\t\"" [show i, reg 'e' i]
-          argPushes i (x, Boxed) = s "\"movq %$$, %%$$;\\n\\t\"" [show i, reg 'r' i]
+          argPushes i (x, Unboxed) = [s "\"xorq %%$$, %%$$\\n\\t\"" [reg 'r' i, reg 'r' i],
+                                      s "\"movl %$$, %%$$;\\n\\t\"" [show i, reg 'e' i]]
+          argPushes i (x, Boxed) = [s "\"movq %$$, %%$$;\\n\\t\"" [show i, reg 'r' i]]
           reg 'e' i | i < 4 = map ('e':) mainRegs !! i -- r8, r9, r11, then stack
                     | otherwise = map (++"d") suppRegs !! (i - 4)
           reg 'r' i | i < 4 = map ('r':) mainRegs !! i -- r8, r9, r11, then stack
