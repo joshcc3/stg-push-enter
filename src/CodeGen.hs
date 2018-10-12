@@ -693,7 +693,7 @@ eval (FuncCall fun args) = do
     papArgPushes <- pushArgsFromLayoutInfo bindings papFunInfoTable args
 
     papTmp <- freshName
-    papJmpAddrStore <- declInit "void*" funTmp (castPtr "void" papSlowEntry)
+    papJmpAddrStore <- declInit "void*" papTmp (castPtr "void" papSlowEntry)
 
     let papUnknownCallStmts = unknownTailCall papTmp papSlowEntry [(tmp, Boxed)]
         papBody = papArgPushes ++ [st $ funCall "unroll_pap" [fun], tmpDecl] ++ papJmpAddrStore:papUnknownCallStmts

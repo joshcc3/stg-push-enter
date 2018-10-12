@@ -105,11 +105,11 @@ toClobberedReg x _ = s "\"$$\"" [reg 'r' x]
 
 
 unknownTailCall tmp f args' = if length args > 6 then error $ s "$$ takes $$, I only know how to deal with <= 6" [f, show args] else
-    asmCode ["volatile", "goto"] body [] (map toAsmInputOperand args) (zipWith toClobberedReg [0..] args)
+    asmCode ["volatile"] body [] (map toAsmInputOperand args) (zipWith toClobberedReg [0..] args)
   where
-	body = concat (zipWith asmArgPushes [0..] args) ++ [asmPopFrame, asmPopRBP, asmJmp argIndex]
-	argIndex = s "%$$" [show $ length args - 1]
-	args = args' ++ [(tmp, Boxed)]
+    body = concat (zipWith asmArgPushes [0..] args) ++ [asmPopFrame, asmPopRBP, asmJmp argIndex]
+    argIndex = s "%$$" [show $ length args - 1]
+    args = args' ++ [(tmp, Boxed)]
 
 
 -- rdx, rcx, rbx

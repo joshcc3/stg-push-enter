@@ -404,7 +404,7 @@ ref var_5_cont(hash_map* bindings)
 				}
 				ref var_63;
 				void* var_65 = (void*)(((un_f_info).extra).function).slow_entry_point;
-				__asm__ volatile   goto (
+				__asm__ volatile (
 					"movq %0, %%rdi;\n\t"
 					"movq %1, %%rsi;\n\t"
 					"movq %%rbp, %%rsp;\n\t"
@@ -441,8 +441,8 @@ ref var_5_cont(hash_map* bindings)
 					}
 					unroll_pap(un_f);
 					ref var_63;
-					void* var_65 = (void*)(((*((((un_f_info).extra).pap_info).info_ptr)).extra).function).slow_entry_point;
-					__asm__ volatile   goto (
+					void* var_66 = (void*)(((*((((un_f_info).extra).pap_info).info_ptr)).extra).function).slow_entry_point;
+					__asm__ volatile (
 						"movq %0, %%rdi;\n\t"
 						"movq %1, %%rsi;\n\t"
 						"movq %%rbp, %%rsp;\n\t"
@@ -676,7 +676,7 @@ ref var_46(ref thunk_ref)
 		}
 		ref var_78;
 		void* var_80 = (void*)(((ma_f_info).extra).function).slow_entry_point;
-		__asm__ volatile   goto (
+		__asm__ volatile (
 			"movq %0, %%rdi;\n\t"
 			"movq %1, %%rsi;\n\t"
 			"movq %%rbp, %%rsp;\n\t"
@@ -702,8 +702,8 @@ ref var_46(ref thunk_ref)
 			}
 			unroll_pap(ma_f);
 			ref var_78;
-			void* var_80 = (void*)(((*((((ma_f_info).extra).pap_info).info_ptr)).extra).function).slow_entry_point;
-			__asm__ volatile   goto (
+			void* var_81 = (void*)(((*((((ma_f_info).extra).pap_info).info_ptr)).extra).function).slow_entry_point;
+			__asm__ volatile (
 				"movq %0, %%rdi;\n\t"
 				"movq %1, %%rsi;\n\t"
 				"movq %%rbp, %%rsp;\n\t"
