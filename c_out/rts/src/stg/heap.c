@@ -25,7 +25,18 @@ ref thunk_continuation(ref thunk_ref, ref (*case_cont)(struct hash_map*), struct
     push_case_frame(case_cont, case_key, bindings);
     push_update_frame(update_ref);
     thunk_info->type = 6;
-    return case_continuation(update_continuation(thunk_info->extra.thunk_info.return_address(thunk_ref)));
+    ref result = update_continuation(thunk_info->extra.thunk_info.return_address(thunk_ref));
+
+	__asm__ volatile (
+	        "movq %0, %%rdi;\n\t"
+	        "movq %%rbp, %%rsp;\n\t"
+	        "popq %%rbp;\n\t"
+	        :
+	        : "r"(res)
+	        : "rdi"
+	);
+	goto *(void*)case_continuation;
+
 }
 
 
