@@ -56,6 +56,7 @@ ref var_0_cont(hash_map* bindings)
 				"popq %%rbp;\n\t"
 				:
 				:"r"(bindings)
+				:"rdi"
 			);
 			goto *(void*)var_9_cont;
 		}
@@ -74,6 +75,7 @@ ref var_0_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(x1_ref), "r"(var_0_cont), "r"(bindings), "r"(var_6),  "r"(x1_ref)
+			:"rdi"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -123,6 +125,7 @@ ref var_5_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(pl_z_ref), "r"(var_5_cont), "r"(bindings), "r"(var_10),  "r"(pl_z_ref)
+			:"rdi"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -167,6 +170,7 @@ ref var_9_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(y1_ref), "r"(var_9_cont), "r"(bindings), "r"(var_15),  "r"(y1_ref)
+			:"rdi"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -183,6 +187,7 @@ ref plus_int(ref x1,  ref y1)
 		"popq %%rbp;\n\t"
 		:
 		:"r"(bindings)
+		:"rdi"
 	);
 	goto *(void*)var_0_cont;
 }
@@ -201,6 +206,7 @@ ref plus_int_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(x1),  "r"(y1)
+			:"rdi"
 		);
 		goto *(void*)plus_int;
 	}
@@ -263,6 +269,7 @@ ref main_()
 		"popq %%rbp;\n\t"
 		:
 		:"r"(bindings)
+		:"rdi"
 	);
 	goto *(void*)var_5_cont;
 }

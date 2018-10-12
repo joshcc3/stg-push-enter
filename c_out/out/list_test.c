@@ -96,6 +96,7 @@ ref var_0_cont(hash_map* bindings)
 				"popq %%rbp;\n\t"
 				:
 				:"r"(bindings)
+				:"rdi"
 			);
 			goto *(void*)var_21_cont;
 		}
@@ -114,6 +115,7 @@ ref var_0_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(x1_ref), "r"(var_0_cont), "r"(bindings), "r"(var_18),  "r"(x1_ref)
+			:"rdi"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -156,6 +158,7 @@ ref var_1_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(he_l_ref), "r"(var_1_cont), "r"(bindings), "r"(var_22),  "r"(he_l_ref)
+			:"rdi"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -198,6 +201,7 @@ ref var_2_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ta_l_ref), "r"(var_2_cont), "r"(bindings), "r"(var_28),  "r"(ta_l_ref)
+			:"rdi"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -250,6 +254,7 @@ ref var_3_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ma_l_ref), "r"(var_3_cont), "r"(bindings), "r"(var_34),  "r"(ma_l_ref)
+			:"rdi"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -337,6 +342,7 @@ ref var_17_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(case_expr_ref), "r"(var_17_cont), "r"(bindings), "r"(var_45),  "r"(case_expr_ref)
+			:"rdi"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -381,6 +387,7 @@ ref var_21_cont(hash_map* bindings)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(y1_ref), "r"(var_21_cont), "r"(bindings), "r"(var_50),  "r"(y1_ref)
+			:"rdi"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -411,6 +418,7 @@ ref var_39(ref thunk_ref)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(var_55)
+			:"rdi"
 		);
 		goto *(void*)(((ma_f_info).extra).function).slow_entry_point;
 	}
@@ -435,6 +443,7 @@ ref var_39(ref thunk_ref)
 				"popq %%rbp;\n\t"
 				:
 				:"r"(var_55)
+				:"rdi"
 			);
 			goto *(void*)(((*((((ma_f_info).extra).pap_info).info_ptr)).extra).function).slow_entry_point;
 		}
@@ -452,6 +461,7 @@ ref var_39(ref thunk_ref)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ma_f_ref), "r"(var_39), "r"(bindings), "r"(var_56),  "r"(ma_f_ref)
+			:"rdi"
 		);
 		goto *(void*)thunk_continuation;
 	}
@@ -479,6 +489,7 @@ ref plus_int(ref x1,  ref y1)
 		"popq %%rbp;\n\t"
 		:
 		:"r"(bindings)
+		:"rdi"
 	);
 	goto *(void*)var_0_cont;
 }
@@ -497,6 +508,7 @@ ref plus_int_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(x1),  "r"(y1)
+			:"rdi"
 		);
 		goto *(void*)plus_int;
 	}
@@ -550,6 +562,7 @@ ref head(ref he_l)
 		"popq %%rbp;\n\t"
 		:
 		:"r"(bindings)
+		:"rdi"
 	);
 	goto *(void*)var_1_cont;
 }
@@ -565,6 +578,7 @@ ref head_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(he_l)
+			:"rdi"
 		);
 		goto *(void*)head;
 	}
@@ -603,6 +617,7 @@ ref tail(ref ta_l)
 		"popq %%rbp;\n\t"
 		:
 		:"r"(bindings)
+		:"rdi"
 	);
 	goto *(void*)var_2_cont;
 }
@@ -618,6 +633,7 @@ ref tail_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ta_l)
+			:"rdi"
 		);
 		goto *(void*)tail;
 	}
@@ -657,6 +673,7 @@ ref map(ref ma_f,  ref ma_l)
 		"popq %%rbp;\n\t"
 		:
 		:"r"(bindings)
+		:"rdi"
 	);
 	goto *(void*)var_3_cont;
 }
@@ -675,6 +692,7 @@ ref map_slow(ref null)
 			"popq %%rbp;\n\t"
 			:
 			:"r"(ma_f),  "r"(ma_l)
+			:"rdi"
 		);
 		goto *(void*)map;
 	}
@@ -753,6 +771,7 @@ ref main_()
 		"popq %%rbp;\n\t"
 		:
 		:"r"(bindings)
+		:"rdi"
 	);
 	goto *(void*)var_17_cont;
 }

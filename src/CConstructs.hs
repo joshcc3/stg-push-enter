@@ -82,11 +82,12 @@ tailCall f args = if length args > 6 then error "Err" else
      concat (zipWith argPushes [0..] args) ++
      "\"movq %%rbp, %%rsp;\\n\\t\"":
      "\"popq %%rbp;\\n\\t\"":
-     [":", asmInputOperands]) ++ [");"] ++
+     [":", asmInputOperands, clobbers]) ++ [");"] ++
     [s "goto *(void*)$$;" [f]]
         where
           asmInputOperands = s ":$$" [commaSep $ map g args]
               where g (x, _) = s "\"r\"($$)" [x]
+          clobbers = s ":$$" (zipWith g [0..] args) where g x _ = s "\"$$\"" [reg 'r' x]
           argPushes i (x, Unboxed) = [s "\"xorq %%$$, %%$$\\n\\t\"" [reg 'r' i, reg 'r' i],
                                       s "\"movl %$$, %%$$;\\n\\t\"" [show i, reg 'e' i]]
           argPushes i (x, Boxed) = [s "\"movq %$$, %%$$;\\n\\t\"" [show i, reg 'r' i]]
