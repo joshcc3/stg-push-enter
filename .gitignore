@@ -53,6 +53,17 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+
+# Haskell Auto-gen
+
+*.dyn_hi
+*.dyn_o
+*.hi
+
+src/Main
+
+
+
 # My own stuff - intellij, target files
 .idea/
 *.iml

@@ -5,6 +5,8 @@ module Types where
 import Control.Monad.State
 import Data.Map
 import Control.Lens
+import Data.Functor.Identity
+import Control.Monad.Fail
 
 type Statement = String
 
@@ -76,3 +78,6 @@ type Arg = (String, ValueType)
 data Function = Fun [Arg] Expression deriving (Eq, Ord, Show)
 data Constructor = Con String [Atom] deriving (Eq, Ord, Show)
 data PartialApp = Pap String [Atom] deriving (Eq, Ord, Show)
+
+
+instance MonadFail Identity
