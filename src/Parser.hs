@@ -18,12 +18,12 @@ program = Program <$> many1 conDecl <*> many1 funDef
 funDef = (,) <$> (TP.identifier stg <* reservedOp stg "=") <*> object
 conDecl = ConDecl <$> 
     (reserved stg "data" *> TP.identifier stg <* reservedOp stg "=") <*>
-    (zipWith toDefn [0..] <$> (many1 conDefn <* reservedOp stg "|" ))
+    (zipWith toDefn [0..] <$> many1 (conDefn <* reservedOp stg "|" ))
   where
     toDefn ix (n, fs) = ConDefn n ix fs
-    conDefn = (,) <$> TP.identifier stg <*> many1 field
+    conDefn = (,) <$> TP.identifier stg <*> try (many field)
     field = fmap f $ TP.identifier stg
-    f x = if take (length "Unboxed") x == "Unboxed" then (x, Boxed) else (x, Unboxed)
+    f x = if x !! (length x - 1) == '\'' then (x, Boxed) else (x, Unboxed)
 
 object = FUNC <$> function  <|> CON <$> constructor <|>  PAP <$> pap <|> THUNK <$> thunk 
 constructor = Con <$> TP.identifier stg <*> many1 atom

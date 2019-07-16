@@ -37,12 +37,19 @@ t5 = ("plus_int = \\ (x1 Boxed) (y1 Boxed) -> case x1 of \n\
       )
 
 
-t6 = "data Int = I UnboxedIVal"
+t6 = ("data Int = I Ival' |", 
+      conDecl,  
+      ConDecl "Int" [ConDefn {conName = "I", conTag = 0, conFields = [("Ival'",Boxed)]}]
+  )
 
-t7 = "data Pair = Pa P_fst P_snd"
 
-t8 = "data List = Cons C_element C_next"
 
-t9 = "data Unit = Unit"
+t7 = ("data Pair = Pa P_fst P_snd |", conDecl, ConDecl "Pair" [ConDefn {conName = "Pa", conTag = 0, conFields = [("P_fst",Unboxed),("P_snd",
+Unboxed)]}])
 
-t10 = "data Bool = True | False"
+t8 = ("data List = Cons C_element C_next | T x |", conDecl, ConDecl "List" [ConDefn {conName = "Cons", conTag = 0, conFields = [("C_element",Unboxed),("C_next",Unboxed)]},ConDefn {conName = "T", conTag = 1, conFields = [("x",Unboxed)]}])
+
+t9 = ("data Unit = Unit |", conDecl, ConDecl "Unit" [ConDefn {conName = "Unit", conTag = 0, conFields = []}]
+ )
+
+t10 = ("data Bool = True | False |", conDecl, ConDecl "Bool" [ConDefn {conName = "True", conTag = 0, conFields = []},ConDefn {conName = "False", conTag = 1, conFields = []}])
