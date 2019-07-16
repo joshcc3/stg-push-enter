@@ -6,6 +6,7 @@ import Control.Monad
 import Control.Monad.State    
 import Control.Lens hiding (cons)
 import Utils
+import Main
 
 {-
 main = let one = I# 1
@@ -368,3 +369,7 @@ testSuite = [(plus_int_test, "plus_int_test"),
              (list_test2, "list_test2"),
              (fibo_test, "fibo_test"),
              (fibo_test2, "fibo_test2")]            
+
+
+test = do
+  mapM (uncurry compile) testSuite

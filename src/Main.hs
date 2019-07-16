@@ -1,9 +1,12 @@
 module Main where
 
 import CodeGen
+import Parser
 import Types
 import Utils
-import SampleProgram
+import System.Environment
+import Text.Parsec
+
 
 {-
 given a program and outfile (without extension):
@@ -27,4 +30,18 @@ compile prog outfile = do
 pprog = putStrLn . toProgram
 
 main = do
-  mapM (uncurry compile) testSuite
+  args <- getArgs
+  if length args /= 3
+  then (
+    putStrLn "Usage: compile <input-file>.stg <out-file>"
+   )
+  else ( do
+    let fpath = args !! 1
+    let out = args !! 2
+    content <- readFile fpath
+    let ast = case parse program "source" content of
+                Right res -> res
+                Left res -> error (show res)
+    x <- compile ast out
+    return x
+   )

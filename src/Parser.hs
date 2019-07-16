@@ -10,11 +10,14 @@ import Control.Applicative(liftA2)
 stgDef :: LanguageDef st
 stgDef = haskellStyle {
     reservedOpNames =  ["|", "=", "->"],
-    reservedNames = ["data", "let", "in", "case", "of", "Boxed", "Unboxed"]
+    reservedNames = ["data", "let", "in", "case", "of", "Boxed", "Unboxed", "exception"]
 }
 
 stg = makeTokenParser stgDef
+
+program :: Parsec String () Program
 program = Program <$> many1 conDecl <*> many1 funDef
+
 funDef = (,) <$> (TP.identifier stg <* reservedOp stg "=") <*> object
 conDecl = ConDecl <$> 
     (reserved stg "data" *> TP.identifier stg <* reservedOp stg "=") <*>
