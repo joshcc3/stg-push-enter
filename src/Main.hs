@@ -31,13 +31,14 @@ pprog = putStrLn . toProgram
 
 main = do
   args <- getArgs
-  if length args /= 3
+  print args
+  if length args /= 2
   then (
     putStrLn "Usage: compile <input-file>.stg <out-file>"
    )
   else ( do
-    let fpath = args !! 1
-    let out = args !! 2
+    let fpath = args !! 0
+    let out = args !! 1
     content <- readFile fpath
     let ast = case parse program "source" content of
                 Right res -> res

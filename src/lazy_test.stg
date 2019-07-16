@@ -1,7 +1,7 @@
 data Int = I' I_val |
 data Pair = Pa P_fst P_snd |
 data List = Cons C_element C_next | Nil |
-data Unit = Unit
+data Unit = Unit |
 data Bool = True | False | 
 
 main_ = let one = I' 1 in 

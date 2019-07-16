@@ -267,6 +267,7 @@ evalFunDef prog = do
   fun_prototypes <- use funProtos
   return $ imports:fun_prototypes ++ concat defereds ++ concat x
     where
+      generateTopLevelDefn (name, THUNK e) = generateTopLevelDefn (name, FUNC (Fun [] e))
       generateTopLevelDefn (name, FUNC (Fun args e))
           = do
         let slowEntryPointDecl = C_Fun slow_entry_name
@@ -325,6 +326,8 @@ evalFunDef prog = do
                     return $ bs ++ concat bindingSts ++ _e
                   f (v, Boxed) = ("ref", v)
                   f (v, Unboxed) = ("int", v)
+      generateTopLevelDefn (name, v) = error $ name ++ " , " ++ show v
+
 {-
 ref map_slow(ref null)
 {
@@ -779,7 +782,7 @@ evalObject obj_name obj_ref_name (CON (Con c atoms)) = do
   bindings <- use stringBindings
   
   ld <- uses (conMap.ix c) (:[])
-  [constrDefn] <- if null ld then error (s "$$" [c])
+  [constrDefn] <- if null ld then error (s "$$, $$, $$" [c, obj_name, show atoms])
                   else return ld
   let fields = fst . unzip . conFields $ constrDefn
   newRef <- newRefMacro ref_name (s "$$*" [c]) (s "sizeof($$)"[c]) val_name
