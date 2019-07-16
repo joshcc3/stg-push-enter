@@ -4,6 +4,10 @@ data List = Cons C_element C_next | Nil |
 data Unit = Unit |
 data Bool = True | False | 
 
+plus_int = \ (x1 Boxed) (y1 Boxed) -> case x1 of 
+      I' a1 -> case y1 of 
+                 I' b1 -> let c1 = I' (+# a1 b1) in c1
+
 main_ = let one = I' 1 in 
       let inc = plus_int one in 
       let inced = map inc list in 
@@ -13,17 +17,13 @@ main_ = let one = I' 1 in
       let element2 = head tail1 in 
       let element3 = plus_int element1 element2 in 
       case element3 of 
-        I' z -> print_int z,
+        I' z -> print_int z
 
 
 
-plus_int = \x1 y1 -> case x1 of 
-      \I' a1 -> case y1 of 
-                 \I' b1 -> let c1 = I' (a1 +# b1) in c1
 
 
-
-map = \f l -> case l of
+map = \ (f Boxed) (l Boxed) -> case l of
       Cons v n -> let new_v = f v in
                   let new_n = map f n in
                   let new_res = Cons new_v new_n in
@@ -32,13 +32,13 @@ map = \f l -> case l of
 
 
 
-head = \l -> case l of
+head = \ (l Boxed) -> case l of
            Cons v n -> v
            Nil -> exception
 
 
 
-tail = \l -> case l of
+tail = \ (l Boxed) -> case l of
       Cons v n -> v
       Nil -> exception
 

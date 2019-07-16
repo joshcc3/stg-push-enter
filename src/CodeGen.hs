@@ -186,7 +186,7 @@ pushArgsFromLayoutInfo bindings infoTable args
         return $ ifSt cond [declare_xref, getBinding updateKey (refname x), push_instr (V (refname x), Boxed)]
                    [[bindingStmt, push_instr (V (deref x), Unboxed)]]
           where
-            updateKey = maybe (error "#1") id $ M.lookup x bindings
+            updateKey = maybe (error $ s "$$ - $$" [x, show bindings]) id $ M.lookup x bindings
             refname x = s "$$_ref" [x]
             (.) = structAccess
             cond = arrayIndex (infoTable."layout"."entries") index."pointer"

@@ -53,3 +53,37 @@ t9 = ("data Unit = Unit |", conDecl, ConDecl "Unit" [ConDefn {conName = "Unit", 
  )
 
 t10 = ("data Bool = True | False |", conDecl, ConDecl "Bool" [ConDefn {conName = "True", conTag = 0, conFields = []},ConDefn {conName = "False", conTag = 1, conFields = []}])
+
+
+t11 = "data Int = I' I_val | \n\
+\data Pair = Pa P_fst P_snd |  \n\
+\data List = Cons C_element C_next | Nil | \n\
+\data Unit = Unit | \n\
+\data Bool = True | False | \n\
+\ plus_int = \\ (x1 Boxed) (y1 Boxed) -> case x1 of  \n\
+ \      I' a1 -> case y1 of  \n\
+  \                I' b1 -> let c1 = I' (+# a1 b1) in c1 \n\
+\"
+
+t12 = "data Int = I' I_val | \n\
+\data Pair = Pa P_fst P_snd | \n\
+\data List = Cons C_element C_next | Nil |\n\
+\data Unit = Unit |\n\
+\data Bool = True | False | \n\
+\  \n\
+\plus_int = \\ (x1 Boxed) (y1 Boxed) -> case x1 of \n\
+\      I' a1 -> case y1 of \n\
+\                 I' b1 -> let c1 = I' (+# a1 b1) in c1 \n\
+\"
+
+t13 = "head = \\ (l Boxed) -> case l of\n\
+\      Cons v n -> v\n\
+\      Nil -> exception\n\
+\\n\
+\\n\
+\\n\
+\tail = \\ (l Boxed) -> case l of\n\
+\ Cons v n -> v\n\
+\ Nil -> exception\n\
+\\n\
+\"

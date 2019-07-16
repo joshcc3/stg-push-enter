@@ -43,6 +43,7 @@ main = do
     let ast = case parse program "source" content of
                 Right res -> res
                 Left res -> error (show res)
+    print ast
     x <- compile ast out
     return x
    )

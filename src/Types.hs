@@ -57,7 +57,7 @@ data ConDecl = ConDecl String [ConstructorDefn] deriving (Eq, Ord, Show)
 
 
 type FunDef = (String, Object)
-data Program = Program [ConDecl] [FunDef]
+data Program = Program [ConDecl] [FunDef] deriving (Eq, Ord, Show)
 
 data Object = THUNK Expression | FUNC Function | CON Constructor | BLACKHOLE | PAP PartialApp deriving (Eq, Ord, Show)
 

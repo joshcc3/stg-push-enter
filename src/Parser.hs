@@ -10,7 +10,7 @@ import Control.Applicative(liftA2)
 stgDef :: LanguageDef st
 stgDef = haskellStyle {
     reservedOpNames =  ["|", "=", "->"],
-    reservedNames = ["data", "let", "in", "case", "of", "Boxed", "Unboxed", "exception"]
+    reservedNames = ["data", "let", "in", "case", "of", "Boxed", "Unboxed"]
 }
 
 stg = makeTokenParser stgDef
@@ -32,7 +32,7 @@ object = FUNC <$> function  <|> CON <$> constructor <|>  PAP <$> pap <|> THUNK <
 constructor = Con <$> TP.identifier stg <*> many1 atom
 pap = Pap <$> (TP.identifier stg <* reservedOp stg "$!" ) <*> many1 atom
 thunk = expr
-function = Fun <$> (reservedOp stg "\\" *> many1 arg <* reservedOp stg "->") <*> expr
+function = Fun <$> (reservedOp stg "\\" *> many1 arg <* reservedOp stg "->") <*> expr <* string "\n"
   where
     arg = TP.parens stg ((,) <$> (TP.identifier stg) <*> typ)
     typ = (Boxed <$ reserved stg "Boxed") <|> (Unboxed <$ reserved stg "Unboxed")
@@ -53,7 +53,7 @@ caseExpr = Case <$> (reserved stg "case" *> atom <* reserved stg "of") <*>
     alts
   where
     alts = many1 alt
-    alt = AltCase <$> TP.identifier stg <*> (many1 (TP.identifier stg)) <*>
+    alt = AltCase <$> TP.identifier stg <*> (many (TP.identifier stg)) <*>
         (reservedOp stg "->" *> expr)
 
 funcCallExpr = FuncCall <$> TP.identifier stg <*> many1 atom
