@@ -1,3 +1,6 @@
+{-# LANGUAGE ExistentialQuantification #-}
+
+
 module ParserTest where
 
 import Parser
@@ -8,7 +11,7 @@ import Text.Parsec.Token
 
 t1 = ("1", lit, L 1)
 
-t2 = ("case x of\n  Pair a b -> +# a b",
+t2 = ("case x of\n  Pair a b -> +# a b;",
       caseExpr,
       Case (V "x") [AltCase "Pair" ["a","b"] (Atom (P (Primop "+#" [V "a",V "b"])))]
       )
@@ -24,21 +27,21 @@ t4 = ("let one = I 1 in \n\
       \ let element2 = head tail1 in \n \
       \ let element3 = plus_int element1 element2 in \n \
       \ case element3 of \n \
-      \   I z -> print_int z",
+      \   I z -> print_int z;",
       letExpr,
       Let "one" (CON (Con "I" [L 1])) (Let "inc" (CON (Con "plus_int" [V "one"])) (Let "inced" (CON (Con "map" [V "inc",V "list"])) (Let "list" (CON (Con "Cons" [V "one",V "inced"])) (Let "element1" (CON (Con "head" [V "inced"])) (Let "tail1" (CON (Con "tail" [V "inced"])) (Let "element2" (CON (Con "head" [V "tail1"])) (Let "element3" (CON (Con "plus_int" [V "element1",V "element2"])) (Case (V "element3") [AltCase "I" ["z"] (FuncCall "print_int" [V "z"])])))))))))
 
 t5 = ("plus_int = \\ (x1 Boxed) (y1 Boxed) -> case x1 of \n\
         \ I a1 -> case y1 of\n\
         \ I b1 -> let c1 = I (+# a1 b1)\n\
-        \ in c1",
+        \ in c1;;",
       funDef,
       ("plus_int",FUNC (Fun [("x1",Boxed),("y1",Boxed)] (Case (V "x1") [AltCase "I" ["a1"] (Case (V "y1") [AltCase "I" ["b1"] (Let "c1" (CON (Con "I" [P (Primop "+#" [V "a1",V "b1"])])) (Atom (V "c1")))])])))
       )
 
 
-t6 = ("data Int = I Ival' |", 
-      conDecl,  
+t6 = ("data Int = I Ival' |",
+      conDecl,
       ConDecl "Int" [ConDefn {conName = "I", conTag = 0, conFields = [("Ival'",Boxed)]}]
   )
 
@@ -54,18 +57,17 @@ t9 = ("data Unit = Unit |", conDecl, ConDecl "Unit" [ConDefn {conName = "Unit", 
 
 t10 = ("data Bool = True | False |", conDecl, ConDecl "Bool" [ConDefn {conName = "True", conTag = 0, conFields = []},ConDefn {conName = "False", conTag = 1, conFields = []}])
 
-
-t11 = "data Int = I' I_val | \n\
+t11 = ("data Int = I' I_val | \n\
 \data Pair = Pa P_fst P_snd |  \n\
 \data List = Cons C_element C_next | Nil | \n\
 \data Unit = Unit | \n\
 \data Bool = True | False | \n\
 \ plus_int = \\ (x1 Boxed) (y1 Boxed) -> case x1 of  \n\
  \      I' a1 -> case y1 of  \n\
-  \                I' b1 -> let c1 = I' (+# a1 b1) in c1 \n\
-\"
+  \                I' b1 -> let c1 = I' (+# a1 b1) in c1;; \n\
+\", program, Program [ConDecl "Int" [ConDefn {conName = "I'", conTag = 0, conFields = [("I_val",Unboxed)]}],ConDecl "Pair" [ConDefn {conName = "Pa", conTag = 0, conFields = [("P_fst",Unboxed),("P_snd",Unboxed)]}],ConDecl "List" [ConDefn {conName = "Cons", conTag = 0, conFields = [("C_element",Unboxed),("C_next",Unboxed)]},ConDefn {conName = "Nil", conTag = 1, conFields = []}],ConDecl "Unit" [ConDefn {conName = "Unit", conTag = 0, conFields = []}],ConDecl "Bool" [ConDefn {conName = "True", conTag = 0, conFields = []},ConDefn {conName = "False", conTag = 1, conFields = []}]] [("plus_int",FUNC (Fun [("x1",Boxed),("y1",Boxed)] (Case (V "x1") [AltCase "I'" ["a1"] (Case (V "y1") [AltCase "I'" ["b1"] (Let "c1" (CON (Con "I'" [P (Primop "+#" [V "a1",V "b1"])])) (Atom (V "c1")))])])))])
 
-t12 = "data Int = I' I_val | \n\
+t12 = ("data Int = I' I_val | \n\
 \data Pair = Pa P_fst P_snd | \n\
 \data List = Cons C_element C_next | Nil |\n\
 \data Unit = Unit |\n\
@@ -73,17 +75,33 @@ t12 = "data Int = I' I_val | \n\
 \  \n\
 \plus_int = \\ (x1 Boxed) (y1 Boxed) -> case x1 of \n\
 \      I' a1 -> case y1 of \n\
-\                 I' b1 -> let c1 = I' (+# a1 b1) in c1 \n\
-\"
+\                 I' b1 -> let c1 = I' (+# a1 b1) in c1;; \n\
+\", program, Program [ConDecl "Int" [ConDefn {conName = "I'", conTag = 0, conFields = [("I_val",Unboxed)]}],ConDecl "Pair" [ConDefn {conName = "Pa", conTag = 0, conFields = [("P_fst",Unboxed),("P_snd",Unboxed)]}],ConDecl "List" [ConDefn {conName = "Cons", conTag = 0, conFields = [("C_element",Unboxed),("C_next",Unboxed)]},ConDefn {conName = "Nil", conTag = 1, conFields = []}],ConDecl "Unit" [ConDefn {conName = "Unit", conTag = 0, conFields = []}],ConDecl "Bool" [ConDefn {conName = "True", conTag = 0, conFields = []},ConDefn {conName = "False", conTag = 1, conFields = []}]] [("plus_int",FUNC (Fun [("x1",Boxed),("y1",Boxed)] (Case (V "x1") [AltCase "I'" ["a1"] (Case (V "y1") [AltCase "I'" ["b1"] (Let "c1" (CON (Con "I'" [P (Primop "+#" [V "a1",V "b1"])])) (Atom (V "c1")))])])))])
 
-t13 = "head = \\ (l Boxed) -> case l of\n\
+t13 = ("head = \\ (l Boxed) -> case l of\n\
 \      Cons v n -> v\n\
-\      Nil -> exception\n\
-\\n\
-\\n\
-\\n\
+\      Nil -> exception;\n\
 \tail = \\ (l Boxed) -> case l of\n\
 \ Cons v n -> v\n\
-\ Nil -> exception\n\
+\ Nil -> exception;\n\
 \\n\
-\"
+\", many1 funDef, [("head",FUNC (Fun [("l",Boxed)] (Case (V "l") [AltCase "Cons" ["v","n"] (Atom (V "v")),AltCase "Nil" [] (Atom (V "exception"))]))),("tail",FUNC (Fun [("l",Boxed)] (Case (V "l") [AltCase "Cons" ["v","n"] (Atom (V "v")),AltCase "Nil" [] (Atom (V "exception"))])))])
+
+t14 = ("head = \\ (l Boxed) -> case l of\n\
+\      Cons v n -> v\n\
+\      Nil m n -> x;\n\
+\", many1 funDef, [("head",FUNC (Fun [("l",Boxed)] (Case (V "l") [AltCase "Cons" ["v","n"] (Atom (V "v")),AltCase "Nil" ["m","n"] (Atom (V "x"))])))])
+
+data T = forall a. (Eq a, Show a) => T (String, Parsec String () a, a)
+
+cases :: [T]
+cases = [T t1, T t2, T t3, T t4, T t5, T t6, T t7, T t8, T t9, T t10, T t11, T t12, T t13, T t14]
+
+
+test :: T -> IO ()
+test (T (dat, p, expected)) = case parse p "t" dat of
+   Right res -> if res /= expected then error (show res) else putStrLn "Passed"
+   Left e -> error . show $ e
+
+
+runTestSuite = mapM_ test cases

@@ -9,9 +9,10 @@ import Control.Applicative(liftA2)
 
 stgDef :: LanguageDef st
 stgDef = haskellStyle {
-    reservedOpNames =  ["|", "=", "->"],
+    reservedOpNames =  ["|", "=", "->", ";"],
     reservedNames = ["data", "let", "in", "case", "of", "Boxed", "Unboxed"]
 }
+
 
 stg = makeTokenParser stgDef
 
@@ -32,7 +33,7 @@ object = FUNC <$> function  <|> CON <$> constructor <|>  PAP <$> pap <|> THUNK <
 constructor = Con <$> TP.identifier stg <*> many1 atom
 pap = Pap <$> (TP.identifier stg <* reservedOp stg "$!" ) <*> many1 atom
 thunk = expr
-function = Fun <$> (reservedOp stg "\\" *> many1 arg <* reservedOp stg "->") <*> expr <* string "\n"
+function = Fun <$> (reservedOp stg "\\" *> many1 arg <* reservedOp stg "->") <*> expr
   where
     arg = TP.parens stg ((,) <$> (TP.identifier stg) <*> typ)
     typ = (Boxed <$ reserved stg "Boxed") <|> (Unboxed <$ reserved stg "Unboxed")
@@ -44,13 +45,14 @@ primop = P <$> (parens stg  helper <|> helper)
         helper = liftA2 Primop (TP.operator stg) . liftA2 (:) atom $ fmap (:[]) atom
 atom = try primop <|> lit <|> var
 
+
 expr = try caseExpr <|> try letExpr <|> try funcCallExpr <|> (Atom <$> try atom)
 letExpr = Let <$>
   (reserved stg "let" *> TP.identifier stg <* reservedOp stg "=") <*>
   (object) <*>
   (reserved stg "in" *> expr)
-caseExpr = Case <$> (reserved stg "case" *> atom <* reserved stg "of") <*>
-    alts
+
+caseExpr = Case <$>  (reserved stg "case" *> atom <* reserved stg "of") <*> alts <* TP.reservedOp stg ";"
   where
     alts = many1 alt
     alt = AltCase <$> TP.identifier stg <*> (many (TP.identifier stg)) <*>
