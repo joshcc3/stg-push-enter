@@ -6,31 +6,48 @@ import Text.Parsec
 import Text.Parsec.Combinator
 import Types
 import Control.Applicative(liftA2)
+import Text.ParserCombinators.Parsec.Char
+
 
 stgDef :: LanguageDef st
 stgDef = haskellStyle {
     reservedOpNames =  ["|", "=", "->", ";"],
-    reservedNames = ["data", "let", "in", "case", "of", "Boxed", "Unboxed"]
+    reservedNames = ["data", "let", "in", "case", "of", "Boxed", "Unboxed"],
+    identStart = lower
 }
 
+conDef :: LanguageDef st
+conDef = stgDef {
+  identStart = upper
+}
+
+primopDef :: LanguageDef st
+primopDef = stgDef {
+  identStart = char '#'
+}
 
 stg = makeTokenParser stgDef
+con = makeTokenParser conDef
+primops = makeTokenParser primopDef
 
 program :: Parsec String () Program
 program = Program <$> many1 conDecl <*> many1 funDef
 
 funDef = (,) <$> (TP.identifier stg <* reservedOp stg "=") <*> object
 conDecl = ConDecl <$> 
-    (reserved stg "data" *> TP.identifier stg <* reservedOp stg "=") <*>
+    (reserved stg "data" *> TP.identifier con <* reservedOp stg "=") <*>
     (zipWith toDefn [0..] <$> many1 (try (conDefn <* reservedOp stg "|" )))
   where
     toDefn ix (n, fs) = ConDefn n ix fs
-    conDefn = (,) <$> TP.identifier stg <*> try (many field)
-    field = fmap f $ TP.identifier stg
-    f x = if x !! (length x - 1) == '\'' then (x, Boxed) else (x, Unboxed)
+    conDefn = (,) <$> TP.identifier con <*> try (many field)
+    field = fmap f $ TP.identifier con
+    f x = if x !! (l - 1) == '\'' then (take (l - 1) x ++ "__b", Boxed) else (x, Unboxed)
+      where
+        l = length x
 
-object = FUNC <$> function  <|> CON <$> constructor <|>  PAP <$> pap <|> THUNK <$> thunk 
-constructor = Con <$> TP.identifier stg <*> many1 atom
+
+object = FUNC <$> function  <|> CON <$> constructor <|> THUNK <$> thunk 
+constructor = Con <$> TP.identifier con <*> many atom
 pap = Pap <$> (TP.identifier stg <* reservedOp stg "$!" ) <*> many1 atom
 thunk = expr
 function = Fun <$> (reservedOp stg "\\" *> many1 arg <* reservedOp stg "->") <*> expr
@@ -42,7 +59,7 @@ lit = (L . fromInteger) <$> TP.integer stg
 var = V <$> TP.identifier stg
 primop = P <$> (parens stg  helper <|> helper)
     where
-        helper = liftA2 Primop (TP.operator stg) . liftA2 (:) atom $ fmap (:[]) atom
+        helper = liftA2 Primop (TP.identifier primops) (many atom)
 atom = try primop <|> lit <|> var
 
 
@@ -55,7 +72,7 @@ letExpr = Let <$>
 caseExpr = Case <$>  (reserved stg "case" *> atom <* reserved stg "of") <*> alts <* TP.reservedOp stg ";"
   where
     alts = many1 alt
-    alt = AltCase <$> TP.identifier stg <*> (many (TP.identifier stg)) <*>
+    alt = AltCase <$> TP.identifier con <*> (many (TP.identifier stg)) <*>
         (reservedOp stg "->" *> expr)
 
 funcCallExpr = FuncCall <$> TP.identifier stg <*> many1 atom

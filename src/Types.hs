@@ -80,4 +80,5 @@ data Constructor = Con String [Atom] deriving (Eq, Ord, Show)
 data PartialApp = Pap String [Atom] deriving (Eq, Ord, Show)
 
 
-instance MonadFail Identity
+instance MonadFail Identity where
+  fail x = error x

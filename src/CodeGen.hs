@@ -574,13 +574,13 @@ generateThunkCont funName (THUNK e)
 
 -- would be interesting to implement printf in the Real World State monad
 evalPrimop :: String -> Primop -> MonStack [String]             
-evalPrimop res (Primop "print_int" [L x]) = do
+evalPrimop res (Primop "#print_int" [L x]) = do
   resDecl <- decl "ref" res
   return $ [st $ funCall "printf" ["%d\n", show x], resDecl]
-evalPrimop res (Primop "exception" []) = do
+evalPrimop res (Primop "#exception" []) = do
   resDecl <- decl "ref" res
   return [st $ funCall "assert" ["false"], resDecl]
-evalPrimop res (Primop "print_int" [V x]) = do
+evalPrimop res (Primop "#print_int" [V x]) = do
   bindings <- use stringBindings
   tmp <- freshName
   let tmp_ref = s "$$_ref" [tmp]
@@ -754,7 +754,10 @@ eval (Atom (V x)) = do
   if M.member x_ref vars
   then return [returnSt x_ref]
   else do
-    [key] <- uses (stringBindings.ix x) (:[])
+    res_ <- uses (stringBindings.ix x) (:[])
+    let [key] = if null res_
+              then error ("x not in state: " ++ show x)
+              else res_
     declX <- decl "ref" x_ref
     return [declX, getBinding key x_ref, returnSt x_ref]
 eval (Atom (P p)) = do

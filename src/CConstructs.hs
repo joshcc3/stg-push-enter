@@ -168,10 +168,10 @@ newScope :: [Statement] -> [Statement]
 newScope st = "{":tab st ++ ["}"]
 
 cOps :: M.Map String String
-cOps = M.fromList  [("+#", "+"), ("-#", "-"), ("==#", "=="), (">#", ">"), ("<#", "<")]
+cOps = M.fromList  [("#plus", "+"), ("#sub", "-"), ("#eq", "=="), ("#gt", ">"), ("#lt", "<")]
 
 binPrimops ::  M.Map String (Int -> Int -> Int)
-binPrimops = M.fromList [("+#", (+)), ("-#", (-)), ("==#", eq), (">#", gt), ("<#", lt)]
+binPrimops = M.fromList [("#plus", (+)), ("#sub", (-)), ("#eq", eq), ("#gt", gt), ("#lt", lt)]
     where
       eq x y | x == y = 1
              | otherwise = 0

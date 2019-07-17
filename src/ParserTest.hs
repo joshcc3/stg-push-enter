@@ -7,7 +7,7 @@ import Parser
 import Text.Parsec
 import Types
 import Text.Parsec.Token
-
+import Control.Monad
 
 t1 = ("1", lit, L 1)
 
@@ -29,7 +29,8 @@ t4 = ("let one = I 1 in \n\
       \ case element3 of \n \
       \   I z -> print_int z;",
       letExpr,
-      Let "one" (CON (Con "I" [L 1])) (Let "inc" (CON (Con "plus_int" [V "one"])) (Let "inced" (CON (Con "map" [V "inc",V "list"])) (Let "list" (CON (Con "Cons" [V "one",V "inced"])) (Let "element1" (CON (Con "head" [V "inced"])) (Let "tail1" (CON (Con "tail" [V "inced"])) (Let "element2" (CON (Con "head" [V "tail1"])) (Let "element3" (CON (Con "plus_int" [V "element1",V "element2"])) (Case (V "element3") [AltCase "I" ["z"] (FuncCall "print_int" [V "z"])])))))))))
+      Let "one" (CON (Con "I" [L 1])) (Let "inc" (THUNK (FuncCall "plus_int" [V "one"])) (Let "inced" (THUNK (FuncCall "map" [V "inc",V "list"])) (Let "list" (CON (Con "Cons" [V"one",V "inced"])) (Let "element1" (THUNK (FuncCall "head" [V "inced"])) (Let "tail1" (THUNK (FuncCall "tail" [V "inced"])) (Let "element2" (THUNK (FuncCall "head" [V "tail1"])) (Let "element3" (THUNK (FuncCall "plus_int" [V "element1",V "element2"])) (Case (V "element3") [AltCase "I" ["z"] (Primop "#print_int" [V "z"])]))))))))
+  )
 
 t5 = ("plus_int = \\ (x1 Boxed) (y1 Boxed) -> case x1 of \n\
         \ I a1 -> case y1 of\n\
@@ -50,7 +51,7 @@ t6 = ("data Int = I Ival' |",
 t7 = ("data Pair = Pa P_fst P_snd |", conDecl, ConDecl "Pair" [ConDefn {conName = "Pa", conTag = 0, conFields = [("P_fst",Unboxed),("P_snd",
 Unboxed)]}])
 
-t8 = ("data List = Cons C_element C_next | T x |", conDecl, ConDecl "List" [ConDefn {conName = "Cons", conTag = 0, conFields = [("C_element",Unboxed),("C_next",Unboxed)]},ConDefn {conName = "T", conTag = 1, conFields = [("x",Unboxed)]}])
+t8 = ("data List = Cons C_element C_next | Nil |", conDecl, ConDecl "List" [ConDefn {conName = "Cons", conTag = 0, conFields = [("C_element",Unboxed),("C_next",Unboxed)]},ConDefn {conName = "Nil", conTag = 1, conFields = []}])
 
 t9 = ("data Unit = Unit |", conDecl, ConDecl "Unit" [ConDefn {conName = "Unit", conTag = 0, conFields = []}]
  )
@@ -98,10 +99,10 @@ cases :: [T]
 cases = [T t1, T t2, T t3, T t4, T t5, T t6, T t7, T t8, T t9, T t10, T t11, T t12, T t13, T t14]
 
 
-test :: T -> IO ()
-test (T (dat, p, expected)) = case parse p "t" dat of
-   Right res -> if res /= expected then error (show res) else putStrLn "Passed"
+test :: Int -> T -> IO ()
+test i (T (dat, p, expected)) = case parse p "t" dat of
+   Right res -> if res /= expected then error (show res) else putStrLn $ "Passed " ++ show i
    Left e -> error . show $ e
 
 
-runTestSuite = mapM_ test cases
+runTestSuite = zipWithM_ test [1..] cases

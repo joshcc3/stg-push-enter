@@ -61,7 +61,7 @@ plus_int_test = Program [intConDecl, unitConDecl] [("plus_int", FUNC plus_int), 
           where e = Let "pl_x" (CON (Con "I" [L 2101])) $
                     Let "pl_y" (CON (Con "I" [L 2132])) $
                     Let "pl_z" (THUNK (FuncCall "plus_int" [V "pl_x", V "pl_y"])) $
-                    Case (V "pl_z") [AltCase "I" ["pl_a"] $ Atom $ P $ Primop "print_int" [V "pl_a"]]
+                    Case (V "pl_z") [AltCase "I" ["pl_a"] $ Atom $ P $ Primop "#print_int" [V "pl_a"]]
 
 {-
   plus_int x1 y1 = case x1 of
@@ -91,7 +91,7 @@ head_fn :: Function
 head_fn = Fun [("he_l", Boxed)] $
           Case (V "he_l") $ [
                     AltCase "Cons" ["he_v", "he_n"] (Atom $ V "he_v"),
-                    AltCase "Nil" [] (Atom . P $ Primop "exception" [])
+                    AltCase "Nil" [] (Atom . P $ Primop "#exception" [])
                     ]
 
 
@@ -105,7 +105,7 @@ tail_fn :: Function
 tail_fn = Fun [("ta_l", Boxed)] $
           Case (V "ta_l") $ [
                     AltCase "Cons" ["ta_v", "ta_n"] (Atom $ V "ta_n"),
-                    AltCase "Nil" [] (Atom . P $ Primop "exception" [])
+                    AltCase "Nil" [] (Atom . P $ Primop "#exception" [])
                     ]
 
 
@@ -154,7 +154,7 @@ print_i_list_fn = Fun [("pr_i_l", Boxed)] $ Case (V "pr_i_l") [
                         Case (V "pr_i_v") $ [
                            AltCase "I" ["pr_i_x"] $
                               Let "pr_i_rest" (THUNK (FuncCall "print_i_list" [V "pr_i_n"])) $
-                                  Let "pr_i_inner" (THUNK (FuncCall "seq" [P $ Primop "print_int" [V "pr_i_x"], V "pr_i_rest"])) $
+                                  Let "pr_i_inner" (THUNK (FuncCall "seq" [P $ Primop "#print_int" [V "pr_i_x"], V "pr_i_rest"])) $
                                       Let "unit" (CON (Con "Unit" [])) $ 
                                           FuncCall "seq" [V "pr_i_inner", V "unit"]
                              
@@ -253,7 +253,7 @@ fibo_test2 = Program [intConDecl, listConDecl, unitConDecl, pairConDecl, boolCon
                  Let "fibsT" fibsT $
                  Let "fibs" fibs $
                  Let "elem" elem $
-                     Case (V "elem") [AltCase "I" ["x"] $ Atom $ P $ Primop "print_int" [V "x"]]
+                     Case (V "elem") [AltCase "I" ["x"] $ Atom $ P $ Primop "#print_int" [V "x"]]
                          where
                            elem = THUNK (FuncCall "index" [V "fibs", L 20])
                            one = CON (Con "I" [L 1])
@@ -332,7 +332,7 @@ list_test = Program [intConDecl, listConDecl, unitConDecl]
               Let "element2" element2 $
               Let "case_expr" (THUNK (FuncCall "plus_int" [V "element1", V "element2"])) $
               Case (V "case_expr")
-                        [AltCase "I" ["x"] (Atom $ P $ Primop "print_int" [V "x"])]
+                        [AltCase "I" ["x"] (Atom $ P $ Primop "#print_int" [V "x"])]
       one = CON (Con "I" [L 1])
       inc = PAP (Pap "plus_int" [V "one"])
       inced = THUNK (FuncCall "map" [V "inc", V "list"])
@@ -373,3 +373,46 @@ testSuite = [(plus_int_test, "plus_int_test"),
 
 test = do
   mapM (uncurry compile) testSuite
+
+
+
+anotherTest = Program [
+    ConDecl "Int" [ConDefn {conName = "I'", conTag = 0, conFields = [("I_val",Unboxed)]}],
+    ConDecl "Pair" [ConDefn {conName = "Pa", conTag = 0, conFields = [("P_fst",Unboxed),("P_snd",Unboxed)]}],
+    ConDecl "List" [ConDefn {conName = "Cons", conTag = 0, conFields = [("C_element",Unboxed),("C_next",Unboxed)]},
+                    ConDefn {conName = "Nil", conTag = 1, conFields = []}],
+    ConDecl "Unit" [ConDefn {conName = "Unit", conTag = 0, conFields = []}],
+    ConDecl "Bool" [ConDefn {conName = "True", conTag = 0, conFields = []},ConDefn {conName = "False", conTag = 1, conFields = []}]] 
+  
+  [
+    ("plus_int", FUNC (Fun [("x1",Boxed),("y1",Boxed)] (Case (V "x1") [
+        AltCase "I'" ["a1"] (Case (V "y1") [
+          AltCase "I'" ["b1"] (Let "c1" (CON (Con "I'" [P (Primop "+#" [V "a1",V "b1"])])) 
+            (Atom (V "c1")))])]))),
+    ("main_", THUNK (Let "one" (CON (Con "I'" [L 1])) 
+                      (Let "inc" (THUNK (FuncCall "plus_int" [V "one"])) 
+                        (Let "inced" (THUNK (FuncCall "map" [V "inc",V "list"]))
+                          (Let "list" (CON (Con "Cons" [V "one",V "inced"])) 
+                            (Let "element1" (THUNK (FuncCall "head" [V "inced"])) 
+                              (Let "tail1" (THUNK (FuncCall "tail" [V "inced"])) 
+                                (Let "element2" (THUNK (FuncCall "head" [V "tail1"])) 
+                                  (Let "element3" (THUNK (FuncCall "plus_int" [V "element1",V "element2"])) 
+                                    (Case (V "element3") [
+                                        AltCase "I'" ["z"] (Atom $ P $ Primop "#print_int" [V "z"])])))))))))),
+    ("map", FUNC (Fun [("f",Boxed),("l",Boxed)] (Case (V "l") [
+        AltCase "Cons" ["v","n"] (Let "new_v" (THUNK (FuncCall "f" [V "v"])) 
+                                    (Let "new_n" (THUNK (FuncCall "map" [V "f",V "n"])) 
+                                      (Let "new_res" (CON (Con "Cons" [V "new_v",V "new_n"])) 
+                                        (Atom (V "new_res"))))),
+        AltCase "Nil" [] (Let "res" (CON (Con "Nil" [])) 
+                            (Atom (V "res")))]))),
+    ("head",FUNC (Fun [("l",Boxed)] (Case (V "l") [
+      AltCase "Cons" ["v","n"] (Atom (V "v")),
+      AltCase "Nil" [] (Atom . P $ Primop "#exception" [])]))),
+    ("tail", FUNC (Fun [("l",Boxed)] (Case (V "l") [
+      AltCase "Cons" ["v","n"] (Atom (V "v")),
+      AltCase "Nil" [] (Atom . P $ Primop "#exception" [])])))
+  ]
+
+brokenTest = Program [ConDecl "Int" [ConDefn {conName = "I'", conTag = 0, conFields = [("I_val",Unboxed)]}],ConDecl "Pair" [ConDefn {conName = "Pa", conTag = 0, conFields = [("P_fst",Unboxed),("P_snd",Unboxed)]}],ConDecl "List" [ConDefn {conName = "Cons", conTag = 0, conFields = [("C_element",Unboxed),("C_next",Unboxed)]},ConDefn {conName = "Nil", conTag = 1, conFields = []}],ConDecl "Unit" [ConDefn {conName = "Unit", conTag = 0, conFields = []}],ConDecl "Bool" [ConDefn {conName = "True", conTag = 0, conFields = []},ConDefn {conName = "False", conTag = 1, conFields = []}]] [("plus_int",FUNC (Fun [("x1",Boxed),("y1",Boxed)] (Case (V "x1") [AltCase "I'" ["a1"] (Case (V "y1") [AltCase "I'" ["b1"] (Let "c1" (CON (Con "I'" [P (Primop "#plus" [V "a1",V "b1"])])) (Atom (V "c1")))])]))),("main_",THUNK (Let "one" (CON (Con "I'" [L 1])) (Let "inc" (THUNK (FuncCall "plus_int" [V "one"])) (Let "inced" (THUNK (FuncCall "map" [V "inc",V "list"])) (Let "list" (CON (Con "Cons" [V "one",V "inced"])) (Let "element1" (THUNK (FuncCall "head" [V "inced"])) (Let "tail1" (THUNK (FuncCall "tail" [V "inced"])) (Let "element2" (THUNK (FuncCall "head" [V "tail1"])) (Let "element3" (THUNK (FuncCall "plus_int" [V "element1",V "element2"])) (Case (V "element3") [AltCase "I'" ["z"] (Atom (P (Primop "#print_int" [V "z"])))])))))))))),("map",FUNC (Fun [("f",Boxed),("l",Boxed)] (Case (V "l") [AltCase "Cons" ["v","n"] (Let "new_v" (THUNK (FuncCall "f" [V "v"])) (Let "new_n" (THUNK (FuncCall "map" [V "f",V "n"])) (Let "new_res" (CON (Con "Cons" [V "new_v",V "new_n"])) (Atom (V "new_res"))))),AltCase "Nil" [] (Let "res" (CON (Con "Nil" [])) (Atom (V "res")))]))),("head",FUNC (Fun [("l",Boxed)] (Case (V "l") [AltCase "Cons" ["v","n"] (Atom (V "v")),AltCase "Nil" [] (Atom (P (Primop "#exception" [])))]))),("tail",FUNC (Fun [("l",Boxed)] (Case (V "l") [AltCase "Cons" ["v","n"] (Atom (V "v")),AltCase "Nil" [] (Atom (P (Primop "#exception" [])))])))]
+

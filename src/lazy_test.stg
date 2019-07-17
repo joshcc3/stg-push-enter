@@ -6,7 +6,7 @@ data Bool = True | False |
 
 plus_int = \ (x1 Boxed) (y1 Boxed) -> case x1 of
       I' a1 -> case y1 of 
-                 I' b1 -> let c1 = I' (+# a1 b1) in c1;;
+                 I' b1 -> let c1 = I' (#plus a1 b1) in c1;;
 
 main_ = let one = I' 1 in 
       let inc = plus_int one in 
@@ -17,7 +17,7 @@ main_ = let one = I' 1 in
       let element2 = head tail1 in 
       let element3 = plus_int element1 element2 in 
       case element3 of 
-        I' z -> print_int z;
+        I' z -> #print_int z;
 
 
 
@@ -28,17 +28,15 @@ map = \ (f Boxed) (l Boxed) -> case l of
                   let new_n = map f n in
                   let new_res = Cons new_v new_n in
                   new_res
-      Nil -> Nil;
-
-
+      Nil -> let res = Nil in res;
 
 head = \ (l Boxed) -> case l of
            Cons v n -> v
-           Nil -> exception;
+           Nil -> #exception;
 
 
 
 tail = \ (l Boxed) -> case l of
       Cons v n -> v
-      Nil -> exception;
+      Nil -> #exception;
 
