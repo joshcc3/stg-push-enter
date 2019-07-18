@@ -66,7 +66,7 @@ plus_int_test = Program [intConDecl, unitConDecl] [("plus_int", FUNC plus_int), 
 {-
   plus_int x1 y1 = case x1 of
                     I# a1 -> case y1 of
-                               I# b1 -> let c1 = I# (a1 +# b1) 
+                               I# b1 -> let c1 = I# (a1 #plus b1)
                                         in c1
 -}
 plus_int = Fun [("x1", Boxed), ("y1", Boxed)] e
@@ -77,7 +77,7 @@ plus_int = Fun [("x1", Boxed), ("y1", Boxed)] e
                                             Atom (V "c1")
                                        ]
                         ]
-      primopSum = P $ Primop "+#" [V "a1", V "b1"]
+      primopSum = P $ Primop "#plus" [V "a1", V "b1"]
 
 
 
@@ -181,7 +181,7 @@ uncurry_fn = Fun [("un_f", Boxed), ("un_p", Boxed)] $
 
 {-
   index :: [a] -> Int# -> a
-  index l x = case x ==# 0 of
+  index l x = case x #eq 0 of
                 True -> head l
                 False -> let n = tail l in 
                          index l n
@@ -189,10 +189,10 @@ uncurry_fn = Fun [("un_f", Boxed), ("un_p", Boxed)] $
 -}
 index_fn :: Function
 index_fn = Fun [("in_l", Boxed), ("in_x", Unboxed)] $
-           Case (P $ Primop "==#" [V "in_x", L 0]) [
+           Case (P $ Primop "#eq" [V "in_x", L 0]) [
                      AltCase "1" [] $ FuncCall "head" [V "in_l"],
                      AltCase "0" [] $ Let "in_n" (THUNK $ FuncCall "tail" [V "in_l"]) $
-                                              FuncCall "index" [V "in_n", P $ Primop "-#" [V "in_x", L 1]]
+                                              FuncCall "index" [V "in_n", P $ Primop "#sub" [V "in_x", L 1]]
                      ]
 
 {-
@@ -387,7 +387,7 @@ anotherTest = Program [
   [
     ("plus_int", FUNC (Fun [("x1",Boxed),("y1",Boxed)] (Case (V "x1") [
         AltCase "I'" ["a1"] (Case (V "y1") [
-          AltCase "I'" ["b1"] (Let "c1" (CON (Con "I'" [P (Primop "+#" [V "a1",V "b1"])])) 
+          AltCase "I'" ["b1"] (Let "c1" (CON (Con "I'" [P (Primop "#plus" [V "a1",V "b1"])]))
             (Atom (V "c1")))])]))),
     ("main_", THUNK (Let "one" (CON (Con "I'" [L 1])) 
                       (Let "inc" (THUNK (FuncCall "plus_int" [V "one"])) 

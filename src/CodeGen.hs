@@ -595,7 +595,7 @@ evalPrimop res (Primop op [L x, L y]) = (:[]) <$> declInit "int" res (show $ may
 evalPrimop res (Primop op [V x, V y]) = do
   bindings <- use stringBindings
   if length (bindings ^.. ix x) == 0
-  then error . show $ bindings
+  then error $ s "$$ is not in $$" [x, show bindings]
   else return ()
   let [xkey] = bindings ^.. ix x
       [ykey] = bindings ^.. ix y

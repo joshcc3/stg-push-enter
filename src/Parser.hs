@@ -7,6 +7,7 @@ import Text.Parsec.Combinator
 import Types
 import Control.Applicative(liftA2)
 import Text.ParserCombinators.Parsec.Char
+import Utils
 
 
 stgDef :: LanguageDef st
@@ -30,8 +31,33 @@ stg = makeTokenParser stgDef
 con = makeTokenParser conDef
 primops = makeTokenParser primopDef
 
+uniqueifyVars :: Program -> Program
+uniqueifyVars (Program c f) = Program c (map transform f)
+  where
+    transform (prefix, o) = (prefix, handleObject o)
+      where
+        top_levels = map fst f
+        handleObject o = case o of
+          THUNK e -> THUNK $ handleExpr e
+          FUNC (Fun args e) -> FUNC $ Fun (map handleArg args) (handleExpr e)
+          CON (Con c atoms) -> CON $ Con c (map handleAtom atoms)
+          PAP (Pap p atoms) -> PAP $ Pap p (map handleAtom atoms)
+        handleArg (a, t) = (handleVar a, t)
+        handleVar x = s "$$_$$" [prefix, x]
+        handleAtom (V x) = V$ handleVar x
+        handleAtom (P (Primop s atoms)) = P (Primop s (map handleAtom atoms))
+        handleAtom x = x
+        handleExpr (Atom a) = Atom $ handleAtom a
+        handleExpr (Let n o e) = Let (handleVar n) (handleObject o) (handleExpr e)
+        handleExpr (Case a alts) = Case (handleAtom a) (map handleAlt alts)
+        handleExpr (FuncCall n atoms)
+            | elem n top_levels = FuncCall n (map handleAtom atoms)
+            | otherwise = FuncCall (handleVar n) (map handleAtom atoms)
+        handleAlt (AltCase con vars e) = AltCase con (map handleVar vars) (handleExpr e)
+
+
 program :: Parsec String () Program
-program = Program <$> many1 conDecl <*> many1 funDef
+program = uniqueifyVars <$> (Program <$> many1 conDecl <*> many1 funDef)
 
 funDef = (,) <$> (TP.identifier stg <* reservedOp stg "=") <*> object
 conDecl = ConDecl <$> 
@@ -46,7 +72,7 @@ conDecl = ConDecl <$>
         l = length x
 
 
-object = FUNC <$> function  <|> CON <$> constructor <|> THUNK <$> thunk 
+object = PAP <$> try pap <|> FUNC <$> function  <|> CON <$> constructor <|> THUNK <$> thunk
 constructor = Con <$> TP.identifier con <*> many atom
 pap = Pap <$> (TP.identifier stg <* reservedOp stg "$!" ) <*> many1 atom
 thunk = expr
