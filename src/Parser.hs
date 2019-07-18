@@ -54,6 +54,7 @@ uniqueifyVars (Program c f) = Program c (map transform f)
             | elem n top_levels = FuncCall n (map handleAtom atoms)
             | otherwise = FuncCall (handleVar n) (map handleAtom atoms)
         handleAlt (AltCase con vars e) = AltCase con (map handleVar vars) (handleExpr e)
+        handleAlt (AltForce var expr) = AltForce (handleVar var) (handleExpr expr)
 
 
 program :: Parsec String () Program
@@ -98,8 +99,8 @@ letExpr = Let <$>
 caseExpr = Case <$>  (reserved stg "case" *> atom <* reserved stg "of") <*> alts <* TP.reservedOp stg ";"
   where
     alts = many1 alt
-    alt = AltCase <$> TP.identifier con <*> (many (TP.identifier stg)) <*>
-        (reservedOp stg "->" *> expr)
+    alt = (AltCase <$> (TP.identifier con <|> (show <$> TP.integer stg))  <*> (many (TP.identifier stg)) <*>
+        (reservedOp stg "->" *> expr)) <|> (AltForce <$> TP.identifier stg <*> (reservedOp stg "->" *> expr))
 
 funcCallExpr = FuncCall <$> TP.identifier stg <*> many1 atom
 

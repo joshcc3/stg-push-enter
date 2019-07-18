@@ -20,6 +20,73 @@ using the `push-enter` approach based on [this paper](http://simonmar.github.io/
  - System F type checking (TODO)
  - Stack Traces (TODO)
   
+# Examples
+
+Given the following prelude:
+```
+data Int = I IB |
+data Unit = Unit |
+data List = Cons V List | Nil |
+
+zipwith = \ (f Boxed) (l1 Boxed) (l2 Boxed) -> case l1 of
+  Cons x y -> case l2 of 
+                Cons a b -> let new_elem = f x a in
+                            let new_tail = zipwith f y b in
+                            let zipped = Cons new_elem new_tail in
+                            zipped;
+                Nil -> let res = Nil in res
+  Nil -> let res = Nil in res;
+
+map = \ (f  Boxed) (l  Boxed) -> case l of
+   Cons x y -> let new_elem = f x in
+               let new_tail = map f y in
+               let res = Cons new_elem new_tail in
+               res
+   Nil -> let res = Nil in res;
+
+plus_int = \(x1  Boxed) (y1  Boxed) -> case x1 of 
+      I a1 -> case y1 of 
+                 I b1 -> let c1 = I (#plus a1 b1) in c1;;
+
+print_int_list = \ (l  Boxed) -> case l of
+                 Cons v n -> case v of
+                               I x -> let rest = print_int_list n in
+                                       let inner = seq (#print_int x) rest in
+                                       let unit = Unit in
+                                       seq inner unit;;
+
+take = \ (n  Boxed) (l Boxed) -> case n of
+  I x -> case x of 
+    0 -> let res = Nil in res
+    n2 -> case l of
+           Cons h t -> let n3 = #sub n2 1 in
+                      let n4 = I n3 in
+                      let rest = take n4 t in
+                      let res = Cons h rest in
+                      res ;;;
+
+seq = \ (a  Boxed) (b Boxed) -> case a of
+                x -> b;
+```
+
+Below is the famous infinite fibonacci sequence.
+```
+main_ = let one = I 1 in 
+      let fibs = Cons one fibtail in
+      let fibtail = Cons one fibrest in
+      let fibrest = zipwith plus_int fibs fibtail in
+      print_int_list fibs
+```
+The above prints
+```
+1
+1
+2
+3
+5
+8
+...
+```
 
 # Language Spec
 See the paper (page 4, 5) for a more detailed description of the constructs.
