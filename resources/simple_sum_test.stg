@@ -6,7 +6,7 @@ plus_int = \ (x1 Boxed) (y1 Boxed) -> case x1 of
                  I b1 -> let c1 = I (#plus a1 b1) in c1;;
 
 
-main_ = \ (a123 Boxed) -> let pl_x = I 1 in
+main_ = let pl_x = I 1 in
      let pl_y = I 2 in
      let pl_z = plus_int pl_x pl_y in
      case pl_z of

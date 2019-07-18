@@ -8,6 +8,15 @@ plus_int = \ (x1 Boxed) (y1 Boxed) -> case x1 of
       I a1 -> case y1 of 
                  I b1 -> let c1 = I (#plus a1 b1) in c1;;
 
+
+head = \ (l Boxed) -> case l of
+           Cons v n -> v
+           Nil -> #exception;
+
+tail = \ (l Boxed) -> case l of
+      Cons v n -> n
+      Nil -> #exception;
+
 map = \ (f Boxed) (l Boxed) -> case l of
       Cons v n -> let new_v = f v in
                   let new_n = map f n in
@@ -15,19 +24,8 @@ map = \ (f Boxed) (l Boxed) -> case l of
                   new_res
       Nil -> let res = Nil in res;
 
-head = \ (l Boxed) -> case l of
-           Cons v n -> v
-           Nil -> #exception;
 
-
-
-tail = \ (l Boxed) -> case l of
-      Cons v n -> v
-      Nil -> #exception;
-
-
-
-main_ = \ (a123 Boxed) -> let one = I 1 in
+main_ = let one = I 1 in
       let inc = plus_int $! one in
       let inced = map inc list in
       let list = Cons one inced in
