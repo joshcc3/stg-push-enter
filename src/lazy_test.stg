@@ -1,14 +1,14 @@
-data Int = I' I_val |
+data Int = I I_valB |
 data Pair = Pa P_fst P_snd |
 data List = Cons C_element C_next | Nil |
 data Unit = Unit |
 data Bool = True | False | 
 
 plus_int = \ (x1 Boxed) (y1 Boxed) -> case x1 of
-      I' a1 -> case y1 of 
-                 I' b1 -> let c1 = I' (#plus a1 b1) in c1;;
+      I a1 -> case y1 of 
+                 I b1 -> let c1 = I (#plus a1 b1) in c1;;
 
-main_ = let one = I' 1 in 
+main_ = let one = I 1 in 
       let inc = plus_int one in 
       let inced = map inc list in 
       let list = Cons one inced in 
@@ -17,7 +17,7 @@ main_ = let one = I' 1 in
       let element2 = head tail1 in 
       let element3 = plus_int element1 element2 in 
       case element3 of 
-        I' z -> #print_int z;
+        I z -> #print_int z;
 
 
 

@@ -41,7 +41,7 @@ conDecl = ConDecl <$>
     toDefn ix (n, fs) = ConDefn n ix fs
     conDefn = (,) <$> TP.identifier con <*> try (many field)
     field = fmap f $ TP.identifier con
-    f x = if x !! (l - 1) == '\'' then (take (l - 1) x ++ "__b", Boxed) else (x, Unboxed)
+    f x = if x !! (length x - 1) == 'B' then (x, Unboxed) else (x, Boxed)
       where
         l = length x
 
