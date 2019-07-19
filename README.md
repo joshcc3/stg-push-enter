@@ -2,7 +2,7 @@ stg-push-enter
 --------------
 
 Implementation of a compiler for an [stg-like](https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/GeneratedCode) language
-using the `push-enter` approach based on [this paper](http://simonmar.github.io/bib/papers/evalapplyjfp06.pdf).
+using the `push-enter` approach based on [this paper](http://simonmar.github.io/bib/papers/evalapplyjfp06.pdf) as a learning experience.
 
 # Features
  - Lazy Evaluation
@@ -21,8 +21,41 @@ using the `push-enter` approach based on [this paper](http://simonmar.github.io/
  - Stack Traces (TODO)
   
 # Examples
+The following examples need the stdlib mentioned at the end.
+## Infinite stream of Fibonacci numbers
+```
+main_ = let one = I 1 in 
+      let fibs = Cons one fibtail in
+      let fibtail = Cons one fibrest in
+      let fibrest = zipwith plus_int fibs fibtail in
+      print_int_list fibs
+```
+The above prints
+```
+1
+1
+2
+3
+5
+8
+...
+```
 
-Given the following prelude:
+## Divide and conquer squared function
+```
+
+square = \ n -> let n_div_2 = #div n 2 in
+                let sq_root = square n_div_2 in
+                let res = #mul sq_root sq_root
+                let is_div_2 = #mod n in
+                case is_div_2 of
+                    0 -> res
+                    1 -> let res2 = #mul res n in
+                         res2;
+```
+
+
+Stdlib of useful functions and data definitions that's to be included in all programs.
 ```
 data Int = I IB |
 data Unit = Unit |
@@ -69,24 +102,6 @@ seq = \ (a  Boxed) (b Boxed) -> case a of
                 x -> b;
 ```
 
-Below is the famous infinite fibonacci sequence.
-```
-main_ = let one = I 1 in 
-      let fibs = Cons one fibtail in
-      let fibtail = Cons one fibrest in
-      let fibrest = zipwith plus_int fibs fibtail in
-      print_int_list fibs
-```
-The above prints
-```
-1
-1
-2
-3
-5
-8
-...
-```
 
 # Language Spec
 See the paper (page 4, 5) for a more detailed description of the constructs.
@@ -122,12 +137,10 @@ prog := f1 = obj1; f2 = obj2; f3 = obj3 ...
 I've changed the grammar slightly and added `primops` to an `atom`. This is to allow them to be used in constructors/function calls, etc. Unboxed types are not allowed to be lifted values (values that can evaluate to bottom - thunks mainly) so you can't instantiate them in a let binding.
 
 # Compile an STG program
-Write an STG program and save it in `<file>.stg`, then run `./compile <path>` - (TODO)
+Write an STG program and save it in `<file>.stg`, then run `./Main <path> <out>; ./compile_<out>.sh to get a binary.`
 
-The parser frontend is unimplemented, currently.
-Instead, prepare your program in the edsl by creating a value of type `Program`. Then you run `compile` on the value also passing in the c output file name. This generates a `.c` file in `c_out/out` and a `.sh` file in `c_out/`. The `.sh` file compiles the generated C code against my `rts` library and produces a binary in `c_out/`.
-
-
+## Sad
+ Then you run `compile` on the value also passing in the c output file name. This generates a `.c` file in `c_out/out` and a `.sh` file in `c_out/`. The `.sh` file compiles the generated C code against my `rts` library and produces a binary in `c_out/`.
 
 # Details
 ##  Memory Representation of Heap Objects

@@ -1,0 +1,9 @@
+
+square = \ n -> let n_div_2 = #div n 2 in
+                let sq_root = square n_div_2 in
+                let res = #mul sq_root sq_root
+                let is_div_2 = #mod n in
+                case is_div_2 of
+                    0 -> res
+                    1 -> let res2 = #mul res n in
+                         res2;
