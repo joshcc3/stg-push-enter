@@ -23,23 +23,58 @@ using the `push-enter` approach based on [this paper](http://simonmar.github.io/
 # Examples
 The following examples need the stdlib mentioned at the end.
 ## Infinite stream of Fibonacci numbers
+Equivalent to the haskell definition 
+```haskell
+fibs = 0:1: map plus_uncurried tailFibTail
+   where
+     plus_uncurried = uncurry (+)
+     fibTail = tail fibs 
+     tailFibTail = zip fibs fibTail
 ```
-main_ = let fibs = Cons zero fibsTail in 
-        let fibsTail = Cons one rest in
-        let rest = map plus_uncurried zipped in
-        let zipped = zip fibs fibsTail in
+```haskell
+main_ = let zero = I 0 in
+        let one = I 1 in
+        let n = I 30 in
         let plus_uncurried = uncurry $! plus_int in
-        print_int_list fibs
+        let consecutiveFibPairs = zip fibs fibsTail in
+        let tailFibsTail = map plus_uncurried consecutiveFibPairs in
+        let fibsTail = Cons one tailFibsTail in
+        let fibs = Cons zero fibsTail in 
+        let actualList = take n fibs in
+        print_int_list actualList
 ```
 The above prints
 ```
+0
 1
 1
 2
 3
 5
 8
-...
+13
+21
+34
+55
+89
+144
+233
+377
+610
+987
+1597
+2584
+4181
+6765
+10946
+17711
+28657
+46368
+75025
+121393
+196418
+317811
+514229
 ```
 
 ## Divide and conquer squared function
@@ -61,14 +96,15 @@ Stdlib of useful functions and data definitions that's to be included in all pro
 data Int = I IB |
 data Unit = Unit |
 data List = Cons V List | Nil |
+data Pair = Pair Fst Snd |
 
 zipwith = \ (f Boxed) (l1 Boxed) (l2 Boxed) -> case l1 of
   Cons x y -> case l2 of 
                 Cons a b -> let new_elem = f x a in
                             let new_tail = zipwith f y b in
                             let zipped = Cons new_elem new_tail in
-                            zipped;
-                Nil -> let res = Nil in res
+                            zipped
+                Nil -> let res = Nil in res;
   Nil -> let res = Nil in res;
 
 map = \ (f  Boxed) (l  Boxed) -> case l of
@@ -78,7 +114,7 @@ map = \ (f  Boxed) (l  Boxed) -> case l of
                res
    Nil -> let res = Nil in res;
 
-plus_int = \(x1  Boxed) (y1  Boxed) -> case x1 of 
+plus_int = \ (x1  Boxed) (y1  Boxed) -> case x1 of 
       I a1 -> case y1 of 
                  I b1 -> let c1 = I (#plus a1 b1) in c1;;
 
@@ -87,22 +123,43 @@ print_int_list = \ (l  Boxed) -> case l of
                                I x -> let rest = print_int_list n in
                                        let inner = seq (#print_int x) rest in
                                        let unit = Unit in
-                                       seq inner unit;;
+                                       seq inner unit;
+                 Nil -> let unit = Unit in unit;
 
 take = \ (n  Boxed) (l Boxed) -> case n of
-  I x -> case x of 
-    0 -> let res = Nil in res
-    n2 -> case l of
-           Cons h t -> let n3 = #sub n2 1 in
-                      let n4 = I n3 in
-                      let rest = take n4 t in
+  I x -> case #eq x 0 of 
+    1 -> let res = Nil in res
+    0 -> case l of
+           Cons h t -> let n2 = I (#sub x 1) in
+                      let rest = take n2 t in
                       let res = Cons h rest in
-                      res ;;;
+                      res
+           Nil -> let res = #exception in res;;;
 
 seq = \ (a  Boxed) (b Boxed) -> case a of
                 x -> b;
+
+tail = \ (l Boxed) -> case l of
+           Cons v n -> n
+           Nil -> #exception;
+
+zip = \ (l1 Boxed) (l2 Boxed) -> case l1 of
+              Nil -> let res = Nil in res
+              Cons a an -> case l2 of
+                             Nil -> let res = Nil in res
+                             Cons b bn -> let p = Pair a b in
+                                          let rest = zip an bn in
+                                          let res = Cons p rest in
+                                          res;;
+
+
+uncurry = \ (f Boxed) (p Boxed) -> case p of
+                Pair a b -> f a b;
 ```
 
+# Bugs
+ - Arguments to constructors must be declared before they are used
+ - Top level functions must be assigned to a function scoped variable before they can be used
 
 # Language Spec
 See the paper (page 4, 5) for a more detailed description of the constructs.

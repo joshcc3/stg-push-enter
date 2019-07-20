@@ -28,7 +28,8 @@ print_int_list = \ (l  Boxed) -> case l of
                                I x -> let rest = print_int_list n in
                                        let inner = seq (#print_int x) rest in
                                        let unit = Unit in
-                                       seq inner unit;;
+                                       seq inner unit;
+                 Nil -> let unit = Unit in unit;
 
 take = \ (n  Boxed) (l Boxed) -> case n of
   I x -> case #eq x 0 of 
@@ -60,12 +61,13 @@ zip = \ (l1 Boxed) (l2 Boxed) -> case l1 of
 uncurry = \ (f Boxed) (p Boxed) -> case p of
                 Pair a b -> f a b;
 
-main_ = let zipped = zip fibs fibTail in
-        let mapped = map plus_uncurried zipped in
-        let fibTail = tail fibs in
-        let plus_uncurried = uncurry $! plus_int in
+main_ = let zero = I 0 in
         let one = I 1 in
-        let fibsT = Cons one mapped in
-        let zero = I 0 in
-        let fibs = Cons zero fibsT in 
-        print_int_list fibs
+        let n = I 30 in
+        let plus_uncurried = uncurry $! plus_int in
+        let consecutiveFibPairs = zip fibs fibsTail in
+        let tailFibsTail = map plus_uncurried consecutiveFibPairs in
+        let fibsTail = Cons one tailFibsTail in
+        let fibs = Cons zero fibsTail in 
+        let actualList = take n fibs in
+        print_int_list actualList
