@@ -1,9 +1,29 @@
+data Int = I IntB |
+data Unit = Unit |
 
-square = \ n -> let n_div_2 = #div n 2 in
-                let sq_root = square n_div_2 in
-                let res = #mul sq_root sq_root
-                let is_div_2 = #mod n in
-                case is_div_2 of
-                    0 -> res
-                    1 -> let res2 = #mul res n in
-                         res2;
+
+square = \ (n Boxed) -> case n of
+                         I v -> l
+
+
+square = \ (n Boxed) -> case n of
+                         I v -> let isbase = #lt v 2 in
+                                case isbase of
+                                   0 ->
+                                  1 ->
+
+                         let x = 1 in 1
+
+                              other -> let n_div_2 = #div n 2 in
+                           let sq_root = square n_div_2 in
+                           let res = #mul sq_root sq_root in
+                           let is_div_2 = #mod n 2 in
+                           case is_div_2 of
+                              0 -> res
+                              1 -> let res2 = #mul res 4 in
+                                   let res3 = I res2 in
+                                   res3;;
+
+main_ = let x = square 10 in
+        case x of
+          I v -> #print_int x;

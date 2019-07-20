@@ -15,6 +15,7 @@ import Control.Applicative
 import Data.List
 import Data.Monoid
 import Bookeeping
+import Data.Char
 
 debug = undefined
 
@@ -484,6 +485,7 @@ ref cont(hash_map *bindings)
     }
 }
 -}
+rawIntConDefn x = ConDefn x 0 []
 
 -- TODO: a case doesn't actually compile to this, this is just the case continuation
 -- TODO: A case actually compiles to a return case_name(bindings);
@@ -520,7 +522,12 @@ generateCaseCont name (Case (V var_name) es) = do
     thunkCase var_key name = assert (s "$$ == $$" [ptrAccess info_table "type", "5"]):
                              tailCall "thunk_continuation" [(var_ref, Boxed), (name, Boxed), ("bindings", Boxed), (var_key, Unboxed), (var_ref, Boxed)]
     caseIf (AltCase conName freeVars exp) = do
-            [conDefn] <- uses (conMap.ix conName) (:[])
+            conDefnList <- uses (conMap.ix conName) (:[])
+            let conDefn = if null conDefnList
+                          then if all isDigit conName
+                          then rawIntConDefn conName
+                          else error $ s "$$ is undefined" [conName]
+                          else head conDefnList
             let expectedConNum = conTag conDefn
                 cond = s "$$ == $$" [actualConNum, show expectedConNum]
             ifBody <- do
@@ -628,7 +635,7 @@ evalPrimop res (Primop op [V x, L y]) = do
                                        maybe (error op) id $ M.lookup op_ cOps,
                                        show y]
    ]
-    
+evalPrimop res a = error (show a)
 
 
 eval :: Expression -> MonStack [String]
