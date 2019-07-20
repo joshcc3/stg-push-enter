@@ -23,14 +23,6 @@ using the `push-enter` approach based on [this paper](http://simonmar.github.io/
 # Examples
 The following examples need the stdlib mentioned at the end.
 ## Infinite stream of Fibonacci numbers
-Equivalent to the haskell definition 
-```haskell
-fibs = 0:1: map plus_uncurried tailFibTail
-   where
-     plus_uncurried = uncurry (+)
-     fibTail = tail fibs 
-     tailFibTail = zip fibs fibTail
-```
 ```haskell
 main_ = let zero = I 0 in
         let one = I 1 in
@@ -77,22 +69,34 @@ The above prints
 514229
 ```
 
-## Divide and conquer squared function
+Based on the haskell definition:
+```haskell
+Equivalent to the haskell definition 
+```haskell
+fibs = 0:1: map plus_uncurried (zip fibs (tail fibs))
+   where
+     plus_uncurried = uncurry (+)
 ```
 
-square = \ n -> let n_div_2 = #div n 2 in
-                let sq_root = square n_div_2 in
-                let res = #mul sq_root sq_root
-                let is_div_2 = #mod n in
-                case is_div_2 of
-                    0 -> res
-                    1 -> let res2 = #mul res n in
-                         res2;
+
+## Divide and conquer integer exponent function
+```haskell
+
+pow = \ (n Boxed) (exp Boxed) -> case n of
+    I 0 -> let res = I 1 in res
+    I 1 -> let res = n in res
+    I v -> let n_div_2 = I (#div n 2) in
+           let square_half = square n_div_2 in
+           let interm_res = mul_int square_half square_half in
+           let res = mul_int (I 4) interm_res in
+           case #mod n 2 in of
+              0 -> res
+              1 -> let result = mul_int res n in result;;
 ```
 
 
 Stdlib of useful functions and data definitions that's to be included in all programs.
-```
+```haskell
 data Int = I IB |
 data Unit = Unit |
 data List = Cons V List | Nil |
@@ -163,7 +167,7 @@ uncurry = \ (f Boxed) (p Boxed) -> case p of
 
 # Language Spec
 See the paper (page 4, 5) for a more detailed description of the constructs.
-```
+```haskell
 atom:  a1 .. an
 
 
@@ -199,9 +203,6 @@ Run `./compile_compiler.sh` which will produce the binary in `c_out/`.
 
 # Compile an STG program
 Write an STG program and save it in `<file>.stg`.  then within `c_out` run `./Main <path to file.stg> <out>`.
-
-## Sad
- Then you run `compile` on the value also passing in the c output file name. This generates a `.c` file in `c_out/out` and a `.sh` file in `c_out/`. The `.sh` file compiles the generated C code against my `rts` library and produces a binary in `c_out/`.
 
 # Details
 ##  Memory Representation of Heap Objects
