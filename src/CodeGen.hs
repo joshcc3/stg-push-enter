@@ -621,7 +621,7 @@ evalPrimop res (Primop op [V x, V y]) = do
 evalPrimop res (Primop op [V x, L y]) = do
   bindings <- use stringBindings
   if length (bindings ^.. ix x) == 0
-  then error . show $ bindings
+  then error $ s "$$: $$" [x, show bindings]
   else return ()
   let [xkey] = bindings ^.. ix x
       x_ref = s "$$_ref" [x]
@@ -680,7 +680,9 @@ eval (FuncCall fun args) = do
     let toArgInit (a@(V x), (_, Unboxed)) = return ([], (a, Nothing, Unboxed))
         toArgInit (a@(V x), (_, Boxed)) = do
                                         x_decl <- decl "ref" x
-                                        return ([x_decl, getBinding (al $ M.lookup x bindings) x], (a, Nothing, Boxed))
+                                        return (
+                                          [x_decl, getBinding (alWithCtx (fun, x, bindings) $ M.lookup x bindings) x], 
+                                          (a, Nothing, Boxed))
         toArgInit (a@(L _), (_, boxed)) = return ([], (a, Nothing, boxed)) -- pass them directly
         toArgInit (a@(P p), (_, boxed)) = do
           freshName >>= \n -> evalPrimop n p >>= \sts -> return (sts, (a, Just n, boxed))

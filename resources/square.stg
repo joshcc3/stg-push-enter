@@ -7,7 +7,7 @@ square = \ (n Boxed) ->
     I v -> let isbase = I (#lt v 2) in
       case isbase of
          I 1 -> let res = I 1 in res
-         other -> let n_div_2 = I (#div n 2) in
+         I z -> let n_div_2 = I (#div n 2) in
                   let sq_root = square n_div_2 in
                   let res = I (#mul sq_root sq_root) in
                   case #mod n 2 in of

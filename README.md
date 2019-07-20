@@ -24,11 +24,12 @@ using the `push-enter` approach based on [this paper](http://simonmar.github.io/
 The following examples need the stdlib mentioned at the end.
 ## Infinite stream of Fibonacci numbers
 ```
-main_ = let one = I 1 in 
-      let fibs = Cons one fibtail in
-      let fibtail = Cons one fibrest in
-      let fibrest = zipwith plus_int fibs fibtail in
-      print_int_list fibs
+main_ = let fibs = Cons zero fibsTail in 
+        let fibsTail = Cons one rest in
+        let rest = map plus_uncurried zipped in
+        let zipped = zip fibs fibsTail in
+        let plus_uncurried = uncurry $! plus_int in
+        print_int_list fibs
 ```
 The above prints
 ```
@@ -136,8 +137,11 @@ prog := f1 = obj1; f2 = obj2; f3 = obj3 ...
 
 I've changed the grammar slightly and added `primops` to an `atom`. This is to allow them to be used in constructors/function calls, etc. Unboxed types are not allowed to be lifted values (values that can evaluate to bottom - thunks mainly) so you can't instantiate them in a let binding.
 
+# Build the compiler
+Run `./compile_compiler.sh` which will produce the binary in `c_out/`.
+
 # Compile an STG program
-Write an STG program and save it in `<file>.stg`, then run `./Main <path> <out>; ./compile_<out>.sh to get a binary.`
+Write an STG program and save it in `<file>.stg`.  then within `c_out` run `./Main <path to file.stg> <out>`.
 
 ## Sad
  Then you run `compile` on the value also passing in the c output file name. This generates a `.c` file in `c_out/out` and a `.sh` file in `c_out/`. The `.sh` file compiles the generated C code against my `rts` library and produces a binary in `c_out/`.

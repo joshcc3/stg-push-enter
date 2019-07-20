@@ -1,14 +1,15 @@
 data Int = I IB |
 data Unit = Unit |
 data List = Cons V List | Nil |
+data Pair = Pair Fst Snd |
 
 zipwith = \ (f Boxed) (l1 Boxed) (l2 Boxed) -> case l1 of
   Cons x y -> case l2 of 
                 Cons a b -> let new_elem = f x a in
                             let new_tail = zipwith f y b in
                             let zipped = Cons new_elem new_tail in
-                            zipped;
-                Nil -> let res = Nil in res
+                            zipped
+                Nil -> let res = Nil in res;
   Nil -> let res = Nil in res;
 
 map = \ (f  Boxed) (l  Boxed) -> case l of
@@ -18,7 +19,7 @@ map = \ (f  Boxed) (l  Boxed) -> case l of
                res
    Nil -> let res = Nil in res;
 
-plus_int = \(x1  Boxed) (y1  Boxed) -> case x1 of 
+plus_int = \ (x1  Boxed) (y1  Boxed) -> case x1 of 
       I a1 -> case y1 of 
                  I b1 -> let c1 = I (#plus a1 b1) in c1;;
 
@@ -30,23 +31,41 @@ print_int_list = \ (l  Boxed) -> case l of
                                        seq inner unit;;
 
 take = \ (n  Boxed) (l Boxed) -> case n of
-  I x -> case x of 
-    0 -> let res = Nil in res
-    n2 -> case l of
-           Cons h t -> let n3 = #sub n2 1 in
-                      let n4 = I n3 in
-                      let rest = take n4 t in
+  I x -> case #eq x 0 of 
+    1 -> let res = Nil in res
+    0 -> case l of
+           Cons h t -> let n2 = I (#sub x 1) in
+                      let rest = take n2 t in
                       let res = Cons h rest in
-                      res ;;;
+                      res
+           Nil -> let res = #exception in res;;;
 
 seq = \ (a  Boxed) (b Boxed) -> case a of
                 x -> b;
 
-main_ = let one = I 1 in 
-      let fibs = Cons one fibtail in
-      let fibrest = zipwith plus_int fibs fibtail in
-      let fibtail = Cons one fibrest in
-      let count = I 10 in
-      let ans = take count fibs in
-      print_int_list ans
+tail = \ (l Boxed) -> case l of
+           Cons v n -> n
+           Nil -> #exception;
 
+zip = \ (l1 Boxed) (l2 Boxed) -> case l1 of
+              Nil -> let res = Nil in res
+              Cons a an -> case l2 of
+                             Nil -> let res = Nil in res
+                             Cons b bn -> let p = Pair a b in
+                                          let rest = zip an bn in
+                                          let res = Cons p rest in
+                                          res;;
+
+
+uncurry = \ (f Boxed) (p Boxed) -> case p of
+                Pair a b -> f a b;
+
+main_ = let zipped = zip fibs fibTail in
+        let mapped = map plus_uncurried zipped in
+        let fibTail = tail fibs in
+        let plus_uncurried = uncurry $! plus_int in
+        let one = I 1 in
+        let fibsT = Cons one mapped in
+        let zero = I 0 in
+        let fibs = Cons zero fibsT in 
+        print_int_list fibs

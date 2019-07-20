@@ -6,7 +6,42 @@ import Control.Monad
 import Control.Monad.State    
 import Control.Lens hiding (cons)
 import Utils
-import Main
+import System.Environment
+import Text.Parsec
+import System.Process
+import System.Exit
+
+
+
+runShellCmd cmd failureMsg = do
+  exit <- system cmd
+  case exit of
+    ExitSuccess -> return ()
+    ExitFailure code -> error $ s "$$: $$" [cmd, failureMsg]
+
+{-
+given a program and outfile (without extension):
+      it gens the statements
+      writes it out to a file outfile in c_out/out
+      and then writes out the compile instruction to c_out/compile_<outfile>.sh
+-}
+compile :: Program -> String -> IO ()
+compile prog out_name = do
+  let content = toProgram prog
+      outfile = s "$$/$$.c" ["../c_out/out", out_name]
+      compile_string = s "gcc  -std=c11 -Wall -ggdb -I rts/src/ -I . $$.c rts/src/stg/plus_int/stack.c rts/src/stg/plus_int/static.c rts/src/stg/heap.c rts/src/data/string_.c rts/src/containers/mmanager.c rts/src/containers/arraylist.c rts/src/stg/bindings.c rts/src/stg/math.c rts/src/typeclasses.c rts/src/stg/util.c rts/src/containers/llist.c rts/src/containers/hash_set.c rts/src/containers/resizable_array.c rts/src/containers/hash_map.c\n" [outfile]
+      cout = s "$$.c" [outfile]
+      compile_script_path = s "../c_out/compile_$$.sh" [out_name]
+      compile_script_dir = "../c_out/" 
+  putStrLn $ s "Compiling to $$" [cout]
+  writeFile cout content
+  putStrLn $ s "Writing compile script to $$" [compile_script_path]
+  writeFile compile_script_path compile_string
+  runShellCmd (s "chmod u+x $$" [compile_script_path]) "Failed to permission compile script"
+  runShellCmd (s "cd $$ && ./$$" [compile_script_dir, compile_script_path]) "Failed to compile program"
+  putStrLn $ s "Compilation of $$ complete." [out_name]
+  putStrLn ""
+
 
 {-
 main = let one = I# 1
@@ -369,7 +404,8 @@ testSuite = [(plus_int_test, "plus_int_test"),
              (list_test2, "list_test2"),
              (fibo_test, "fibo_test"),
              (fibo_test2, "fibo_test2"),
-             (brokenTest2, "broken_test2")]            
+             (brokenTest2, "broken_test2"),            
+             (broken_fibo, "broken_fibo")]            
 
 
 test = do
@@ -503,3 +539,97 @@ brokenTest = Program
                                               (Case (V "main__element3") [
                                                   AltCase "I" ["main__z"] (Atom (P (Primop "#print_int" [V "main__z"])))])))))))))))]
               
+
+
+broken_fibo = Program [
+  ConDecl "Int" [ConDefn {conName = "I", conTag = 0, conFields = [("IB",Unboxed)]}],
+  ConDecl "Unit" [ConDefn {conName = "Unit", conTag = 0, conFields = []}],
+  ConDecl "List" [ConDefn {conName = "Cons", conTag = 0, conFields = [("V",Boxed),("List",Boxed)]},
+  ConDefn {conName = "Nil", conTag = 1, conFields = []}],
+  ConDecl "Pair" [ConDefn {conName = "Pa", conTag = 0, conFields = [("Fst",Boxed),("Snd",Boxed)]}]] 
+  [("zipwith",FUNC (Fun [("zipwith_f",Boxed),("zipwith_l1",Boxed),("zipwith_l2",Boxed)] 
+    (Case (V "zipwith_l1") [
+      AltCase "Cons" ["zipwith_x","zipwith_y"] (Case (V "zipwith_l2") 
+         [AltCase "Cons" ["zipwith_a","zipwith_b"] 
+            (Let "zipwith_new_elem" (THUNK (FuncCall "zipwith_f" [V "zipwith_x",V "zipwith_a"])) 
+            (Let "zipwith_new_tail" (THUNK (FuncCall "zipwith" [V "zipwith_f",V "zipwith_y",V "zipwith_b"])) 
+            (Let "zipwith_zipped" (CON (Con "Cons" [V "zipwith_new_elem",V "zipwith_new_tail"])) 
+            (Atom (V "zipwith_zipped"))))),
+          AltCase "Nil" [] (Let "zipwith_res" (CON (Con "Nil" [])) (Atom (V "zipwith_res")))]),
+       AltCase "Nil" [] (Let "zipwith_res" (CON (Con "Nil" [])) (Atom (V "zipwith_res")))]))),
+   ("map",{-FUNC (Fun [("map_f",Boxed),("map_l",Boxed)] (Case (V "map_l") [
+      AltCase "Cons" ["map_x","map_y"] 
+        (Let "map_new_elem" (THUNK (FuncCall "map_f" [V "map_x"])) 
+        (Let "map_new_tail" (THUNK (FuncCall "map" [V "map_f",V "map_y"])) 
+        (Let "map_res" (CON (Con "Cons" [V "map_new_elem",V "map_new_tail"])) (Atom (V "map_res"))))),
+      AltCase "Nil" [] (Let "map_res" (CON (Con "Nil" [])) (Atom (V "map_res")))]))),-} FUNC map_fn),
+    ("plus_int", {-FUNC (Fun [("plus_int_x1",Boxed),("plus_int_y1",Boxed)] 
+      (Case (V "plus_int_x1") [
+        AltCase "I" ["plus_int_a1"] (Case (V "plus_int_y1") [
+            AltCase "I" ["plus_int_b1"] 
+              (Let "plus_int_c1" (CON (Con "I" [P (Primop "#plus" [V "plus_int_a1",V "plus_int_b1"])])) (Atom (V "plus_int_c1")))])]))),
+      -} FUNC plus_int),
+     ("print_i_list", {-FUNC (Fun [("print_int_list_l",Boxed)] (Case (V "print_int_list_l") [
+        AltCase "Cons" ["print_int_list_v","print_int_list_n"] 
+          (Case (V "print_int_list_v") [
+            AltCase "I" ["print_int_list_x"] (
+              Let "print_int_list_rest" (THUNK (FuncCall "print_int_list" [V "print_int_list_n"])) 
+                (Let "print_int_list_inner" (THUNK (FuncCall "seq" [P (Primop "#print_int" [V "print_int_list_x"]),V "print_int_list_rest"]))
+                (Let "print_int_list_unit" (CON (Con "Unit" [])) (FuncCall "seq" [V "print_int_list_inner",V "print_int_list_unit"]))))])]))),
+      -} FUNC print_i_list_fn),          
+    ("take",FUNC (Fun [("take_n",Boxed),("take_l",Boxed)] 
+      (Case (V "take_n") [
+        AltCase "I" ["take_x"] (Case (P (Primop "#eq" [V "take_x",L 0]))  [
+          AltCase "1" [] (Let "take_res" (CON (Con "Nil" [])) (Atom (V "take_res"))),
+          AltCase "0" [] (Case (V "take_l") [
+                            AltCase "Cons" ["take_h","take_t"] 
+                              (Let "take_n2" (CON (Con "I" [P (Primop "#sub" [V "take_x",L 1])])) 
+                                (Let "take_rest" (THUNK (FuncCall "take" [V "take_n2",V "take_t"])) 
+                                  (Let "take_res" (CON (Con "Cons" [V "take_h",V "take_rest"])) (Atom (V "take_res"))))),
+                            AltCase "Nil" [] (Let "take_res" (THUNK (Atom (P (Primop "#exception" [])))) (Atom (V "take_res")))])])]))),
+    ("seq", {-FUNC (Fun [("seq_a",Boxed),("seq_b",Boxed)] (Case (V "seq_a") [AltForce "seq_x" (Atom (V "seq_b"))]))),-}
+      FUNC seq_fn),
+    
+    {-tail_fn = Fun [("ta_l", Boxed)] $
+          Case (V "ta_l") $ [
+                    AltCase "Cons" ["ta_v", "ta_n"] (Atom $ V "ta_n"),
+                    AltCase "Nil" [] (Atom . P $ Primop "#exception" [])
+                    ]
+    -}
+    ("tail",FUNC (Fun [("tail_l",Boxed)] (Case (V "tail_l") [
+        AltCase "Cons" ["tail_v", "tail_n"] (Atom (V "tail_v")),
+        AltCase "Nil" [] (Atom (P (Primop "#exception" [])))]))),
+        --FUNC tail_fn),
+    ("zip", FUNC (Fun [("zip_l1",Boxed),("zip_l2",Boxed)] (Case (V "zip_l1") [
+      AltCase "Nil" [] (Let "zip_res" (CON (Con "Nil" [])) (Atom (V "zip_res"))),
+      AltCase "Cons" ["zip_a","zip_an"] (Case (V "zip_l2") [
+          AltCase "Nil" [] (Let "zip_res" (CON (Con "Nil" [])) (Atom (V "zip_res"))),
+          AltCase "Cons" ["zip_b","zip_bn"] (Let "zip_p" (CON (Con "Pa" [V "zip_a",V "zip_b"])) 
+                                            (Let "zip_rest" (THUNK (FuncCall "zip" [V "zip_an",V "zip_bn"])) 
+                                            (Let "zip_res" (CON (Con "Cons" [V "zip_p",V "zip_rest"])) 
+                                            (Atom (V "zip_res")))))])]
+      ))),
+     -- -} FUNC zip_fn),                                       
+    ("uncurry", FUNC (Fun [("uncurry_f",Boxed),("uncurry_p",Boxed)] 
+        (Case (V "uncurry_p") [AltCase "Pa" ["uncurry_a","uncurry_b"] 
+                                --(Let "uncurry_res" (THUNK (FuncCall "uncurry_f" [V "uncurry_a",V "uncurry_b"])) 
+                                --(Atom (V "uncurry_res")))
+                                (FuncCall "uncurry_f" [V "uncurry_a",V "uncurry_b"])
+                              ]))),
+                              -- FUNC uncurry_fn),
+    ("main_", THUNK (Let "main__zipped" (THUNK (FuncCall "zip" [V "main__fibs",V "main__fibTail"])) 
+                    (Let "main__mapped" (THUNK (FuncCall "map" [V "main__plus_uncurried",V "main__zipped"])) 
+                    (Let "main__fibTail" (THUNK (FuncCall "tail" [V "main__fibs"])) 
+                    (Let "main__plus_uncurried" (PAP (Pap "uncurry" [V "plus_int"])) 
+                    (Let "main__one" (CON (Con "I" [L 1])) 
+                    (Let "main__fibsT" (CON (Con "Cons" [V "main__one",V "main__mapped"])) 
+                    (Let "main__zero" (CON (Con "I" [L 0])) 
+                    (Let "main__fibs" (CON (Con "Cons" [V "main__zero",V "main__fibsT"])) 
+                    (FuncCall "print_i_list" [V "main__fibs"]))))))))))
+  ]
+{-                                                  
+  Fun [("un_f", Boxed), ("un_p", Boxed)] $
+  Case (V "un_p") $ [
+            AltCase "Pa" ["un_a", "un_b"] $ FuncCall "un_f" [V "un_a", V "un_b"]
+            ]
+-}

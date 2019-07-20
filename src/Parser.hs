@@ -43,16 +43,15 @@ uniqueifyVars (Program c f) = Program c (map transform f)
           CON (Con c atoms) -> CON $ Con c (map handleAtom atoms)
           PAP (Pap p atoms) -> PAP $ Pap p (map handleAtom atoms)
         handleArg (a, t) = (handleVar a, t)
-        handleVar x = s "$$_$$" [prefix, x]
-        handleAtom (V x) = V$ handleVar x
+        handleVar x | elem x top_levels = x 
+                    | otherwise = s "$$_$$" [prefix, x]
+        handleAtom (V x) = V $ handleVar x
         handleAtom (P (Primop s atoms)) = P (Primop s (map handleAtom atoms))
         handleAtom x = x
         handleExpr (Atom a) = Atom $ handleAtom a
         handleExpr (Let n o e) = Let (handleVar n) (handleObject o) (handleExpr e)
         handleExpr (Case a alts) = Case (handleAtom a) (map handleAlt alts)
-        handleExpr (FuncCall n atoms)
-            | elem n top_levels = FuncCall n (map handleAtom atoms)
-            | otherwise = FuncCall (handleVar n) (map handleAtom atoms)
+        handleExpr (FuncCall n atoms) = FuncCall (handleVar n) (map handleAtom atoms)
         handleAlt (AltCase con vars e) = AltCase con (map handleVar vars) (handleExpr e)
         handleAlt (AltForce var expr) = AltForce (handleVar var) (handleExpr expr)
 
