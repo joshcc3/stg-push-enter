@@ -6,7 +6,14 @@ import Types
 import Utils
 import System.Environment
 import Text.Parsec
+import System.Process
+import System.Exit
 
+runShellCmd cmd failureMsg = do
+  exit <- system cmd
+  case exit of
+    ExitSuccess -> return ()
+    ExitFailure code -> error $ s "$$: $$" [cmd, failureMsg]
 
 {-
 given a program and outfile (without extension):
@@ -18,12 +25,14 @@ compile :: Program -> String -> IO ()
 compile prog outfile = do
   let content = toProgram prog
       compile_string = s "gcc  -std=c11 -Wall -ggdb -I rts/src/ -I . out/$$.c rts/src/stg/plus_int/stack.c rts/src/stg/plus_int/static.c rts/src/stg/heap.c rts/src/data/string_.c rts/src/containers/mmanager.c rts/src/containers/arraylist.c rts/src/stg/bindings.c rts/src/stg/math.c rts/src/typeclasses.c rts/src/stg/util.c rts/src/containers/llist.c rts/src/containers/hash_set.c rts/src/containers/resizable_array.c rts/src/containers/hash_map.c\n" [outfile]
-      cout = s "c_out/out/$$.c" [outfile]
-      compile_script = s "c_out/compile_$$.sh" [outfile]
+      cout = s "out/$$.c" [outfile]
+      compile_script = s "compile_$$.sh" [outfile]
   putStrLn $ s "Compiling to $$" [cout]
   writeFile cout content
   putStrLn $ s "Writing compile script to $$" [compile_script]
   writeFile compile_script compile_string
+  runShellCmd (s "chmod u+x ./compile_$$.sh" [outfile]) "Failed to permission compile script"
+  runShellCmd (s "./compile_$$.sh" [outfile]) "Failed to compile program"
   putStrLn $ s "Compilation of $$ complete." [outfile]
   putStrLn ""
 
